@@ -1,0 +1,30 @@
+services:
+  iraniu-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iraniu-app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3001}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_DIRECTORY_CHANNEL_ID: ${TELEGRAM_DIRECTORY_CHANNEL_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Iraniu <no-reply@example.com>}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      - iraniu_data:/app/server/data
+
+volumes:
+  iraniu_data:
