@@ -16,10 +16,14 @@ export default function AuthLoginLayout({ variant = "manager", badge, title, des
       <div className="auth-login__wrap">
         <header className="auth-login__hero">
           <Link to="/" className="auth-login__logo" aria-label="ایرانیو — صفحهٔ اصلی">
-            <span className="auth-login__logo-mark" aria-hidden="true">
-              ای
-            </span>
-            <span className="auth-login__logo-text">ایرانیو</span>
+            <img
+              src="/images/login-logo.png"
+              alt=""
+              className="auth-login__logo-img"
+              width={320}
+              height={80}
+              decoding="async"
+            />
           </Link>
           {badge ? (
             <span className="auth-login__badge">
@@ -28,12 +32,7 @@ export default function AuthLoginLayout({ variant = "manager", badge, title, des
             </span>
           ) : null}
           <h1 className="auth-login__title">{title}</h1>
-          <p className="auth-login__lead">{description}</p>
-          <ul className="auth-login__features">
-            <li>دسترسی امن با HTTPS</li>
-            <li>رمزنگاری رمز عبور روی سرور</li>
-            {v === "admin" ? <li>ورود دو مرحله‌ای در صورت فعال‌سازی</li> : <li>پنل اختصاصی کسب‌وکار شما</li>}
-          </ul>
+          {description ? <p className="auth-login__lead">{description}</p> : null}
         </header>
 
         <div className="auth-login__card" id="auth-login-panel">

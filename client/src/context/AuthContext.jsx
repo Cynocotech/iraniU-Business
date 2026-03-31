@@ -82,7 +82,11 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email, password, totp: totp || undefined }),
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.hint || data.error || String(r.status));
+      if (!r.ok) {
+        const err = new Error(data.hint || data.error || String(r.status));
+        if (data.error) err.code = data.error;
+        throw err;
+      }
       if (data.token) {
         writeToken(data.token);
         setTokenState(data.token);
@@ -102,7 +106,11 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email, password, totp: totp || undefined }),
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.hint || data.error || String(r.status));
+      if (!r.ok) {
+        const err = new Error(data.hint || data.error || String(r.status));
+        if (data.error) err.code = data.error;
+        throw err;
+      }
       if (data.token) {
         writeToken(data.token);
         setTokenState(data.token);
