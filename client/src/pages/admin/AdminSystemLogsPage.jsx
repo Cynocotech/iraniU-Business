@@ -89,7 +89,11 @@ export default function AdminSystemLogsPage({ embedded = false }) {
                   <td>{r.level || "info"}</td>
                   <td dir="ltr">
                     {r.actor_type}
-                    {r.actor_id ? `#${r.actor_id}` : ""}
+                    {r.actor_name
+                      ? ` — ${r.actor_name}`
+                      : r.actor_id
+                        ? ` #${r.actor_id}`
+                        : ""}
                   </td>
                   <td dir="ltr">{r.action}</td>
                   <td dir="ltr">

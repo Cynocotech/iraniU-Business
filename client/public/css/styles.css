@@ -2524,7 +2524,8 @@ body.app-shell-body .admin-topbar {
   max-height: 48px;
   object-fit: contain;
   object-position: center right;
-  background: transparent;
+  background: none;
+  background-color: transparent;
 }
 
 .app-shell__nav-title {

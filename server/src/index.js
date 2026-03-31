@@ -518,15 +518,30 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
   const where = [];
   const params = [];
   if (levelOk) {
-    where.push("level = ?");
+    where.push("sl.level = ?");
     params.push(level);
   }
   if (actorOk) {
-    where.push("actor_type = ?");
+    where.push("sl.actor_type = ?");
     params.push(actor);
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  const q = `SELECT * FROM system_logs ${whereSql} ORDER BY datetime(created_at) DESC, id DESC LIMIT ?`;
+  const q = `
+    SELECT sl.*,
+      COALESCE(sa.name, mg.name) AS actor_name
+    FROM system_logs sl
+    LEFT JOIN super_admins sa
+      ON sl.actor_type = 'superadmin'
+      AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
+      AND sa.id = CAST(sl.actor_id AS INTEGER)
+    LEFT JOIN managers mg
+      ON sl.actor_type = 'manager'
+      AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
+      AND mg.id = CAST(sl.actor_id AS INTEGER)
+    ${whereSql}
+    ORDER BY datetime(sl.created_at) DESC, sl.id DESC
+    LIMIT ?
+  `;
   const rows = db.prepare(q).all(...params, limit);
   res.json(rows);
 });
