@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { db, ensureRestaurantSafraDemo } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword } from "./authUtil.js";
-import { requireSuperAdmin } from "./authMiddleware.js";
+import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
@@ -38,6 +38,9 @@ const PATCHABLE_BUSINESS = new Set([
   "careers_title",
   "careers_text",
   "reservation_link",
+  "call_tracking_enabled",
+  "call_tracking_number",
+  "call_forward_number",
 ]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +55,7 @@ if (process.env.TRUST_PROXY === "1") {
 }
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use("/uploads", express.static(uploadsDir));
@@ -559,6 +563,11 @@ function updateBusinessBySlug(req, res) {
       updates[key] = v;
       continue;
     }
+    if (key === "call_tracking_enabled") {
+      const v = val === true || val === 1 || val === "1" ? 1 : 0;
+      updates[key] = v;
+      continue;
+    }
     if (key === "package") {
       updates[key] = String(val);
       continue;
@@ -701,6 +710,170 @@ app.post("/api/phone-click", (req, res) => {
     console.error("phone_clicks insert", e);
   }
   res.status(201).json({ ok: true });
+});
+
+function normalizePhone(raw) {
+  return String(raw || "").trim().replace(/\s+/g, "");
+}
+
+function twimlDial(to, slug) {
+  const safeTo = String(to).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const callbackBase = process.env.PUBLIC_SITE_URL || "";
+  const callbackUrl = callbackBase
+    ? `${callbackBase.replace(/\/+$/, "")}/api/twilio/voice/status?slug=${encodeURIComponent(slug)}`
+    : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="en-GB">Please wait while we connect your call.</Say>
+  <Dial callerId="${safeTo}" record="record-from-answer">
+    <Number${callbackUrl ? ` statusCallback="${callbackUrl}" statusCallbackEvent="initiated ringing answered completed"` : ""}>${safeTo}</Number>
+  </Dial>
+</Response>`;
+}
+
+app.post("/api/twilio/voice/incoming", (req, res) => {
+  const toNumber = normalizePhone(req.body?.To);
+  if (!toNumber) return res.status(400).send("missing to");
+  const biz = db
+    .prepare(
+      `SELECT b.slug, b.call_forward_number, b.phone, b.call_tracking_enabled, b.call_tracking_number,
+              m.twilio_phone_number
+       FROM businesses b
+       LEFT JOIN managers m ON m.id = b.manager_id
+       WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
+       LIMIT 1`
+    )
+    .get(toNumber);
+  if (!biz || !biz.call_tracking_enabled) {
+    return res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>`);
+  }
+  const forwardTo = normalizePhone(biz.call_forward_number || biz.phone);
+  if (!forwardTo) {
+    return res
+      .type("text/xml")
+      .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>No destination configured.</Say><Hangup/></Response>`);
+  }
+  res.type("text/xml").send(twimlDial(forwardTo, biz.slug));
+});
+
+app.post("/api/twilio/voice/status", (req, res) => {
+  const slugQ = String(req.query.slug || "").trim().toLowerCase();
+  const toNumber = normalizePhone(req.body?.To);
+  const slugByTo = toNumber
+    ? db
+        .prepare(
+          `SELECT b.slug
+           FROM businesses b
+           LEFT JOIN managers m ON m.id = b.manager_id
+           WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
+           LIMIT 1`
+        )
+        .get(toNumber)?.slug
+    : null;
+  const businessSlug = slugQ || slugByTo || null;
+  const callSid = String(req.body?.CallSid || "").trim() || null;
+  if (!callSid) return res.status(400).send("missing call sid");
+  const durationRaw = parseInt(String(req.body?.CallDuration || ""), 10);
+  const duration = Number.isFinite(durationRaw) ? durationRaw : null;
+  const payload = {
+    business_slug: businessSlug,
+    call_sid: callSid,
+    from_number: normalizePhone(req.body?.From) || null,
+    to_number: toNumber || null,
+    direction: String(req.body?.Direction || "").trim() || null,
+    status: String(req.body?.CallStatus || "").trim() || null,
+    duration_seconds: duration,
+    recording_url: String(req.body?.RecordingUrl || "").trim() || null,
+  };
+  db.prepare(
+    `INSERT INTO call_logs
+      (business_slug, call_sid, from_number, to_number, direction, status, duration_seconds, recording_url)
+     VALUES
+      (@business_slug, @call_sid, @from_number, @to_number, @direction, @status, @duration_seconds, @recording_url)
+     ON CONFLICT(call_sid) DO UPDATE SET
+      business_slug=excluded.business_slug,
+      from_number=excluded.from_number,
+      to_number=excluded.to_number,
+      direction=excluded.direction,
+      status=excluded.status,
+      duration_seconds=excluded.duration_seconds,
+      recording_url=excluded.recording_url`
+  ).run(payload);
+  res.json({ ok: true });
+});
+
+app.get("/api/manager/call-logs", requireManager, (req, res) => {
+  const limit = Math.min(300, Math.max(1, parseInt(String(req.query.limit || "100"), 10) || 100));
+  const rows = db
+    .prepare(
+      `SELECT c.*, b.name_fa AS business_name
+       FROM call_logs c
+       JOIN businesses b ON b.slug = c.business_slug
+       WHERE b.manager_id = ?
+       ORDER BY datetime(c.created_at) DESC, c.id DESC
+       LIMIT ?`
+    )
+    .all(req.auth.sub, limit);
+  res.json(rows);
+});
+
+app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
+  const m = db
+    .prepare(
+      `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
+       FROM managers WHERE id = ?`
+    )
+    .get(req.auth.sub);
+  if (!m) return res.status(404).json({ error: "not_found" });
+  const masked =
+    m.twilio_auth_token && String(m.twilio_auth_token).length > 4
+      ? `••••${String(m.twilio_auth_token).slice(-4)}`
+      : m.twilio_auth_token
+      ? "••••"
+      : null;
+  res.json({
+    twilio_account_sid: m.twilio_account_sid || "",
+    twilio_phone_number: m.twilio_phone_number || "",
+    twilio_auth_token_set: !!m.twilio_auth_token,
+    twilio_auth_token_masked: masked,
+  });
+});
+
+app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+  const updates = {};
+  if ("twilio_account_sid" in b) updates.twilio_account_sid = String(b.twilio_account_sid || "").trim() || null;
+  if ("twilio_phone_number" in b) updates.twilio_phone_number = String(b.twilio_phone_number || "").trim() || null;
+  if ("twilio_auth_token" in b) updates.twilio_auth_token = String(b.twilio_auth_token || "").trim() || null;
+  const keys = Object.keys(updates);
+  if (!keys.length) return res.status(400).json({ error: "no_fields" });
+  const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
+  db.prepare(`UPDATE managers SET ${setClause} WHERE id = @id`).run({ ...updates, id: req.auth.sub });
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "manager_twilio_settings_updated",
+    targetType: "manager",
+    targetId: req.auth.sub,
+    message: "Manager updated Twilio settings",
+    meta: { fields: keys.filter((k) => k !== "twilio_auth_token") },
+  });
+  const m = db
+    .prepare(
+      `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
+       FROM managers WHERE id = ?`
+    )
+    .get(req.auth.sub);
+  res.json({
+    twilio_account_sid: m?.twilio_account_sid || "",
+    twilio_phone_number: m?.twilio_phone_number || "",
+    twilio_auth_token_set: !!m?.twilio_auth_token,
+    twilio_auth_token_masked:
+      m?.twilio_auth_token && String(m.twilio_auth_token).length > 4
+        ? `••••${String(m.twilio_auth_token).slice(-4)}`
+        : m?.twilio_auth_token
+        ? "••••"
+        : null,
+  });
 });
 
 /** Google review redirect: increment SQLite then 302 */

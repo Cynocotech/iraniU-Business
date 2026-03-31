@@ -33,6 +33,9 @@ export default function DashboardBusinessForm({
   const [address, setAddress] = useState("");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [reservationLink, setReservationLink] = useState("");
+  const [callTrackingEnabled, setCallTrackingEnabled] = useState(false);
+  const [callTrackingNumber, setCallTrackingNumber] = useState("");
+  const [callForwardNumber, setCallForwardNumber] = useState("");
   const [promoTitle, setPromoTitle] = useState("");
   const [promoDescription, setPromoDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -57,6 +60,9 @@ export default function DashboardBusinessForm({
       setAddress(b.address || "");
       setGoogleReviewUrl(b.google_review_url || "");
       setReservationLink(b.reservation_link || "");
+      setCallTrackingEnabled(!!b.call_tracking_enabled);
+      setCallTrackingNumber(b.call_tracking_number || "");
+      setCallForwardNumber(b.call_forward_number || "");
       setPromoTitle(b.promo_title || "");
       setPromoDescription(b.promo_description || "");
       setCoverImageUrl(b.cover_image_url || "");
@@ -132,6 +138,9 @@ export default function DashboardBusinessForm({
         address,
         google_review_url: googleReviewUrl,
         reservation_link: reservationLink,
+        call_tracking_enabled: callTrackingEnabled ? 1 : 0,
+        call_tracking_number: callTrackingNumber,
+        call_forward_number: callForwardNumber,
         promo_title: promoTitle,
         promo_description: promoDescription,
         cover_image_url: coverImageUrl,
@@ -331,6 +340,41 @@ export default function DashboardBusinessForm({
             />
             <p className="field-hint">
               اگر پر شود، در صفحه عمومی دکمه «رزرو آنلاین» نمایش داده می‌شود و کاربر به این لینک منتقل می‌شود.
+            </p>
+          </div>
+          <div className="field field--block">
+            <label htmlFor="dash-call-track-enabled">فعالسازی شماره ابری و ثبت تماس (Twilio)</label>
+            <select
+              id="dash-call-track-enabled"
+              value={callTrackingEnabled ? "1" : "0"}
+              onChange={(e) => setCallTrackingEnabled(e.target.value === "1")}
+            >
+              <option value="0">غیرفعال</option>
+              <option value="1">فعال</option>
+            </select>
+          </div>
+          <div className="field field--block">
+            <label htmlFor="dash-call-track-number">شماره ابری (Twilio Number)</label>
+            <input
+              id="dash-call-track-number"
+              value={callTrackingNumber}
+              onChange={(e) => setCallTrackingNumber(e.target.value)}
+              dir="ltr"
+              placeholder="+44..."
+            />
+          </div>
+          <div className="field field--block">
+            <label htmlFor="dash-call-forward-number">شماره مقصد برای فوروارد</label>
+            <input
+              id="dash-call-forward-number"
+              value={callForwardNumber}
+              onChange={(e) => setCallForwardNumber(e.target.value)}
+              dir="ltr"
+              placeholder="+44..."
+            />
+            <p className="field-hint">
+              اگر خالی باشد، شماره اصلی کسب‌وکار استفاده می‌شود. در Twilio webhook را روی
+              <span dir="ltr"> /api/twilio/voice/incoming </span> بگذارید.
             </p>
           </div>
         </div>

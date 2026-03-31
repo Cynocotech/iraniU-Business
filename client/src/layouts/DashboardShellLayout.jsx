@@ -10,6 +10,8 @@ const NAV = [
   { to: "/dashboard/edit", label: "ویرایش آگهی" },
   { to: "/dashboard/careers", label: "فرصت‌های شغلی" },
   { to: "/dashboard/media", label: "تصاویر" },
+  { to: "/dashboard/twilio", label: "تنظیمات Twilio" },
+  { to: "/dashboard/calls", label: "لاگ تماس‌ها" },
   { to: "/dashboard/qr", label: "QR نظر Google" },
   { to: "/dashboard/biolink", label: "لینک‌های من (Biolink)" },
 ];

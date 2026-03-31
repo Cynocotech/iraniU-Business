@@ -23,6 +23,8 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-}
       EMAIL_FROM: ${EMAIL_FROM:-Iraniu <no-reply@example.com>}
       TRUST_PROXY: ${TRUST_PROXY:-1}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
     volumes:
       - iraniu_data:/app/server/data
 

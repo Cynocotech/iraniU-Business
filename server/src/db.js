@@ -79,6 +79,9 @@ function migrateBusinessesColumns() {
     ["careers_title", "TEXT"],
     ["careers_text", "TEXT"],
     ["reservation_link", "TEXT"],
+    ["call_tracking_enabled", "INTEGER NOT NULL DEFAULT 0"],
+    ["call_tracking_number", "TEXT"],
+    ["call_forward_number", "TEXT"],
   ];
   for (const [col, typ] of add) {
     if (!names.has(col)) {
@@ -158,6 +161,19 @@ function ensureAdminTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_reservations_business_date ON reservations(business_slug, reservation_date);
     CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
+    CREATE TABLE IF NOT EXISTS call_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_slug TEXT,
+      call_sid TEXT UNIQUE,
+      from_number TEXT,
+      to_number TEXT,
+      direction TEXT,
+      status TEXT,
+      duration_seconds INTEGER,
+      recording_url TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_call_logs_business ON call_logs(business_slug, created_at DESC);
     CREATE TABLE IF NOT EXISTS business_categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE NOT NULL,
@@ -198,6 +214,9 @@ function migrateAuthTables() {
     ["telegram_bot_token", "TEXT"],
     ["telegram_chat_id", "TEXT"],
     ["avatar_url", "TEXT"],
+    ["twilio_account_sid", "TEXT"],
+    ["twilio_auth_token", "TEXT"],
+    ["twilio_phone_number", "TEXT"],
   ];
   for (const [col, typ] of mAdd) {
     if (!mNames.has(col)) {

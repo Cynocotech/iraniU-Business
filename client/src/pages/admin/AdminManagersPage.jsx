@@ -10,6 +10,7 @@ export default function AdminManagersPage() {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState(null);
   const [rowPw, setRowPw] = useState({});
+  const [rowTwilio, setRowTwilio] = useState({});
 
   const load = () => {
     apiGet("/api/managers").then(setRows).catch(() => setRows([]));
@@ -47,6 +48,33 @@ export default function AdminManagersPage() {
       setRowPw((prev) => ({ ...prev, [id]: "" }));
       load();
       setMsg(`رمز مدیر ${id} به‌روز شد.`);
+    } catch (err) {
+      setMsg(err.message || String(err));
+    }
+  };
+
+  const saveRowTwilio = async (id) => {
+    const row = rowTwilio[id] || {};
+    setMsg(null);
+    try {
+      const payload = {
+        twilio_account_sid: row.twilio_account_sid || "",
+        twilio_phone_number: row.twilio_phone_number || "",
+      };
+      if ((row.twilio_auth_token || "").trim()) payload.twilio_auth_token = row.twilio_auth_token.trim();
+      const data = await apiPatchUrl(`/api/admin/managers/${id}/twilio-settings`, payload);
+      setRowTwilio((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          twilio_account_sid: data.twilio_account_sid || "",
+          twilio_phone_number: data.twilio_phone_number || "",
+          twilio_auth_token: "",
+          twilio_auth_token_set: !!data.twilio_auth_token_set,
+          twilio_auth_token_masked: data.twilio_auth_token_masked || "",
+        },
+      }));
+      setMsg(`تنظیمات Twilio مدیر ${id} ذخیره شد.`);
     } catch (err) {
       setMsg(err.message || String(err));
     }
@@ -116,6 +144,7 @@ export default function AdminManagersPage() {
                 <th>ایمیل</th>
                 <th>رمز / ۲FA</th>
                 <th>تلفن</th>
+                <th>Twilio</th>
                 <th>تاریخ ثبت</th>
                 <th>آگهی‌های وابسته</th>
                 <th>پنل</th>
@@ -145,6 +174,65 @@ export default function AdminManagersPage() {
                     </div>
                   </td>
                   <td dir="ltr">{r.phone || "—"}</td>
+                  <td style={{ minWidth: "14rem", fontSize: "0.85rem" }}>
+                    <div className="field" style={{ marginBottom: "0.35rem" }}>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        placeholder="Account SID"
+                        value={rowTwilio[r.id]?.twilio_account_sid ?? r.twilio_account_sid ?? ""}
+                        onChange={(e) =>
+                          setRowTwilio((prev) => ({
+                            ...prev,
+                            [r.id]: {
+                              ...prev[r.id],
+                              twilio_account_sid: e.target.value,
+                              twilio_phone_number: prev[r.id]?.twilio_phone_number ?? r.twilio_phone_number ?? "",
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="field" style={{ marginBottom: "0.35rem" }}>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        placeholder="Twilio Number"
+                        value={rowTwilio[r.id]?.twilio_phone_number ?? r.twilio_phone_number ?? ""}
+                        onChange={(e) =>
+                          setRowTwilio((prev) => ({
+                            ...prev,
+                            [r.id]: {
+                              ...prev[r.id],
+                              twilio_phone_number: e.target.value,
+                              twilio_account_sid: prev[r.id]?.twilio_account_sid ?? r.twilio_account_sid ?? "",
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <input
+                        type="password"
+                        dir="ltr"
+                        placeholder={
+                          rowTwilio[r.id]?.twilio_auth_token_set || r.twilio_auth_token_set
+                            ? `Token: ${rowTwilio[r.id]?.twilio_auth_token_masked || r.twilio_auth_token_masked || "••••"}`
+                            : "Twilio Auth Token"
+                        }
+                        value={rowTwilio[r.id]?.twilio_auth_token || ""}
+                        onChange={(e) =>
+                          setRowTwilio((prev) => ({
+                            ...prev,
+                            [r.id]: { ...prev[r.id], twilio_auth_token: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+                    <button type="button" className="btn btn--ghost" onClick={() => saveRowTwilio(r.id)}>
+                      ذخیره Twilio
+                    </button>
+                  </td>
                   <td dir="ltr" style={{ whiteSpace: "nowrap", fontSize: "0.85rem" }}>
                     {r.created_at}
                   </td>

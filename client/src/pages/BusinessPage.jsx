@@ -153,6 +153,9 @@ export default function BusinessPage() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`
     : "https://www.google.com/maps";
   const reservationLink = String(b?.reservation_link || "").trim();
+  const trackedEnabled = !!b?.call_tracking_enabled;
+  const trackedNumber = String(b?.call_tracking_number || "").trim();
+  const phoneForCall = trackedEnabled && trackedNumber ? trackedNumber : String(b?.phone || "").trim();
 
   const coverStyleUrl = useMemo(() => {
     if (!b) return COVER_BY_CATEGORY.default;
@@ -290,11 +293,11 @@ export default function BusinessPage() {
                 {!b.claimed && <span className="badge badge--unclaimed">بدون مالک</span>}
                 {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
               </p>
-              {isActive && b.cta && String(b.cta).trim() && b.phone && (
+              {isActive && b.cta && String(b.cta).trim() && phoneForCall && (
                 <p className="profile-cta-row">
                   <a
                     className="btn btn--primary"
-                    href={`tel:${String(b.phone).replace(/\s/g, "")}`}
+                    href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
                     onClick={() => trackBusinessPhoneClick(b.slug)}
                   >
                     {String(b.cta).trim()}
@@ -469,7 +472,7 @@ export default function BusinessPage() {
               تماس
             </h2>
             <ul className="contact-list" id="biz-contact">
-              {b.phone ? (
+              {phoneForCall ? (
                 <li className="contact-list__item">
                   <span className="contact-list__icon-wrap" aria-hidden="true">
                     <svg className="contact-list__svg" aria-hidden="true">
@@ -478,12 +481,12 @@ export default function BusinessPage() {
                   </span>
                   <div className="contact-list__main">
                     <a
-                      href={`tel:${String(b.phone).replace(/\s/g, "")}`}
+                      href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
                       className="phone-ltr"
                       dir="ltr"
                       onClick={() => trackBusinessPhoneClick(b.slug)}
                     >
-                      {b.phone}
+                      {phoneForCall}
                     </a>
                   </div>
                 </li>

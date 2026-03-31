@@ -53,7 +53,7 @@ export function totpGenerateSecret(accountLabel = "Iraniu") {
 
 export function stripManagerRow(row) {
   if (!row) return null;
-  const { password_hash, totp_secret, telegram_bot_token, ...rest } = row;
+  const { password_hash, totp_secret, telegram_bot_token, twilio_auth_token, ...rest } = row;
   return rest;
 }
 

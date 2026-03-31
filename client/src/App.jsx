@@ -14,6 +14,8 @@ import ManagerSignupPage from "./pages/ManagerSignupPage.jsx";
 import DashboardOverviewPage from "./pages/dashboard/DashboardOverviewPage.jsx";
 import DashboardEditPage from "./pages/dashboard/DashboardEditPage.jsx";
 import DashboardMediaPage from "./pages/dashboard/DashboardMediaPage.jsx";
+import DashboardTwilioSettingsPage from "./pages/dashboard/DashboardTwilioSettingsPage.jsx";
+import DashboardCallsPage from "./pages/dashboard/DashboardCallsPage.jsx";
 import DashboardQrPage from "./pages/dashboard/DashboardQrPage.jsx";
 import DashboardBiolinkPage from "./pages/dashboard/DashboardBiolinkPage.jsx";
 import DashboardCareersPage from "./pages/dashboard/DashboardCareersPage.jsx";
@@ -70,6 +72,8 @@ export default function App() {
         <Route path="edit" element={<DashboardEditPage />} />
         <Route path="careers" element={<DashboardCareersPage />} />
         <Route path="media" element={<DashboardMediaPage />} />
+        <Route path="twilio" element={<DashboardTwilioSettingsPage />} />
+        <Route path="calls" element={<DashboardCallsPage />} />
         <Route path="qr" element={<DashboardQrPage />} />
         <Route path="biolink" element={<DashboardBiolinkPage />} />
       </Route>

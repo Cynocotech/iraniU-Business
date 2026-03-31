@@ -64,6 +64,13 @@ function attachLinkedBusinesses(managerRow) {
     linked_businesses,
     password_set: !!managerRow.password_hash,
     totp_enabled: !!managerRow.totp_enabled,
+    twilio_auth_token_set: !!managerRow.twilio_auth_token,
+    twilio_auth_token_masked:
+      managerRow.twilio_auth_token && String(managerRow.twilio_auth_token).length > 4
+        ? `••••${String(managerRow.twilio_auth_token).slice(-4)}`
+        : managerRow.twilio_auth_token
+        ? "••••"
+        : null,
   };
 }
 
@@ -425,5 +432,68 @@ export function registerAuthRoutes(app) {
       message: `Manager password reset for manager #${id}`,
     });
     res.json({ ok: true });
+  });
+
+  app.get("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const m = db
+      .prepare(
+        `SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number
+         FROM managers WHERE id = ?`
+      )
+      .get(id);
+    if (!m) return res.status(404).json({ error: "not_found" });
+    res.json({
+      id: m.id,
+      twilio_account_sid: m.twilio_account_sid || "",
+      twilio_phone_number: m.twilio_phone_number || "",
+      twilio_auth_token_set: !!m.twilio_auth_token,
+      twilio_auth_token_masked:
+        m.twilio_auth_token && String(m.twilio_auth_token).length > 4
+          ? `••••${String(m.twilio_auth_token).slice(-4)}`
+          : m.twilio_auth_token
+          ? "••••"
+          : null,
+    });
+  });
+
+  app.patch("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const exists = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(id);
+    if (!exists) return res.status(404).json({ error: "not_found" });
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const updates = {};
+    if ("twilio_account_sid" in b) updates.twilio_account_sid = String(b.twilio_account_sid || "").trim() || null;
+    if ("twilio_phone_number" in b) updates.twilio_phone_number = String(b.twilio_phone_number || "").trim() || null;
+    if ("twilio_auth_token" in b) updates.twilio_auth_token = String(b.twilio_auth_token || "").trim() || null;
+    const keys = Object.keys(updates);
+    if (!keys.length) return res.status(400).json({ error: "no_fields" });
+    const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
+    db.prepare(`UPDATE managers SET ${setClause} WHERE id = @id`).run({ ...updates, id });
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_manager_twilio_updated",
+      targetType: "manager",
+      targetId: id,
+      message: `Super admin updated manager #${id} Twilio settings`,
+      meta: { fields: keys.filter((k) => k !== "twilio_auth_token") },
+    });
+    const m = db
+      .prepare(`SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number FROM managers WHERE id = ?`)
+      .get(id);
+    res.json({
+      id: m.id,
+      twilio_account_sid: m.twilio_account_sid || "",
+      twilio_phone_number: m.twilio_phone_number || "",
+      twilio_auth_token_set: !!m.twilio_auth_token,
+      twilio_auth_token_masked:
+        m.twilio_auth_token && String(m.twilio_auth_token).length > 4
+          ? `••••${String(m.twilio_auth_token).slice(-4)}`
+          : m.twilio_auth_token
+          ? "••••"
+          : null,
+    });
   });
 }
