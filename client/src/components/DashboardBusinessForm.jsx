@@ -42,6 +42,19 @@ export default function DashboardBusinessForm({
   const [hoursRows, setHoursRows] = useState(() => [...DEFAULT_HOURS_ROWS]);
   const [galleryUrls, setGalleryUrls] = useState(["", "", "", ""]);
   const [categories, setCategories] = useState([]);
+  const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGet("/api/twilio-module-status")
+      .then((d) => {
+        if (!cancelled && d && typeof d.enabled === "boolean") setTwilioModuleEnabled(d.enabled);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const applyBusiness = useCallback(
     (b) => {
@@ -342,41 +355,49 @@ export default function DashboardBusinessForm({
               اگر پر شود، در صفحه عمومی دکمه «رزرو آنلاین» نمایش داده می‌شود و کاربر به این لینک منتقل می‌شود.
             </p>
           </div>
-          <div className="field field--block">
-            <label htmlFor="dash-call-track-enabled">فعالسازی شماره ابری و ثبت تماس (Twilio)</label>
-            <select
-              id="dash-call-track-enabled"
-              value={callTrackingEnabled ? "1" : "0"}
-              onChange={(e) => setCallTrackingEnabled(e.target.value === "1")}
-            >
-              <option value="0">غیرفعال</option>
-              <option value="1">فعال</option>
-            </select>
-          </div>
-          <div className="field field--block">
-            <label htmlFor="dash-call-track-number">شماره ابری (Twilio Number)</label>
-            <input
-              id="dash-call-track-number"
-              value={callTrackingNumber}
-              onChange={(e) => setCallTrackingNumber(e.target.value)}
-              dir="ltr"
-              placeholder="+44..."
-            />
-          </div>
-          <div className="field field--block">
-            <label htmlFor="dash-call-forward-number">شماره مقصد برای فوروارد</label>
-            <input
-              id="dash-call-forward-number"
-              value={callForwardNumber}
-              onChange={(e) => setCallForwardNumber(e.target.value)}
-              dir="ltr"
-              placeholder="+44..."
-            />
-            <p className="field-hint">
-              اگر خالی باشد، شماره اصلی کسب‌وکار استفاده می‌شود. در Twilio webhook را روی
-              <span dir="ltr"> /api/twilio/voice/incoming </span> بگذارید.
+          {twilioModuleEnabled ? (
+            <>
+              <div className="field field--block">
+                <label htmlFor="dash-call-track-enabled">فعالسازی شماره ابری و ثبت تماس (Twilio)</label>
+                <select
+                  id="dash-call-track-enabled"
+                  value={callTrackingEnabled ? "1" : "0"}
+                  onChange={(e) => setCallTrackingEnabled(e.target.value === "1")}
+                >
+                  <option value="0">غیرفعال</option>
+                  <option value="1">فعال</option>
+                </select>
+              </div>
+              <div className="field field--block">
+                <label htmlFor="dash-call-track-number">شماره ابری (Twilio Number)</label>
+                <input
+                  id="dash-call-track-number"
+                  value={callTrackingNumber}
+                  onChange={(e) => setCallTrackingNumber(e.target.value)}
+                  dir="ltr"
+                  placeholder="+44..."
+                />
+              </div>
+              <div className="field field--block">
+                <label htmlFor="dash-call-forward-number">شماره مقصد برای فوروارد</label>
+                <input
+                  id="dash-call-forward-number"
+                  value={callForwardNumber}
+                  onChange={(e) => setCallForwardNumber(e.target.value)}
+                  dir="ltr"
+                  placeholder="+44..."
+                />
+                <p className="field-hint">
+                  اگر خالی باشد، شماره اصلی کسب‌وکار استفاده می‌شود. در Twilio webhook را روی
+                  <span dir="ltr"> /api/twilio/voice/incoming </span> بگذارید.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="field-hint" style={{ gridColumn: "1 / -1" }}>
+              ماژول Twilio از پنل سوپرادمین (امنیت و ۲FA) غیرفعال شده است؛ فیلدهای شماره ابری در این فرم نمایش داده نمی‌شوند.
             </p>
-          </div>
+          )}
         </div>
 
         <h3 style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>پیشنهاد و تبلیغ</h3>

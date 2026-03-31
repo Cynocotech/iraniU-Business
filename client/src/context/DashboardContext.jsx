@@ -29,6 +29,19 @@ export function DashboardProvider({ children }) {
   const [biz, setBiz] = useState(null);
   const [phoneClickCount, setPhoneClickCount] = useState(null);
   const [impersonation, setImpersonation] = useState(() => readImpersonation());
+  const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGet("/api/twilio-module-status")
+      .then((d) => {
+        if (!cancelled && d && typeof d.enabled === "boolean") setTwilioModuleEnabled(d.enabled);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,8 +152,9 @@ export function DashboardProvider({ children }) {
       phoneClickCount,
       impersonation,
       endImpersonation,
+      twilioModuleEnabled,
     }),
-    [dashSlug, onSlugChange, biz, setBiz, heroQr, phoneClickCount, impersonation, endImpersonation]
+    [dashSlug, onSlugChange, biz, setBiz, heroQr, phoneClickCount, impersonation, endImpersonation, twilioModuleEnabled]
   );
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

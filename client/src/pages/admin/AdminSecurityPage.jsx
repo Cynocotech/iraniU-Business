@@ -39,6 +39,10 @@ export default function AdminSecurityPage() {
   const [telegramTestMsg, setTelegramTestMsg] = useState(null);
   const [telegramTestBusy, setTelegramTestBusy] = useState(false);
 
+  const [twilioModule, setTwilioModule] = useState({ enabled: true });
+  const [twilioModuleBusy, setTwilioModuleBusy] = useState(false);
+  const [twilioModuleMsg, setTwilioModuleMsg] = useState(null);
+
   const loadTelegramConfig = useCallback(() => {
     apiGet("/api/admin/telegram-config")
       .then((d) => {
@@ -53,9 +57,33 @@ export default function AdminSecurityPage() {
       .catch(() => setTelegramCfg({}));
   }, []);
 
+  const loadTwilioModule = useCallback(() => {
+    apiGet("/api/admin/twilio-module")
+      .then((d) => setTwilioModule(d && typeof d.enabled === "boolean" ? d : { enabled: true }))
+      .catch(() => setTwilioModule({ enabled: true }));
+  }, []);
+
   useEffect(() => {
     loadTelegramConfig();
   }, [loadTelegramConfig]);
+
+  useEffect(() => {
+    loadTwilioModule();
+  }, [loadTwilioModule]);
+
+  const setTwilioModuleEnabled = async (nextEnabled) => {
+    setTwilioModuleMsg(null);
+    setTwilioModuleBusy(true);
+    try {
+      const d = await apiPatchJson("/api/admin/twilio-module", { enabled: nextEnabled });
+      setTwilioModule(d);
+      setTwilioModuleMsg(nextEnabled ? "ماژول Twilio فعال شد." : "ماژول Twilio غیرفعال شد؛ منوی Twilio در پنل مدیر و فیلدهای شماره ابری مخفی می‌شوند.");
+    } catch (err) {
+      setTwilioModuleMsg(err.message || String(err));
+    } finally {
+      setTwilioModuleBusy(false);
+    }
+  };
 
   const saveTelegramConfig = async (e) => {
     e.preventDefault();
@@ -441,6 +469,47 @@ export default function AdminSecurityPage() {
             {telegramTestMsg}
           </p>
         )}
+      </section>
+
+      <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
+        <h2>ماژول Twilio</h2>
+        <p className="field-hint">
+          با غیرفعال کردن، وب‌هوک‌های صوتی Twilio پاسخ نمی‌دهند، منوی «تنظیمات Twilio» و «لاگ تماس‌ها» در پنل مدیر
+          مخفی می‌شود و مدیران نمی‌توانند تنظیمات Twilio را ذخیره کنند. داده‌های ذخیره‌شده در دیتابیس پاک نمی‌شود.
+        </p>
+        <p className="field-hint" style={{ marginBottom: "0.75rem" }}>
+          وضعیت فعلی:{" "}
+          <strong>{twilioModule.enabled ? "فعال" : "غیرفعال"}</strong>
+        </p>
+        <div className="dashboard-actions dashboard-actions--inline">
+          {twilioModule.enabled ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={twilioModuleBusy}
+              onClick={() => setTwilioModuleEnabled(false)}
+            >
+              {twilioModuleBusy ? "در حال ذخیره…" : "غیرفعال کردن ماژول Twilio"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={twilioModuleBusy}
+              onClick={() => setTwilioModuleEnabled(true)}
+            >
+              {twilioModuleBusy ? "در حال ذخیره…" : "فعال کردن ماژول Twilio"}
+            </button>
+          )}
+        </div>
+        {twilioModuleMsg ? (
+          <p
+            className="field-hint"
+            style={{ marginTop: "0.75rem", color: twilioModuleMsg.includes("غیرفعال") || twilioModuleMsg.includes("فعال") ? "var(--color-success, #2e7d32)" : "#b71c1c" }}
+          >
+            {twilioModuleMsg}
+          </p>
+        ) : null}
       </section>
     </>
   );

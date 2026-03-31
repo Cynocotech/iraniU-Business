@@ -153,7 +153,8 @@ export default function BusinessPage() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`
     : "https://www.google.com/maps";
   const reservationLink = String(b?.reservation_link || "").trim();
-  const trackedEnabled = !!b?.call_tracking_enabled;
+  const twilioModuleOn = b?.twilio_module_enabled !== false;
+  const trackedEnabled = twilioModuleOn && !!b?.call_tracking_enabled;
   const trackedNumber = String(b?.call_tracking_number || "").trim();
   const phoneForCall = trackedEnabled && trackedNumber ? trackedNumber : String(b?.phone || "").trim();
 

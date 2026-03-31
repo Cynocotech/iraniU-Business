@@ -11,6 +11,7 @@ import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
+import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -67,6 +68,11 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
+/** عمومی — برای مخفی کردن منوی Twilio در پنل مدیر */
+app.get("/api/twilio-module-status", (_req, res) => {
+  res.json({ enabled: isTwilioModuleEnabled() });
+});
+
 app.get("/api/businesses", (_req, res) => {
   const rows = db.prepare(`SELECT * FROM businesses ORDER BY name_fa`).all();
   res.json(rows);
@@ -87,7 +93,8 @@ app.get("/api/categories", (_req, res) => {
 app.get("/api/businesses/:slug", (req, res) => {
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(req.params.slug);
   if (!row) return res.status(404).json({ error: "not_found", slug: req.params.slug });
-  res.json(row);
+  const twilioOn = isTwilioModuleEnabled();
+  res.json({ ...row, twilio_module_enabled: twilioOn });
 });
 
 const DEFAULT_JSON_HOURS = "[]";
@@ -615,6 +622,11 @@ function updateBusinessBySlug(req, res) {
     delete updates.manager_id;
     delete updates.claimed;
     delete updates.package;
+    if (!isTwilioModuleEnabled()) {
+      delete updates.call_tracking_enabled;
+      delete updates.call_tracking_number;
+      delete updates.call_forward_number;
+    }
   }
 
   if (Object.keys(updates).length === 0) {
@@ -732,6 +744,9 @@ function twimlDial(to, slug) {
 }
 
 app.post("/api/twilio/voice/incoming", (req, res) => {
+  if (!isTwilioModuleEnabled()) {
+    return res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>`);
+  }
   const toNumber = normalizePhone(req.body?.To);
   if (!toNumber) return res.status(400).send("missing to");
   const biz = db
@@ -757,6 +772,9 @@ app.post("/api/twilio/voice/incoming", (req, res) => {
 });
 
 app.post("/api/twilio/voice/status", (req, res) => {
+  if (!isTwilioModuleEnabled()) {
+    return res.json({ ok: true, skipped: true });
+  }
   const slugQ = String(req.query.slug || "").trim().toLowerCase();
   const toNumber = normalizePhone(req.body?.To);
   const slugByTo = toNumber
@@ -803,6 +821,9 @@ app.post("/api/twilio/voice/status", (req, res) => {
 });
 
 app.get("/api/manager/call-logs", requireManager, (req, res) => {
+  if (!isTwilioModuleEnabled()) {
+    return res.status(403).json({ error: "twilio_module_disabled" });
+  }
   const limit = Math.min(300, Math.max(1, parseInt(String(req.query.limit || "100"), 10) || 100));
   const rows = db
     .prepare(
@@ -832,6 +853,7 @@ app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
       ? "••••"
       : null;
   res.json({
+    module_enabled: isTwilioModuleEnabled(),
     twilio_account_sid: m.twilio_account_sid || "",
     twilio_phone_number: m.twilio_phone_number || "",
     twilio_auth_token_set: !!m.twilio_auth_token,
@@ -840,6 +862,9 @@ app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
 });
 
 app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
+  if (!isTwilioModuleEnabled()) {
+    return res.status(403).json({ error: "twilio_module_disabled", hint: "Twilio module is off in super admin settings" });
+  }
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const updates = {};
   if ("twilio_account_sid" in b) updates.twilio_account_sid = String(b.twilio_account_sid || "").trim() || null;

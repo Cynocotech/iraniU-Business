@@ -5,13 +5,13 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 
-const NAV = [
+const NAV_BASE = [
   { to: "/dashboard", label: "نمای کلی", end: true },
   { to: "/dashboard/edit", label: "ویرایش آگهی" },
   { to: "/dashboard/careers", label: "فرصت‌های شغلی" },
   { to: "/dashboard/media", label: "تصاویر" },
-  { to: "/dashboard/twilio", label: "تنظیمات Twilio" },
-  { to: "/dashboard/calls", label: "لاگ تماس‌ها" },
+  { to: "/dashboard/twilio", label: "تنظیمات Twilio", twilioOnly: true },
+  { to: "/dashboard/calls", label: "لاگ تماس‌ها", twilioOnly: true },
   { to: "/dashboard/qr", label: "QR نظر Google" },
   { to: "/dashboard/biolink", label: "لینک‌های من (Biolink)" },
 ];
@@ -62,7 +62,8 @@ function ImpersonationBanner() {
 }
 
 function DashboardChrome() {
-  const { dashSlug } = useDashboard();
+  const { dashSlug, twilioModuleEnabled } = useDashboard();
+  const navItems = NAV_BASE.filter((item) => !item.twilioOnly || twilioModuleEnabled);
   const { logout, me } = useAuth();
   const navigate = useNavigate();
   const onLogout = () => {
@@ -89,7 +90,7 @@ function DashboardChrome() {
           </Link>
           <p className="app-shell__nav-title">پنل کسب‌وکار</p>
           <ul className="app-shell__nav">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <li key={item.to}>
                 <NavLink to={item.to} end={item.end}>
                   {item.label}

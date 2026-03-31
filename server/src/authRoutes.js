@@ -27,6 +27,11 @@ import {
   applyTelegramConfigPatch,
   getEffectiveTelegramConfig,
 } from "./telegramSettings.js";
+import {
+  getTwilioModuleForAdmin,
+  setTwilioModuleEnabled,
+  isTwilioModuleEnabled,
+} from "./twilioModuleSettings.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -375,6 +380,27 @@ export function registerAuthRoutes(app) {
     }
   });
 
+  app.get("/api/admin/twilio-module", requireSuperAdmin, (_req, res) => {
+    res.json(getTwilioModuleForAdmin());
+  });
+
+  app.patch("/api/admin/twilio-module", requireSuperAdmin, (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    if (!("enabled" in b)) {
+      return res.status(400).json({ error: "missing_enabled", hint: "enabled: true|false" });
+    }
+    const enabled = b.enabled === true || b.enabled === 1 || b.enabled === "1" || b.enabled === "true";
+    const next = setTwilioModuleEnabled(enabled);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_twilio_module_toggled",
+      targetType: "settings",
+      targetId: "twilio_module",
+      message: `Twilio module ${enabled ? "enabled" : "disabled"}`,
+    });
+    res.json(next);
+  });
+
   /** تلگرام: دکمهٔ Kick out — باید webhook با setWebhook ثبت شود */
   app.post("/api/telegram/webhook", async (req, res) => {
     const secret = getEffectiveTelegramConfig().webhookSecret;
@@ -446,6 +472,7 @@ export function registerAuthRoutes(app) {
     if (!m) return res.status(404).json({ error: "not_found" });
     res.json({
       id: m.id,
+      module_enabled: isTwilioModuleEnabled(),
       twilio_account_sid: m.twilio_account_sid || "",
       twilio_phone_number: m.twilio_phone_number || "",
       twilio_auth_token_set: !!m.twilio_auth_token,
@@ -459,6 +486,9 @@ export function registerAuthRoutes(app) {
   });
 
   app.patch("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
+    if (!isTwilioModuleEnabled()) {
+      return res.status(403).json({ error: "twilio_module_disabled", hint: "Twilio module is off in super admin settings" });
+    }
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     const exists = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(id);

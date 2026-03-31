@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 
 export default function DashboardTwilioSettingsPage() {
   const { isSuperAdmin } = useAuth();
+  const [moduleEnabled, setModuleEnabled] = useState(true);
   const [twilioSid, setTwilioSid] = useState("");
   const [twilioPhone, setTwilioPhone] = useState("");
   const [twilioToken, setTwilioToken] = useState("");
@@ -19,6 +20,7 @@ export default function DashboardTwilioSettingsPage() {
     if (isSuperAdmin) return;
     apiGet("/api/manager/twilio-settings")
       .then((d) => {
+        if (typeof d.module_enabled === "boolean") setModuleEnabled(d.module_enabled);
         setTwilioSid(d.twilio_account_sid || "");
         setTwilioPhone(d.twilio_phone_number || "");
         setTwilioTokenSet(!!d.twilio_auth_token_set);
@@ -26,6 +28,14 @@ export default function DashboardTwilioSettingsPage() {
       })
       .catch(() => setTwilioMsg("بارگذاری تنظیمات ناموفق بود."));
   };
+
+  useEffect(() => {
+    apiGet("/api/twilio-module-status")
+      .then((d) => {
+        if (d && typeof d.enabled === "boolean") setModuleEnabled(d.enabled);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadTwilio();
@@ -53,6 +63,20 @@ export default function DashboardTwilioSettingsPage() {
       setTwilioSaving(false);
     }
   };
+
+  if (!moduleEnabled) {
+    return (
+      <DashboardMain>
+        <section className="dashboard-panel" aria-labelledby="twilio-settings-heading">
+          <DashboardPanelHead headingId="twilio-settings-heading" title="تنظیمات Twilio" icon={dashboardIcons.overview} />
+          <p className="field-hint">
+            ماژول Twilio توسط سوپرادمین غیرفعال شده است. برای فعال‌سازی از{" "}
+            <Link to="/admin-security">امنیت و ۲FA</Link> در پنل سوپرادمین، بخش «ماژول Twilio» را باز کنید.
+          </p>
+        </section>
+      </DashboardMain>
+    );
+  }
 
   return (
     <DashboardMain>

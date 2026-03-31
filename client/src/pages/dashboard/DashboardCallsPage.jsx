@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiGet } from "../../api.js";
 import DashboardMain from "../../components/DashboardMain.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
@@ -6,13 +7,31 @@ import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPa
 export default function DashboardCallsPage() {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
+  const [moduleOff, setModuleOff] = useState(false);
 
   const load = () => {
     setErr("");
+    setModuleOff(false);
     apiGet("/api/manager/call-logs?limit=200")
       .then((d) => setRows(Array.isArray(d) ? d : []))
-      .catch(() => setErr("بارگذاری لاگ تماس ناموفق بود."));
+      .catch((e) => {
+        const msg = String(e?.message || e || "");
+        if (msg.includes("403") || msg.includes("twilio_module")) {
+          setModuleOff(true);
+          setRows([]);
+        } else {
+          setErr("بارگذاری لاگ تماس ناموفق بود.");
+        }
+      });
   };
+
+  useEffect(() => {
+    apiGet("/api/twilio-module-status")
+      .then((d) => {
+        if (d && d.enabled === false) setModuleOff(true);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     load();
@@ -22,9 +41,16 @@ export default function DashboardCallsPage() {
     <DashboardMain>
       <section className="dashboard-panel">
         <DashboardPanelHead headingId="calls-heading" title="لاگ تماس‌ها" icon={dashboardIcons.overview} />
-        <p className="field-hint">تماس‌های ثبت‌شده از شماره ابری Twilio در این بخش نمایش داده می‌شود.</p>
+        {moduleOff ? (
+          <p className="field-hint">
+            ماژول Twilio غیرفعال است. برای مشاهدهٔ لاگ تماس‌ها، از{" "}
+            <Link to="/admin-security">امنیت و ۲FA</Link> ماژول را فعال کنید.
+          </p>
+        ) : (
+          <p className="field-hint">تماس‌های ثبت‌شده از شماره ابری Twilio در این بخش نمایش داده می‌شود.</p>
+        )}
         <div className="dashboard-actions">
-          <button type="button" className="btn btn--ghost" onClick={load}>
+          <button type="button" className="btn btn--ghost" onClick={load} disabled={moduleOff}>
             تازه سازی
           </button>
         </div>

@@ -11,6 +11,7 @@ export default function AdminManagersPage() {
   const [msg, setMsg] = useState(null);
   const [rowPw, setRowPw] = useState({});
   const [rowTwilio, setRowTwilio] = useState({});
+  const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
 
   const load = () => {
     apiGet("/api/managers").then(setRows).catch(() => setRows([]));
@@ -18,6 +19,14 @@ export default function AdminManagersPage() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    apiGet("/api/admin/twilio-module")
+      .then((d) => {
+        if (d && typeof d.enabled === "boolean") setTwilioModuleEnabled(d.enabled);
+      })
+      .catch(() => {});
   }, []);
 
   const submit = async (e) => {
@@ -54,6 +63,10 @@ export default function AdminManagersPage() {
   };
 
   const saveRowTwilio = async (id) => {
+    if (!twilioModuleEnabled) {
+      setMsg("ماژول Twilio غیرفعال است؛ ابتدا از امنیت و ۲FA آن را فعال کنید.");
+      return;
+    }
     const row = rowTwilio[id] || {};
     setMsg(null);
     try {
@@ -89,6 +102,12 @@ export default function AdminManagersPage() {
       </p>
       <section className="dashboard-panel">
         <h2>حساب‌های مدیر</h2>
+        {!twilioModuleEnabled ? (
+          <p className="field-hint" style={{ color: "#5d4037" }}>
+            ماژول Twilio غیرفعال است — ستون Twilio فقط خواندنی است. برای ذخیره از{" "}
+            <Link to="/admin-security">امنیت و ۲FA</Link> بخش «ماژول Twilio» را فعال کنید.
+          </p>
+        ) : null}
         <p className="field-hint">
           برای هر مدیر یک ایمیل و رمز (حداقل ۸ کاراکتر) تعریف کنید. مدیر از صفحهٔ{" "}
           <Link to="/login">ورود مدیر</Link> وارد پنل می‌شود. می‌توانید Google Authenticator را از API تنظیم کنید (۲FA).
@@ -180,6 +199,7 @@ export default function AdminManagersPage() {
                         type="text"
                         dir="ltr"
                         placeholder="Account SID"
+                        disabled={!twilioModuleEnabled}
                         value={rowTwilio[r.id]?.twilio_account_sid ?? r.twilio_account_sid ?? ""}
                         onChange={(e) =>
                           setRowTwilio((prev) => ({
@@ -198,6 +218,7 @@ export default function AdminManagersPage() {
                         type="text"
                         dir="ltr"
                         placeholder="Twilio Number"
+                        disabled={!twilioModuleEnabled}
                         value={rowTwilio[r.id]?.twilio_phone_number ?? r.twilio_phone_number ?? ""}
                         onChange={(e) =>
                           setRowTwilio((prev) => ({
@@ -215,6 +236,7 @@ export default function AdminManagersPage() {
                       <input
                         type="password"
                         dir="ltr"
+                        disabled={!twilioModuleEnabled}
                         placeholder={
                           rowTwilio[r.id]?.twilio_auth_token_set || r.twilio_auth_token_set
                             ? `Token: ${rowTwilio[r.id]?.twilio_auth_token_masked || r.twilio_auth_token_masked || "••••"}`
@@ -229,7 +251,12 @@ export default function AdminManagersPage() {
                         }
                       />
                     </div>
-                    <button type="button" className="btn btn--ghost" onClick={() => saveRowTwilio(r.id)}>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      disabled={!twilioModuleEnabled}
+                      onClick={() => saveRowTwilio(r.id)}
+                    >
                       ذخیره Twilio
                     </button>
                   </td>
