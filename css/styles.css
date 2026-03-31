@@ -2526,6 +2526,9 @@ body.app-shell-body .admin-topbar {
   text-decoration: none;
   border-radius: var(--radius-sm);
   transition: opacity 0.15s ease;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .app-shell__brand:hover {
@@ -2546,8 +2549,14 @@ body.app-shell-body .admin-topbar {
   max-height: 48px;
   object-fit: contain;
   object-position: center right;
-  background: none;
-  background-color: transparent;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  /* شفافیت واقعی PNG — بدون لایهٔ مات پشت تصویر */
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  mix-blend-mode: normal;
 }
 
 .app-shell__nav-title {
