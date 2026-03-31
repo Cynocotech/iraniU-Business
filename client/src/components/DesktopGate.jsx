@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 /** مسیرهایی که روی دسکتاپ هم بدون «فقط موبایل» نمایش داده می‌شوند (لینک عمومی، پنل، تبلیغات، ادمین). */
-const ALLOW = /^\/(dashboard|advertise|admin|l\/)/;
+const ALLOW = /^\/(login|dashboard|advertise|admin|l\/)/;
 
 export default function DesktopGate() {
   const { pathname } = useLocation();

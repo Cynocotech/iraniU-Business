@@ -461,6 +461,83 @@ export function registerAuthRoutes(app) {
     res.json({ ok: true });
   });
 
+  /** سوپرادمین‌ها: فهرست، ایجاد، حذف (حذفِ خود یا آخرین حساب مجاز نیست) */
+  app.get("/api/admin/super-admins", requireSuperAdmin, (_req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url
+         FROM super_admins ORDER BY id ASC`
+      )
+      .all();
+    res.json(rows);
+  });
+
+  app.post("/api/admin/super-admins", requireSuperAdmin, (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const email = String(b.email || "")
+      .trim()
+      .toLowerCase();
+    const password = String(b.password || "").trim();
+    const name = String(b.name || "").trim() || "Super Admin";
+    const totpSetupRequired =
+      b.totp_setup_required === false || b.totp_setup_required === 0 || b.totp_setup_required === "0" ? 0 : 1;
+    if (!email) {
+      return res.status(400).json({ error: "missing_email" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "invalid_email" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
+    }
+    if (db.prepare(`SELECT id FROM super_admins WHERE email = ?`).get(email)) {
+      return res.status(409).json({ error: "email_taken" });
+    }
+    const hash = hashPassword(password);
+    const ins = db
+      .prepare(
+        `INSERT INTO super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
+         VALUES (?, ?, ?, ?, 0)`
+      )
+      .run(email, hash, name, totpSetupRequired);
+    const row = db
+      .prepare(
+        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url FROM super_admins WHERE id = ?`
+      )
+      .get(ins.lastInsertRowid);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "super_admin_created",
+      targetType: "superadmin",
+      targetId: row.id,
+      message: `Super admin created: ${email}`,
+      meta: { totp_setup_required: totpSetupRequired },
+    });
+    res.status(201).json(row);
+  });
+
+  app.delete("/api/admin/super-admins/:id", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    if (id === Number(req.auth.sub)) {
+      return res.status(400).json({ error: "cannot_delete_self", hint: "نمی‌توانید حساب خود را حذف کنید" });
+    }
+    const total = db.prepare(`SELECT COUNT(*) AS c FROM super_admins`).get().c;
+    if (total <= 1) {
+      return res.status(400).json({ error: "last_admin", hint: "حداقل یک سوپرادمین باید بماند" });
+    }
+    const info = db.prepare(`DELETE FROM super_admins WHERE id = ?`).run(id);
+    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "super_admin_deleted",
+      targetType: "superadmin",
+      targetId: id,
+      message: `Super admin #${id} deleted`,
+    });
+    res.json({ ok: true });
+  });
+
   app.get("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });

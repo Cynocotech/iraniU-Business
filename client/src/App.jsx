@@ -34,14 +34,18 @@ import AdminChatLogPage from "./pages/admin/AdminChatLogPage.jsx";
 import AdminSystemLogsPage from "./pages/admin/AdminSystemLogsPage.jsx";
 import AdminSecurityPage from "./pages/admin/AdminSecurityPage.jsx";
 import AdminNotesTasksPage from "./pages/admin/AdminNotesTasksPage.jsx";
+import AdminSuperAdminsPage from "./pages/admin/AdminSuperAdminsPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ManagerLoginPage from "./pages/ManagerLoginPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
 import { RequireManager, RequireSuperAdmin } from "./components/RequireAuth.jsx";
+import DesktopGate from "./components/DesktopGate.jsx";
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <DesktopGate />
+      <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/listings" element={<ListingsPage />} />
@@ -52,10 +56,10 @@ export default function App() {
         <Route path="/claim" element={<ClaimPage />} />
         <Route path="/onboarding" element={<BusinessOnboardingPage />} />
         <Route path="/manager-signup" element={<ManagerSignupPage />} />
-        <Route path="/login" element={<ManagerLoginPage />} />
       </Route>
 
-      {/* ورود سوپرادمین بدون هدر و ناوبری سایت */}
+      {/* ورود مدیر و سوپرادمین — تمام‌صفحه بدون هدر سایت */}
+      <Route path="/login" element={<ManagerLoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
 
       {/* صفحهٔ لینک‌تک (Biolink) بدون هدر سایت — تمام‌قد و قابل اشتراک روی دسکتاپ */}
@@ -100,9 +104,11 @@ export default function App() {
         <Route path="/admin-chat-log" element={<AdminChatLogPage />} />
         <Route path="/admin-system-logs" element={<AdminSystemLogsPage />} />
         <Route path="/admin-security" element={<AdminSecurityPage />} />
+        <Route path="/admin-super-admins" element={<AdminSuperAdminsPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 }

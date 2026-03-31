@@ -8,6 +8,7 @@ const adminNav = [
   { to: "/admin", label: "داشبورد", end: true },
   { to: "/admin-notes", label: "یادداشت و کارها" },
   { to: "/admin-security", label: "امنیت و ۲FA" },
+  { to: "/admin-super-admins", label: "سوپرادمین‌ها" },
   { to: "/admin-businesses", label: "همه آگهی‌ها" },
   { to: "/admin-edit", label: "ویرایش آگهی" },
   { to: "/admin-add", label: "افزودن آگهی" },
