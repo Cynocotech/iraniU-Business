@@ -14,11 +14,18 @@ function formatNum(n) {
 export default function AdminHomePage() {
   const [stats, setStats] = useState(null);
   const [err, setErr] = useState(null);
+  const [brief, setBrief] = useState(null);
 
   useEffect(() => {
     apiGet("/api/admin/stats")
       .then(setStats)
       .catch(() => setErr("بارگذاری آمار ناموفق بود."));
+  }, []);
+
+  useEffect(() => {
+    apiGet("/api/admin/workspace-brief")
+      .then(setBrief)
+      .catch(() => setBrief(null));
   }, []);
 
   return (
@@ -82,6 +89,46 @@ export default function AdminHomePage() {
           {err}
         </p>
       )}
+
+      <section className="dashboard-panel" id="admin-workspace" aria-labelledby="admin-workspace-h" style={{ marginBottom: "var(--space-lg)" }}>
+        <h2 id="admin-workspace-h">یادداشت و کارهای داخلی</h2>
+        <p className="field-hint">
+          مختص سوپرادمین؛ در فهرست عمومی سایت دیده نمی‌شود.{" "}
+          <Link className="btn btn--primary" to="/admin-notes" style={{ display: "inline-block", marginInlineStart: "0.35rem" }}>
+            باز کردن صفحهٔ کامل
+          </Link>
+        </p>
+        {brief ? (
+          <div className="form-grid" style={{ maxWidth: "42rem", marginTop: "0.75rem" }}>
+            <p style={{ margin: 0 }}>
+              <strong>کارهای باز:</strong>{" "}
+              <span dir="ltr">{formatNum(brief.open_tasks_count)}</span>
+            </p>
+            {brief.recent_notes && brief.recent_notes.length > 0 ? (
+              <div>
+                <p className="field-hint" style={{ marginBottom: "0.5rem" }}>
+                  آخرین یادداشت‌ها:
+                </p>
+                <ul style={{ margin: 0, paddingInlineStart: "1.25rem" }}>
+                  {brief.recent_notes.map((n) => (
+                    <li key={n.id} style={{ marginBottom: "0.35rem" }}>
+                      <span style={{ whiteSpace: "pre-wrap" }}>{n.preview}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="field-hint" style={{ margin: 0 }}>
+                هنوز یادداشت داخلی ثبت نشده است.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="field-hint" style={{ marginTop: "0.75rem" }}>
+            در حال بارگذاری…
+          </p>
+        )}
+      </section>
 
       <section className="dashboard-panel" id="admin-quick" aria-labelledby="admin-quick-h">
         <h2 id="admin-quick-h">اقدام سریع</h2>

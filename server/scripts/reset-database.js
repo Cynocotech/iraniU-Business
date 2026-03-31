@@ -89,7 +89,25 @@ try {
       window_start_ms INTEGER NOT NULL,
       blocked_until_ms INTEGER
     );
+    CREATE TABLE IF NOT EXISTS admin_internal_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS admin_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT,
+      done INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      due_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     DELETE FROM login_ip_throttle;
+    DELETE FROM admin_internal_notes;
+    DELETE FROM admin_tasks;
     DELETE FROM super_admins;
     DELETE FROM site_chat_messages;
     DELETE FROM reservations;

@@ -17,6 +17,7 @@ function errMessage(code) {
 export default function AdminSecurityPage() {
   const { me, loadMe } = useAuth();
   const totpOn = !!me?.totp_enabled;
+  const mustEnroll2fa = me?.role === "superadmin" && !!me?.totp_setup_required && !me?.totp_enabled;
 
   const [telegramCfg, setTelegramCfg] = useState(null);
   const [tgForm, setTgForm] = useState({
@@ -64,12 +65,14 @@ export default function AdminSecurityPage() {
   }, []);
 
   useEffect(() => {
+    if (mustEnroll2fa) return;
     loadTelegramConfig();
-  }, [loadTelegramConfig]);
+  }, [mustEnroll2fa, loadTelegramConfig]);
 
   useEffect(() => {
+    if (mustEnroll2fa) return;
     loadTwilioModule();
-  }, [loadTwilioModule]);
+  }, [mustEnroll2fa, loadTwilioModule]);
 
   const setTwilioModuleEnabled = async (nextEnabled) => {
     setTwilioModuleMsg(null);
@@ -185,6 +188,24 @@ export default function AdminSecurityPage() {
         <Link to="/admin">← داشبورد</Link>
       </p>
 
+      {mustEnroll2fa ? (
+        <div
+          className="dashboard-panel"
+          style={{
+            marginBottom: "1rem",
+            border: "1px solid rgba(183, 28, 28, 0.35)",
+            background: "rgba(255, 235, 238, 0.95)",
+          }}
+          role="status"
+        >
+          <p style={{ margin: 0, fontWeight: 600 }}>ورود دو مرحله‌ای الزامی است</p>
+          <p className="field-hint" style={{ margin: "0.5rem 0 0" }}>
+            قبل از استفاده از بقیهٔ پنل سوپرادمین، بخش زیر را باز کنید، QR را در Google Authenticator اسکن کنید و ۲FA را
+            فعال کنید.
+          </p>
+        </div>
+      ) : null}
+
       <section className="dashboard-panel">
         <h2>ورود دو مرحله‌ای (Google Authenticator)</h2>
         <p className="field-hint">
@@ -276,6 +297,7 @@ export default function AdminSecurityPage() {
         )}
       </section>
 
+      {!mustEnroll2fa ? (
       <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
         <h2>پیکربندی تلگرام</h2>
         <p className="field-hint">
@@ -470,7 +492,9 @@ export default function AdminSecurityPage() {
           </p>
         )}
       </section>
+      ) : null}
 
+      {!mustEnroll2fa ? (
       <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
         <h2>ماژول Twilio</h2>
         <p className="field-hint">
@@ -511,6 +535,7 @@ export default function AdminSecurityPage() {
           </p>
         ) : null}
       </section>
+      ) : null}
     </>
   );
 }

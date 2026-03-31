@@ -31,5 +31,9 @@ export function RequireSuperAdmin({ children }) {
   if (me?.role !== "superadmin") {
     return <Navigate to={`/admin/login?redirect=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   }
+  const mustEnroll2fa = !!me?.totp_setup_required && !me?.totp_enabled;
+  if (mustEnroll2fa && loc.pathname !== "/admin-security") {
+    return <Navigate to="/admin-security" replace />;
+  }
   return children;
 }

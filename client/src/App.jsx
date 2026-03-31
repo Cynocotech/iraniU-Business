@@ -33,6 +33,7 @@ import AdminManagersPage from "./pages/admin/AdminManagersPage.jsx";
 import AdminChatLogPage from "./pages/admin/AdminChatLogPage.jsx";
 import AdminSystemLogsPage from "./pages/admin/AdminSystemLogsPage.jsx";
 import AdminSecurityPage from "./pages/admin/AdminSecurityPage.jsx";
+import AdminNotesTasksPage from "./pages/admin/AdminNotesTasksPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ManagerLoginPage from "./pages/ManagerLoginPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
@@ -86,6 +87,7 @@ export default function App() {
         }
       >
         <Route path="/admin" element={<AdminHomePage />} />
+        <Route path="/admin-notes" element={<AdminNotesTasksPage />} />
         <Route path="/admin-businesses" element={<AdminBusinessesPage />} />
         <Route path="/admin-add" element={<AdminAddBusinessPage />} />
         <Route path="/admin-categories" element={<AdminCategoriesPage />} />

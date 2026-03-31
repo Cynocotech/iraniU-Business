@@ -210,6 +210,7 @@ export function registerAuthRoutes(app) {
         role: "superadmin",
         user: stripSuperAdminRow(a),
         totp_enabled: !!a.totp_enabled,
+        totp_setup_required: !!a.totp_setup_required,
       });
     }
     return res.status(401).json({ error: "unauthorized" });
@@ -325,7 +326,7 @@ export function registerAuthRoutes(app) {
     if (!totpVerify(a.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE super_admins SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE super_admins SET totp_enabled = 1, totp_setup_required = 0 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "admin_2fa_enabled",
@@ -525,5 +526,160 @@ export function registerAuthRoutes(app) {
           ? "••••"
           : null,
     });
+  });
+
+  /** یادداشت و کارهای داخلی سوپرادمین (در API عمومی نیست) */
+  app.get("/api/admin/workspace-brief", requireSuperAdmin, (_req, res) => {
+    const open_tasks_count = db.prepare(`SELECT COUNT(*) AS c FROM admin_tasks WHERE done = 0`).get().c;
+    const recent_notes = db
+      .prepare(
+        `SELECT id, body, updated_at FROM admin_internal_notes ORDER BY datetime(updated_at) DESC, id DESC LIMIT 5`
+      )
+      .all()
+      .map((row) => {
+        const raw = String(row.body || "");
+        const preview = raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+        return { id: row.id, updated_at: row.updated_at, preview };
+      });
+    res.json({ open_tasks_count, recent_notes });
+  });
+
+  app.get("/api/admin/internal-notes", requireSuperAdmin, (_req, res) => {
+    const rows = db
+      .prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes ORDER BY datetime(updated_at) DESC, id DESC`)
+      .all();
+    res.json(rows);
+  });
+
+  app.post("/api/admin/internal-notes", requireSuperAdmin, (req, res) => {
+    const body = String((req.body && req.body.body) || "").trim();
+    if (!body) return res.status(400).json({ error: "missing_body" });
+    const ins = db.prepare(`INSERT INTO admin_internal_notes (body) VALUES (?)`).run(body);
+    const r = db.prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = ?`).get(ins.lastInsertRowid);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_internal_note_created",
+      targetType: "admin_note",
+      targetId: String(r.id),
+      message: "Internal note created",
+    });
+    res.status(201).json(r);
+  });
+
+  app.patch("/api/admin/internal-notes/:id", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const body = String((req.body && req.body.body) || "").trim();
+    if (!body) return res.status(400).json({ error: "missing_body" });
+    const info = db.prepare(`UPDATE admin_internal_notes SET body = ?, updated_at = datetime('now') WHERE id = ?`).run(body, id);
+    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    const row = db.prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = ?`).get(id);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_internal_note_updated",
+      targetType: "admin_note",
+      targetId: String(id),
+      message: "Internal note updated",
+    });
+    res.json(row);
+  });
+
+  app.delete("/api/admin/internal-notes/:id", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const info = db.prepare(`DELETE FROM admin_internal_notes WHERE id = ?`).run(id);
+    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_internal_note_deleted",
+      targetType: "admin_note",
+      targetId: String(id),
+      message: "Internal note deleted",
+    });
+    res.json({ ok: true });
+  });
+
+  app.get("/api/admin/tasks", requireSuperAdmin, (_req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT id, title, body, done, sort_order, due_at, created_at, updated_at
+         FROM admin_tasks
+         ORDER BY done ASC, sort_order DESC, id DESC`
+      )
+      .all();
+    res.json(rows);
+  });
+
+  app.post("/api/admin/tasks", requireSuperAdmin, (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const title = String(b.title || "").trim();
+    if (!title) return res.status(400).json({ error: "missing_title" });
+    const bodyText = String(b.body || "").trim() || null;
+    const dueRaw = b.due_at != null && b.due_at !== "" ? String(b.due_at).trim() : null;
+    const maxRow = db.prepare(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM admin_tasks`).get();
+    const sort_order = Number(maxRow.m) + 1;
+    const ins = db
+      .prepare(`INSERT INTO admin_tasks (title, body, due_at, sort_order) VALUES (?, ?, ?, ?)`)
+      .run(title, bodyText, dueRaw, sort_order);
+    const r = db.prepare(`SELECT * FROM admin_tasks WHERE id = ?`).get(ins.lastInsertRowid);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_task_created",
+      targetType: "admin_task",
+      targetId: String(r.id),
+      message: "Internal task created",
+    });
+    res.status(201).json(r);
+  });
+
+  app.patch("/api/admin/tasks/:id", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const updates = {};
+    if ("title" in b) updates.title = String(b.title || "").trim() || null;
+    if ("body" in b) updates.body = String(b.body || "").trim() || null;
+    if ("done" in b) updates.done = b.done === true || b.done === 1 || b.done === "1" ? 1 : 0;
+    if ("due_at" in b) {
+      const d = b.due_at;
+      updates.due_at = d == null || d === "" ? null : String(d).trim();
+    }
+    if ("sort_order" in b) {
+      const n = parseInt(String(b.sort_order), 10);
+      if (Number.isFinite(n)) updates.sort_order = n;
+    }
+    const keys = Object.keys(updates);
+    if (!keys.length) return res.status(400).json({ error: "no_fields" });
+    if (updates.title === null) return res.status(400).json({ error: "invalid_title" });
+    const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
+    const info = db
+      .prepare(`UPDATE admin_tasks SET ${setClause}, updated_at = datetime('now') WHERE id = @id`)
+      .run({ ...updates, id });
+    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    const row = db.prepare(`SELECT * FROM admin_tasks WHERE id = ?`).get(id);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_task_updated",
+      targetType: "admin_task",
+      targetId: String(id),
+      message: "Internal task updated",
+      meta: { fields: keys },
+    });
+    res.json(row);
+  });
+
+  app.delete("/api/admin/tasks/:id", requireSuperAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const info = db.prepare(`DELETE FROM admin_tasks WHERE id = ?`).run(id);
+    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_task_deleted",
+      targetType: "admin_task",
+      targetId: String(id),
+      message: "Internal task deleted",
+    });
+    res.json({ ok: true });
   });
 }

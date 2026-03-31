@@ -58,6 +58,17 @@ export async function apiPatchUrl(path, body) {
   return data;
 }
 
+export async function apiDelete(path) {
+  const r = await fetch(path, {
+    method: "DELETE",
+    ...fetchOpts,
+    headers: { ...authHeaders() },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.hint || data.error || String(r.status));
+  return data;
+}
+
 /**
  * به‌روزرسانی آگهی — POST به مسیر تخت /api/businesses/update با { slug, ... } تا ۴۰۴ پروکسی/مسیرهای تودرتو رخ ندهد.
  */

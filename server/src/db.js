@@ -242,6 +242,9 @@ function migrateAuthTables() {
   if (!saNames.has("avatar_url")) {
     db.exec(`ALTER TABLE super_admins ADD COLUMN avatar_url TEXT`);
   }
+  if (!saNames.has("totp_setup_required")) {
+    db.exec(`ALTER TABLE super_admins ADD COLUMN totp_setup_required INTEGER NOT NULL DEFAULT 0`);
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS login_ip_throttle (
       ip TEXT PRIMARY KEY,
@@ -253,6 +256,30 @@ function migrateAuthTables() {
 }
 
 migrateAuthTables();
+
+function ensureAdminWorkspaceTables() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_internal_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS admin_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT,
+      done INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      due_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_admin_tasks_done_sort ON admin_tasks(done, sort_order DESC, id DESC);
+  `);
+}
+
+ensureAdminWorkspaceTables();
 
 /** گالری دمو — فایل‌ها در client/public/images/sofreh/ */
 const SOFREH_GALLERY_JSON = JSON.stringify([
