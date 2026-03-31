@@ -44,7 +44,7 @@ export default function DashboardCallsPage() {
         {moduleOff ? (
           <p className="field-hint">
             ماژول Twilio غیرفعال است. برای مشاهدهٔ لاگ تماس‌ها، از{" "}
-            <Link to="/admin-security">امنیت و ۲FA</Link> ماژول را فعال کنید.
+            <Link to="/admin-settings?tab=security">تنظیمات</Link> ماژول را فعال کنید.
           </p>
         ) : (
           <p className="field-hint">تماس‌های ثبت‌شده از شماره ابری Twilio در این بخش نمایش داده می‌شود.</p>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet } from "../../api.js";
 
-export default function AdminSystemLogsPage() {
+export default function AdminSystemLogsPage({ embedded = false }) {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
   const [level, setLevel] = useState("");
@@ -25,12 +25,20 @@ export default function AdminSystemLogsPage() {
 
   return (
     <>
-      <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
-        <Link to="/admin">← داشبورد</Link>
-        <button type="button" className="btn btn--ghost" style={{ marginInlineStart: "0.5rem" }} onClick={load}>
-          تازه سازی
-        </button>
-      </p>
+      {!embedded ? (
+        <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
+          <Link to="/admin">← داشبورد</Link>
+          <button type="button" className="btn btn--ghost" style={{ marginInlineStart: "0.5rem" }} onClick={load}>
+            تازه سازی
+          </button>
+        </p>
+      ) : (
+        <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
+          <button type="button" className="btn btn--ghost" onClick={load}>
+            تازه سازی
+          </button>
+        </p>
+      )}
       <section className="dashboard-panel">
         <h2>لاگ سیستم و تغییرات پروفایل</h2>
         <p className="field-hint">تاریخچه تغییرات مدیر/ادمین و خطاهای سرور با زمان ثبت می‌شود.</p>

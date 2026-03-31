@@ -32,8 +32,12 @@ export function RequireSuperAdmin({ children }) {
     return <Navigate to={`/admin/login?redirect=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   }
   const mustEnroll2fa = !!me?.totp_setup_required && !me?.totp_enabled;
-  if (mustEnroll2fa && loc.pathname !== "/admin-security") {
-    return <Navigate to="/admin-security" replace />;
+  if (mustEnroll2fa) {
+    const params = new URLSearchParams(loc.search);
+    const tab = params.get("tab") || "security";
+    if (loc.pathname !== "/admin-settings" || tab !== "security") {
+      return <Navigate to="/admin-settings?tab=security" replace />;
+    }
   }
   return children;
 }

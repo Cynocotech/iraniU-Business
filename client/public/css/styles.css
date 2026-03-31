@@ -2576,6 +2576,47 @@ body.app-shell-body .admin-topbar {
   border-inline-start-color: #26a69a;
 }
 
+/* تب‌های صفحهٔ تنظیمات سوپرادمین (امنیت / سوپرادمین‌ها / لاگ) */
+.admin-settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+  padding: 4px;
+  background: rgba(26, 31, 36, 0.04);
+  border-radius: var(--radius-md);
+}
+
+.admin-settings-tabs__btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.admin-settings-tabs__btn:hover {
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.admin-settings-tabs__btn--active {
+  color: #00695c;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-settings-panels {
+  min-width: 0;
+}
+
 .app-shell__nav-icon {
   width: 22px;
   height: 22px;

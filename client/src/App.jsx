@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout.jsx";
 import DashboardShellLayout from "./layouts/DashboardShellLayout.jsx";
 import AdminShellLayout from "./layouts/AdminShellLayout.jsx";
@@ -31,10 +31,8 @@ import AdminLinkPage from "./pages/admin/AdminLinkPage.jsx";
 import AdminBillingPage from "./pages/admin/AdminBillingPage.jsx";
 import AdminManagersPage from "./pages/admin/AdminManagersPage.jsx";
 import AdminChatLogPage from "./pages/admin/AdminChatLogPage.jsx";
-import AdminSystemLogsPage from "./pages/admin/AdminSystemLogsPage.jsx";
-import AdminSecurityPage from "./pages/admin/AdminSecurityPage.jsx";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage.jsx";
 import AdminNotesTasksPage from "./pages/admin/AdminNotesTasksPage.jsx";
-import AdminSuperAdminsPage from "./pages/admin/AdminSuperAdminsPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ManagerLoginPage from "./pages/ManagerLoginPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
@@ -102,9 +100,10 @@ export default function App() {
         <Route path="/admin-billing" element={<AdminBillingPage />} />
         <Route path="/admin-managers" element={<AdminManagersPage />} />
         <Route path="/admin-chat-log" element={<AdminChatLogPage />} />
-        <Route path="/admin-system-logs" element={<AdminSystemLogsPage />} />
-        <Route path="/admin-security" element={<AdminSecurityPage />} />
-        <Route path="/admin-super-admins" element={<AdminSuperAdminsPage />} />
+        <Route path="/admin-settings" element={<AdminSettingsPage />} />
+        <Route path="/admin-system-logs" element={<Navigate to="/admin-settings?tab=logs" replace />} />
+        <Route path="/admin-security" element={<Navigate to="/admin-settings?tab=security" replace />} />
+        <Route path="/admin-super-admins" element={<Navigate to="/admin-settings?tab=super-admins" replace />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

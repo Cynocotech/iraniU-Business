@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { apiDelete, apiGet, apiPost } from "../../api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 
-export default function AdminSuperAdminsPage() {
+export default function AdminSuperAdminsPage({ embedded = false }) {
   const { me } = useAuth();
   const myId = me?.user?.id;
 
@@ -79,9 +79,11 @@ export default function AdminSuperAdminsPage() {
 
   return (
     <>
-      <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
-        <Link to="/admin">← داشبورد</Link>
-      </p>
+      {!embedded ? (
+        <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
+          <Link to="/admin">← داشبورد</Link>
+        </p>
+      ) : null}
 
       <section className="dashboard-panel">
         <h2>ایجاد سوپرادمین جدید</h2>

@@ -71,7 +71,7 @@ export default function DashboardTwilioSettingsPage() {
           <DashboardPanelHead headingId="twilio-settings-heading" title="تنظیمات Twilio" icon={dashboardIcons.overview} />
           <p className="field-hint">
             ماژول Twilio توسط سوپرادمین غیرفعال شده است. برای فعال‌سازی از{" "}
-            <Link to="/admin-security">امنیت و ۲FA</Link> در پنل سوپرادمین، بخش «ماژول Twilio» را باز کنید.
+            <Link to="/admin-settings?tab=security">تنظیمات</Link> در پنل سوپرادمین، بخش «ماژول Twilio» را باز کنید.
           </p>
         </section>
       </DashboardMain>

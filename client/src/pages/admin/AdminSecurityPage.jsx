@@ -14,7 +14,7 @@ function errMessage(code) {
   return map[code] || code;
 }
 
-export default function AdminSecurityPage() {
+export default function AdminSecurityPage({ embedded = false }) {
   const { me, loadMe } = useAuth();
   const totpOn = !!me?.totp_enabled;
   const mustEnroll2fa = me?.role === "superadmin" && !!me?.totp_setup_required && !me?.totp_enabled;
@@ -184,9 +184,11 @@ export default function AdminSecurityPage() {
 
   return (
     <>
-      <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
-        <Link to="/admin">← داشبورد</Link>
-      </p>
+      {!embedded ? (
+        <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
+          <Link to="/admin">← داشبورد</Link>
+        </p>
+      ) : null}
 
       {mustEnroll2fa ? (
         <div
