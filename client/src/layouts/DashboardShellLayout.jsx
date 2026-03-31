@@ -6,14 +6,14 @@ import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 
 const NAV_BASE = [
-  { to: "/dashboard", label: "نمای کلی", end: true },
-  { to: "/dashboard/edit", label: "ویرایش آگهی" },
-  { to: "/dashboard/careers", label: "فرصت‌های شغلی" },
-  { to: "/dashboard/media", label: "تصاویر" },
-  { to: "/dashboard/twilio", label: "تنظیمات Twilio", twilioOnly: true },
-  { to: "/dashboard/calls", label: "لاگ تماس‌ها", twilioOnly: true },
-  { to: "/dashboard/qr", label: "QR نظر Google" },
-  { to: "/dashboard/biolink", label: "لینک‌های من (Biolink)" },
+  { to: "/dashboard", label: "نمای کلی", end: true, iconKey: "overview" },
+  { to: "/dashboard/edit", label: "ویرایش آگهی", iconKey: "edit" },
+  { to: "/dashboard/careers", label: "فرصت‌های شغلی", iconKey: "careers" },
+  { to: "/dashboard/media", label: "تصاویر", iconKey: "media" },
+  { to: "/dashboard/twilio", label: "تنظیمات Twilio", twilioOnly: true, iconKey: "twilio" },
+  { to: "/dashboard/calls", label: "لاگ تماس‌ها", twilioOnly: true, iconKey: "calls" },
+  { to: "/dashboard/qr", label: "QR نظر Google", iconKey: "qr" },
+  { to: "/dashboard/biolink", label: "لینک‌های من (Biolink)", iconKey: "biolink" },
 ];
 
 function ImpersonationBanner() {
@@ -98,21 +98,37 @@ function DashboardChrome() {
             {navItems.map((item) => (
               <li key={item.to}>
                 <NavLink to={item.to} end={item.end}>
-                  {item.label}
+                  <span className="app-shell__nav-icon" aria-hidden="true">
+                    {dashboardIcons[item.iconKey]}
+                  </span>
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
             <li>
-              <Link to={previewTo}>پیش‌نمایش صفحهٔ آگهی</Link>
+              <Link to={previewTo}>
+                <span className="app-shell__nav-icon" aria-hidden="true">
+                  {dashboardIcons.preview}
+                </span>
+                <span>پیش‌نمایش صفحهٔ آگهی</span>
+              </Link>
             </li>
             <li>
               <Link to={biolinkPublicTo} target="_blank" rel="noreferrer">
-                صفحهٔ Biolink (عمومی)
+                <span className="app-shell__nav-icon" aria-hidden="true">
+                  {dashboardIcons.external}
+                </span>
+                <span>صفحهٔ Biolink (عمومی)</span>
               </Link>
             </li>
           </ul>
           <div className="app-shell__sidebar-foot">
-            <Link to="/listings">مشاهده در فهرست</Link>
+            <Link to="/listings">
+              <span className="app-shell__nav-icon" aria-hidden="true">
+                {dashboardIcons.listings}
+              </span>
+              <span>مشاهده در فهرست</span>
+            </Link>
           </div>
         </aside>
 

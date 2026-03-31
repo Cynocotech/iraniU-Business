@@ -2625,8 +2625,16 @@ body.app-shell-body .admin-topbar {
 }
 
 .app-shell__sidebar-foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: var(--color-primary);
   font-weight: 600;
+  text-decoration: none;
+}
+
+.app-shell__sidebar-foot a:hover {
+  text-decoration: underline;
 }
 
 .app-shell__body {
