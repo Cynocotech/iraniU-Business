@@ -7,9 +7,8 @@ const TABS = [
   {
     id: "security",
     label: "امنیت و ۲FA",
-    hint: "رمز دو مرحله‌ای و ماژول‌ها",
     icon: (
-      <svg className="admin-settings-tabs__glyph" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="admin-settings-tabs__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path
           fill="currentColor"
           d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v5.7c0 4.67-3.13 8.98-7 10.05-3.87-1.07-7-5.38-7-10.05V6.3l7-3.12zM11 7h2v6h-2V7zm0 8h2v2h-2v-2z"
@@ -20,9 +19,8 @@ const TABS = [
   {
     id: "super-admins",
     label: "سوپرادمین‌ها",
-    hint: "دسترسی سطح بالا",
     icon: (
-      <svg className="admin-settings-tabs__glyph" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="admin-settings-tabs__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path
           fill="currentColor"
           d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
@@ -33,9 +31,8 @@ const TABS = [
   {
     id: "logs",
     label: "لاگ سیستم",
-    hint: "رویدادها و خطاها",
     icon: (
-      <svg className="admin-settings-tabs__glyph" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="admin-settings-tabs__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path
           fill="currentColor"
           d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7v-7zm4-5h2v12h-2V5zm4 3h2v9h-2V8z"
@@ -84,13 +81,8 @@ export default function AdminSettingsPage() {
                 }
                 onClick={() => setTab(t.id)}
               >
-                <span className="admin-settings-tabs__btn-inner">
-                  {t.icon}
-                  <span className="admin-settings-tabs__text">
-                    <span className="admin-settings-tabs__label">{t.label}</span>
-                    <span className="admin-settings-tabs__hint">{t.hint}</span>
-                  </span>
-                </span>
+                {t.icon}
+                <span className="admin-settings-tabs__label">{t.label}</span>
               </button>
             );
           })}

@@ -2497,32 +2497,33 @@ body.app-shell-body .admin-topbar {
 }
 
 .app-shell__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  display: block;
   margin-bottom: var(--space-xl);
   padding: 0 var(--space-xs);
-  font-weight: 800;
-  font-size: 1.15rem;
-  color: var(--color-text);
+  line-height: 0;
   text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s ease;
 }
 
 .app-shell__brand:hover {
   text-decoration: none;
-  color: var(--color-primary);
+  opacity: 0.9;
 }
 
-.app-shell__brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #4db6ac, #7e57c2);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 0.95rem;
-  box-shadow: 0 6px 20px rgba(126, 87, 194, 0.25);
+.app-shell__brand:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 3px;
+}
+
+.app-shell__brand-img {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  max-height: 48px;
+  object-fit: contain;
+  object-position: center right;
 }
 
 .app-shell__nav-title {
@@ -2576,13 +2577,13 @@ body.app-shell-body .admin-topbar {
   border-inline-start-color: #26a69a;
 }
 
-/* صفحهٔ تنظیمات سوپرادمین — هدر و تب‌های بخش */
+/* صفحهٔ تنظیمات سوپرادمین — هدر و تب‌ها (استایل خط‌زیر / underline) */
 .admin-settings-page {
   min-width: 0;
 }
 
 .admin-settings-head {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .admin-settings-head__crumb {
@@ -2602,7 +2603,7 @@ body.app-shell-body .admin-topbar {
 
 .admin-settings-head__titles {
   padding-bottom: var(--space-md);
-  border-bottom: 1px solid rgba(58, 11, 71, 0.12);
+  border-bottom: 1px solid rgba(58, 11, 71, 0.1);
 }
 
 .admin-settings-head__title {
@@ -2621,152 +2622,98 @@ body.app-shell-body .admin-topbar {
 }
 
 .admin-settings-tabs-wrap {
-  position: relative;
   margin-bottom: var(--space-lg);
-  padding: 5px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, rgba(58, 11, 71, 0.06) 0%, rgba(77, 182, 172, 0.08) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 1px 2px rgba(26, 31, 36, 0.06);
-  border: 1px solid rgba(58, 11, 71, 0.1);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .admin-settings-tabs {
   display: flex;
-  flex-direction: row;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .admin-settings-tabs__btn {
-  flex: 1 1 0;
-  min-width: min(100%, 10.5rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0;
-  padding: 0;
+  margin-bottom: -1px;
+  padding: 0.7rem 1.15rem;
   border: none;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-bottom: 3px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
   color: var(--color-muted);
   cursor: pointer;
-  text-align: start;
   font: inherit;
+  font-size: 0.94rem;
+  font-weight: 600;
+  white-space: nowrap;
   transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.15s ease;
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-.admin-settings-tabs__btn-inner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  min-height: 3.5rem;
-  border-radius: inherit;
-}
-
-.admin-settings-tabs__glyph {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  opacity: 0.72;
-  transition: opacity 0.2s ease;
-}
-
-.admin-settings-tabs__text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.admin-settings-tabs__label {
-  font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1.25;
-  color: inherit;
-}
-
-.admin-settings-tabs__hint {
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1.3;
-  color: var(--color-muted);
-  opacity: 0.95;
-}
-
-.admin-settings-tabs__btn:hover:not(.admin-settings-tabs__btn--active) .admin-settings-tabs__btn-inner {
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.admin-settings-tabs__btn:hover:not(.admin-settings-tabs__btn--active) {
+.admin-settings-tabs__btn:hover {
   color: var(--color-primary);
-}
-
-.admin-settings-tabs__btn:hover:not(.admin-settings-tabs__btn--active) .admin-settings-tabs__glyph {
-  opacity: 0.95;
+  background: rgba(58, 11, 71, 0.04);
 }
 
 .admin-settings-tabs__btn--active {
-  color: var(--color-primary);
-  box-shadow: 0 4px 18px rgba(58, 11, 71, 0.12);
+  color: #00695c;
+  font-weight: 700;
+  border-bottom-color: #26a69a;
+  background: rgba(77, 182, 172, 0.08);
 }
 
-.admin-settings-tabs__btn--active .admin-settings-tabs__btn-inner {
-  background: var(--color-surface);
-  box-shadow:
-    0 0 0 1px rgba(77, 182, 172, 0.45),
-    0 2px 8px rgba(38, 166, 154, 0.12);
+.admin-settings-tabs__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
 }
 
-.admin-settings-tabs__btn--active .admin-settings-tabs__glyph {
+.admin-settings-tabs__btn--active .admin-settings-tabs__icon {
   opacity: 1;
   color: #00897b;
 }
 
-.admin-settings-tabs__btn--active .admin-settings-tabs__hint {
-  color: #5c6670;
+.admin-settings-tabs__label {
+  line-height: 1.3;
 }
 
 .admin-settings-tabs__btn:focus-visible {
-  outline: none;
-}
-
-.admin-settings-tabs__btn:focus-visible .admin-settings-tabs__btn-inner {
   outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 @media (max-width: 640px) {
   .admin-settings-tabs-wrap {
-    padding: 4px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
     scrollbar-width: thin;
   }
 
   .admin-settings-tabs {
     flex-wrap: nowrap;
     min-width: min-content;
+    padding-bottom: 1px;
   }
 
   .admin-settings-tabs__btn {
-    flex: 0 0 min(88vw, 15rem);
-    min-width: min(88vw, 15rem);
-    scroll-snap-align: start;
+    flex: 0 0 auto;
   }
 }
 
 .admin-settings-panels {
   min-width: 0;
-  padding-top: 2px;
+  padding-top: var(--space-xs);
 }
 
 .app-shell__nav-icon {

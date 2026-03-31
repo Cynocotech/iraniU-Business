@@ -29,11 +29,16 @@ export default function AppShellLayout() {
           aria-hidden="true"
         ></label>
         <aside className="app-shell__sidebar" aria-label="منوی پنل">
-          <Link className="app-shell__brand" to="/">
-            <span className="app-shell__brand-mark" aria-hidden="true">
-              ای
-            </span>
-            <span>ایرانیو</span>
+          <Link className="app-shell__brand" to="/" title="ایرانیو — صفحهٔ اصلی">
+            <img
+              className="app-shell__brand-img"
+              src="/images/iraniu-logo-header.png"
+              alt=""
+              width={200}
+              height={52}
+              decoding="async"
+            />
+            <span className="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
           </Link>
           <p className="app-shell__nav-title">پنل کسب‌وکار</p>
           <ul className="app-shell__nav">
