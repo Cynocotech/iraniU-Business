@@ -3,21 +3,22 @@ import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
+import { adminShellNavIcons } from "../components/AdminShellNavIcons.jsx";
 
 const adminNav = [
-  { to: "/admin", label: "داشبورد", end: true },
-  { to: "/admin-notes", label: "یادداشت و کارها" },
-  { to: "/admin-businesses", label: "همه آگهی‌ها" },
-  { to: "/admin-edit", label: "ویرایش آگهی" },
-  { to: "/admin-add", label: "افزودن آگهی" },
-  { to: "/admin-categories", label: "دسته‌بندی‌ها" },
-  { to: "/admin-qr-export", label: "خروجی QR" },
-  { to: "/admin-claims", label: "درخواست‌های ادعا" },
-  { to: "/admin-link", label: "لینک آگهی ↔ مدیر" },
-  { to: "/admin-billing", label: "صورت‌حساب" },
-  { to: "/admin-managers", label: "حساب‌های مدیر" },
-  { to: "/admin-chat-log", label: "گفتگو و لاگ سایت" },
-  { to: "/admin-settings", label: "تنظیمات" },
+  { to: "/admin", label: "داشبورد", end: true, icon: "dashboard" },
+  { to: "/admin-notes", label: "یادداشت و کارها", icon: "notes" },
+  { to: "/admin-businesses", label: "همه آگهی‌ها", icon: "businesses" },
+  { to: "/admin-edit", label: "ویرایش آگهی", icon: "edit" },
+  { to: "/admin-add", label: "افزودن آگهی", icon: "add" },
+  { to: "/admin-categories", label: "دسته‌بندی‌ها", icon: "categories" },
+  { to: "/admin-qr-export", label: "خروجی QR", icon: "qrExport" },
+  { to: "/admin-claims", label: "درخواست‌های ادعا", icon: "claims" },
+  { to: "/admin-link", label: "لینک آگهی ↔ مدیر", icon: "link" },
+  { to: "/admin-billing", label: "صورت‌حساب", icon: "billing" },
+  { to: "/admin-managers", label: "حساب‌های مدیر", icon: "managers" },
+  { to: "/admin-chat-log", label: "گفتگو و لاگ سایت", icon: "chatLog" },
+  { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
 ];
 
 export default function AdminShellLayout() {
@@ -64,13 +65,21 @@ export default function AdminShellLayout() {
             {adminNav.map((item) => (
               <li key={item.to}>
                 <NavLink to={item.to} end={item.end === true}>
-                  {item.label}
+                  <span className="app-shell__nav-icon" aria-hidden="true">
+                    {adminShellNavIcons[item.icon]}
+                  </span>
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
           </ul>
           <div className="app-shell__sidebar-foot">
-            <Link to="/">بازگشت به سایت عمومی</Link>
+            <Link to="/">
+              <span className="app-shell__nav-icon" aria-hidden="true">
+                {adminShellNavIcons.homePublic}
+              </span>
+              <span>بازگشت به سایت عمومی</span>
+            </Link>
           </div>
         </aside>
 
