@@ -105,7 +105,7 @@ export default function AdminManagersPage() {
         {!twilioModuleEnabled ? (
           <p className="field-hint" style={{ color: "#5d4037" }}>
             ماژول Twilio غیرفعال است — ستون Twilio فقط خواندنی است. برای ذخیره از{" "}
-            <Link to="/admin-settings?tab=security">تنظیمات</Link> بخش «ماژول Twilio» را فعال کنید.
+            <Link to="/admin-settings#security">تنظیمات</Link> بخش «ماژول Twilio» را فعال کنید.
           </p>
         ) : null}
         <p className="field-hint">

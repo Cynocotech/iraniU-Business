@@ -2621,99 +2621,19 @@ body.app-shell-body .admin-topbar {
   line-height: 1.45;
 }
 
-.admin-settings-tabs-wrap {
-  margin-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.admin-settings-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-settings-tabs__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  margin-bottom: -1px;
-  padding: 0.7rem 1.15rem;
-  border: none;
-  border-bottom: 3px solid transparent;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: transparent;
-  color: var(--color-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.94rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.admin-settings-tabs__btn:hover {
-  color: var(--color-primary);
-  background: rgba(58, 11, 71, 0.04);
-}
-
-.admin-settings-tabs__btn--active {
-  color: #00695c;
-  font-weight: 700;
-  border-bottom-color: #26a69a;
-  background: rgba(77, 182, 172, 0.08);
-}
-
-.admin-settings-tabs__icon {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  opacity: 0.75;
-  transition: opacity 0.15s ease;
-}
-
-.admin-settings-tabs__btn--active .admin-settings-tabs__icon {
-  opacity: 1;
-  color: #00897b;
-}
-
-.admin-settings-tabs__label {
-  line-height: 1.3;
-}
-
-.admin-settings-tabs__btn:focus-visible {
-  outline: 2px solid var(--color-primary-light);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-@media (max-width: 640px) {
-  .admin-settings-tabs-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-  }
-
-  .admin-settings-tabs {
-    flex-wrap: nowrap;
-    min-width: min-content;
-    padding-bottom: 1px;
-  }
-
-  .admin-settings-tabs__btn {
-    flex: 0 0 auto;
-  }
-}
-
-.admin-settings-panels {
+.admin-settings-sections {
   min-width: 0;
-  padding-top: var(--space-xs);
+}
+
+.admin-settings-section {
+  min-width: 0;
+  scroll-margin-top: 1rem;
+}
+
+.admin-settings-section + .admin-settings-section {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid rgba(58, 11, 71, 0.1);
 }
 
 .app-shell__nav-icon {

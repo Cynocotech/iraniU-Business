@@ -101,9 +101,9 @@ export default function App() {
         <Route path="/admin-managers" element={<AdminManagersPage />} />
         <Route path="/admin-chat-log" element={<AdminChatLogPage />} />
         <Route path="/admin-settings" element={<AdminSettingsPage />} />
-        <Route path="/admin-system-logs" element={<Navigate to="/admin-settings?tab=logs" replace />} />
-        <Route path="/admin-security" element={<Navigate to="/admin-settings?tab=security" replace />} />
-        <Route path="/admin-super-admins" element={<Navigate to="/admin-settings?tab=super-admins" replace />} />
+        <Route path="/admin-system-logs" element={<Navigate to="/admin-settings#logs" replace />} />
+        <Route path="/admin-security" element={<Navigate to="/admin-settings#security" replace />} />
+        <Route path="/admin-super-admins" element={<Navigate to="/admin-settings#super-admins" replace />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
