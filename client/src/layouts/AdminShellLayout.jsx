@@ -71,15 +71,27 @@ export default function AdminShellLayout() {
 
         <div className="app-shell__body">
           <header className="app-shell__header">
-            <label
-              htmlFor="admin-shell-sidebar-toggle"
-              className="app-shell__sidebar-toggle"
-              aria-label="باز و بسته کردن منو"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path stroke="currentColor" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </label>
+            <div className="app-shell__header-leading">
+              <Link className="app-shell__header-logo" to="/" title="ایرانیو — صفحهٔ اصلی">
+                <img
+                  src="/images/iraniu-logo-header.png"
+                  alt=""
+                  width={180}
+                  height={48}
+                  decoding="async"
+                />
+                <span className="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
+              </Link>
+              <label
+                htmlFor="admin-shell-sidebar-toggle"
+                className="app-shell__sidebar-toggle"
+                aria-label="باز و بسته کردن منو"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path stroke="currentColor" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </label>
+            </div>
             <div className="app-shell__header-text">
               <h1>پنل سوپرادمین</h1>
               <p>سلام! خوش آمدید — همان چیدمان داشبورد کسب‌وکار</p>
