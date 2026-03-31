@@ -75,13 +75,6 @@ export default function AdminHomePage() {
           </p>
           <p className="app-shell__metric-hint">آگهی‌هایی با وضعیت غیرفعال</p>
         </div>
-        <div className="app-shell__metric app-shell__metric--purple">
-          <p className="app-shell__metric-label">بسته ویژه</p>
-          <p className="app-shell__metric-value" dir="ltr">
-            {stats ? formatNum(stats.featured_businesses) : "…"}
-          </p>
-          <p className="app-shell__metric-hint">آگهی با بستهٔ تبلیغاتی ویژه</p>
-        </div>
       </div>
 
       {err && (

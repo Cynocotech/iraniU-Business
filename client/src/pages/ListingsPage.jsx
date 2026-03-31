@@ -17,9 +17,6 @@ function filterRows(rows, searchParams) {
   const q = (searchParams.get("q") || "").trim().toLowerCase();
   const city = (searchParams.get("city") || "").trim().toLowerCase();
   const cat = (searchParams.get("cat") || "").trim();
-  const featured = searchParams.get("featured") === "1";
-
-  if (featured) out = out.filter((b) => b.package === "featured");
   if (city) {
     out = out.filter((b) => (b.city || "").toLowerCase().includes(city));
   }

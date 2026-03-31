@@ -1,6 +1,6 @@
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { apiGet, apiPost } from "../api.js";
+import { apiGet } from "../api.js";
 import {
   parseGalleryJson,
   parseHoursJson,
@@ -110,19 +110,6 @@ export default function BusinessPage() {
   const [showOnboardingWelcome, setShowOnboardingWelcome] = useState(
     () => !!location.state?.onboardingComplete
   );
-  const [booking, setBooking] = useState({
-    customer_name: "",
-    customer_email: "",
-    customer_phone: "",
-    reservation_date: "",
-    reservation_time: "",
-    party_size: "2",
-    notes: "",
-  });
-  const [bookingBusy, setBookingBusy] = useState(false);
-  const [bookingMsg, setBookingMsg] = useState("");
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
-  const [bookingSuccessOpen, setBookingSuccessOpen] = useState(false);
 
   useEffect(() => {
     setB(null);
@@ -165,8 +152,7 @@ export default function BusinessPage() {
   const mapsSearchUrl = b?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`
     : "https://www.google.com/maps";
-
-  const isFeatured = b?.package === "featured";
+  const reservationLink = String(b?.reservation_link || "").trim();
 
   const coverStyleUrl = useMemo(() => {
     if (!b) return COVER_BY_CATEGORY.default;
@@ -189,36 +175,10 @@ export default function BusinessPage() {
 
   const hoursRows = parseHoursJson(b?.hours_json);
   const gallerySlots = parseGalleryJson(b?.gallery_json);
-  const showPromo =
-    isFeatured && !!(b?.promo_title?.trim() || b?.promo_description?.trim());
+  const showPromo = !!(b?.promo_title?.trim() || b?.promo_description?.trim());
   const careersBody = b?.careers_text && String(b.careers_text).trim();
   const careersSubtitle = b?.careers_title && String(b.careers_title).trim();
   const showCareers = !!careersBody;
-
-  const submitBooking = async (e) => {
-    e.preventDefault();
-    if (!b?.slug) return;
-    setBookingBusy(true);
-    setBookingMsg("");
-    try {
-      await apiPost("/api/reservations", { business_slug: b.slug, ...booking });
-      setBooking({
-        customer_name: "",
-        customer_email: "",
-        customer_phone: "",
-        reservation_date: "",
-        reservation_time: "",
-        party_size: "2",
-        notes: "",
-      });
-      setBookingModalOpen(false);
-      setBookingSuccessOpen(true);
-    } catch (err) {
-      setBookingMsg(`خطا: ${err.message || "نامشخص"}`);
-    } finally {
-      setBookingBusy(false);
-    }
-  };
 
   if (loadState === "loading") {
     return (
@@ -329,7 +289,6 @@ export default function BusinessPage() {
                 {!isActive && <span className="badge">غیرفعال</span>}
                 {!b.claimed && <span className="badge badge--unclaimed">بدون مالک</span>}
                 {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
-                {isFeatured && <span className="badge">ویژه</span>}
               </p>
               {isActive && b.cta && String(b.cta).trim() && b.phone && (
                 <p className="profile-cta-row">
@@ -484,17 +443,19 @@ export default function BusinessPage() {
             </div>
           </section>
 
-          <section className="profile-panel profile-body" aria-labelledby="booking-title">
-            <h2 id="booking-title" className="profile-section-heading">
-              رزرو آنلاین
-            </h2>
-            <p className="field-hint">برای رزرو، روی دکمهٔ «رزرو» بزنید تا فرم در پنجره باز شود.</p>
-            <div className="dashboard-actions">
-              <button type="button" className="btn btn--primary" onClick={() => setBookingModalOpen(true)}>
+          {reservationLink && (
+            <section className="profile-panel profile-body" aria-labelledby="booking-title">
+              <h2 id="booking-title" className="profile-section-heading">
                 رزرو
-              </button>
-            </div>
-          </section>
+              </h2>
+              <p className="field-hint">برای رزرو از لینک اختصاصی این کسب‌وکار استفاده کنید.</p>
+              <div className="dashboard-actions">
+                <a className="btn btn--primary" href={reservationLink} target="_blank" rel="noopener noreferrer">
+                  رزرو آنلاین
+                </a>
+              </div>
+            </section>
+          )}
         </div>
 
         <aside aria-label="تماس و تبلیغات">
@@ -566,119 +527,6 @@ export default function BusinessPage() {
       <p style={{ marginTop: "1.5rem" }}>
         <Link to="/listings">بازگشت به لیست</Link>
       </p>
-
-      <div
-        className="admin-detail-modal"
-        hidden={!bookingModalOpen}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="booking-modal-title"
-      >
-        <div className="admin-detail-modal__backdrop" aria-hidden="true" onClick={() => setBookingModalOpen(false)} />
-        <div className="admin-detail-modal__panel">
-          <h2 className="admin-detail-modal__title" id="booking-modal-title">
-            فرم رزرو
-          </h2>
-          <p className="field-hint" style={{ marginTop: 0 }}>
-            فیلدهای ضروری: نام، ایمیل، تاریخ، ساعت
-          </p>
-          <form className="form-grid" onSubmit={submitBooking}>
-            <div className="field field--block">
-              <label htmlFor="booking-name">نام شما</label>
-              <input
-                id="booking-name"
-                value={booking.customer_name}
-                onChange={(e) => setBooking((s) => ({ ...s, customer_name: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="field field--block">
-              <label htmlFor="booking-email">ایمیل</label>
-              <input
-                id="booking-email"
-                type="email"
-                dir="ltr"
-                value={booking.customer_email}
-                onChange={(e) => setBooking((s) => ({ ...s, customer_email: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="booking-date">تاریخ</label>
-              <input
-                id="booking-date"
-                type="date"
-                value={booking.reservation_date}
-                onChange={(e) => setBooking((s) => ({ ...s, reservation_date: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="booking-time">ساعت</label>
-              <input
-                id="booking-time"
-                type="time"
-                value={booking.reservation_time}
-                onChange={(e) => setBooking((s) => ({ ...s, reservation_time: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="field field--block">
-              <label htmlFor="booking-phone">شماره تماس (اختیاری)</label>
-              <input
-                id="booking-phone"
-                dir="ltr"
-                value={booking.customer_phone}
-                onChange={(e) => setBooking((s) => ({ ...s, customer_phone: e.target.value }))}
-              />
-            </div>
-            <div className="dashboard-actions dashboard-actions--inline">
-              <button className="btn btn--primary" disabled={bookingBusy}>
-                {bookingBusy ? "در حال ارسال…" : "ثبت رزرو"}
-              </button>
-              <button type="button" className="btn btn--ghost" onClick={() => setBookingModalOpen(false)}>
-                بستن
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div
-        className="admin-detail-modal"
-        hidden={!bookingSuccessOpen}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="booking-success-title"
-      >
-        <div className="admin-detail-modal__backdrop" aria-hidden="true" onClick={() => setBookingSuccessOpen(false)} />
-        <div className="admin-detail-modal__panel" style={{ textAlign: "center" }}>
-          <div
-            aria-hidden="true"
-            style={{
-              width: "3.25rem",
-              height: "3.25rem",
-              margin: "0 auto 0.75rem",
-              borderRadius: "999px",
-              background: "rgba(46, 125, 50, 0.12)",
-              color: "#2e7d32",
-              display: "grid",
-              placeItems: "center",
-              fontSize: "1.5rem",
-            }}
-          >
-            🎫
-          </div>
-          <h2 className="admin-detail-modal__title" id="booking-success-title">
-            درخواست رزرو شما ثبت شد. ایمیل تایید برای شما ارسال می‌شود.
-          </h2>
-          <div className="dashboard-actions dashboard-actions--inline" style={{ justifyContent: "center", marginTop: "1rem" }}>
-            <button type="button" className="btn btn--primary" onClick={() => setBookingSuccessOpen(false)}>
-              متوجه شدم
-            </button>
-          </div>
-        </div>
-      </div>
     </article>
   );
 }

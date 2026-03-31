@@ -13,8 +13,7 @@ export default function HomePage() {
   useEffect(() => {
     apiGet("/api/businesses")
       .then((rows) => {
-        const f = (rows || []).filter((b) => b.package === "featured").slice(0, 6);
-        setFeatured(f);
+        setFeatured((rows || []).slice(0, 6));
       })
       .catch(() => setFeatured([]));
   }, []);
@@ -83,12 +82,6 @@ export default function HomePage() {
                 جستجو
               </button>
             </div>
-            <div className="hero__filters-extra hero__filters-extra--home">
-              <label className="hero__filter-check">
-                <input type="checkbox" name="featured" id="hero-featured" value="1" />
-                <span>فقط آگهی‌های ویژه (تبلیغاتی)</span>
-              </label>
-            </div>
           </form>
         </div>
       </section>
@@ -121,7 +114,7 @@ export default function HomePage() {
         <div className="card-grid card-grid--home">
           {featured.length === 0 ? (
             <p className="field-hint" style={{ gridColumn: "1 / -1" }}>
-              هنوز آگهی ویژه‌ای ثبت نشده.{" "}
+              هنوز آگهی‌ای ثبت نشده.{" "}
               <Link to="/listings">مشاهدهٔ همهٔ آگهی‌ها</Link>
             </p>
           ) : (

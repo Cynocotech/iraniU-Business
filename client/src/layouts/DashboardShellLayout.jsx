@@ -3,14 +3,13 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { DashboardProvider, useDashboard } from "../context/DashboardContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
+import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 
 const NAV = [
   { to: "/dashboard", label: "نمای کلی", end: true },
   { to: "/dashboard/edit", label: "ویرایش آگهی" },
   { to: "/dashboard/careers", label: "فرصت‌های شغلی" },
-  { to: "/dashboard/package", label: "بسته تبلیغاتی" },
   { to: "/dashboard/media", label: "تصاویر" },
-  { to: "/dashboard/reservations", label: "رزروها" },
   { to: "/dashboard/qr", label: "QR نظر Google" },
   { to: "/dashboard/biolink", label: "لینک‌های من (Biolink)" },
 ];
@@ -106,8 +105,6 @@ function DashboardChrome() {
           </ul>
           <div className="app-shell__sidebar-foot">
             <Link to="/listings">مشاهده در فهرست</Link>
-            {" · "}
-            <Link to="/advertise">ارتقای بسته</Link>
           </div>
         </aside>
 
@@ -138,9 +135,18 @@ function DashboardChrome() {
               <button type="button" className="btn btn--ghost" onClick={onLogout}>
                 خروج
               </button>
+              <ProfileAvatarUploader />
               <div className="app-shell__user">
                 <div className="app-shell__user-avatar" aria-hidden="true">
-                  س
+                  {me?.user?.avatar_url ? (
+                    <img
+                      src={me.user.avatar_url}
+                      alt=""
+                      style={{ width: "100%", height: "100%", borderRadius: "999px", objectFit: "cover" }}
+                    />
+                  ) : (
+                    "س"
+                  )}
                 </div>
                 <div className="app-shell__user-text">
                   <strong>{me?.role === "superadmin" ? "سوپرادمین" : "مدیر آگهی"}</strong>

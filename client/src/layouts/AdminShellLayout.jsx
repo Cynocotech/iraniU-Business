@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
+import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 
 const adminNav = [
   { to: "/admin", label: "داشبورد", end: true },
@@ -99,9 +100,18 @@ export default function AdminShellLayout() {
               <button type="button" className="btn btn--ghost" onClick={onLogout}>
                 خروج
               </button>
+              <ProfileAvatarUploader />
               <div className="app-shell__user">
                 <div className="app-shell__user-avatar" aria-hidden="true">
-                  س
+                  {me?.user?.avatar_url ? (
+                    <img
+                      src={me.user.avatar_url}
+                      alt=""
+                      style={{ width: "100%", height: "100%", borderRadius: "999px", objectFit: "cover" }}
+                    />
+                  ) : (
+                    "س"
+                  )}
                 </div>
                 <div className="app-shell__user-text">
                   <strong>سوپرادمین</strong>

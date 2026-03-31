@@ -7,10 +7,9 @@ import { fileURLToPath } from "url";
 import { db, ensureRestaurantSafraDemo } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword } from "./authUtil.js";
-import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
+import { requireSuperAdmin } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
-import { sendReservationEmails, sendManagerTelegramBooking } from "./bookingNotify.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 
 const PATCHABLE_BUSINESS = new Set([
@@ -38,6 +37,7 @@ const PATCHABLE_BUSINESS = new Set([
   "biolink_json",
   "careers_title",
   "careers_text",
+  "reservation_link",
 ]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +52,9 @@ if (process.env.TRUST_PROXY === "1") {
 }
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+const uploadsDir = path.join(__dirname, "..", "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use("/uploads", express.static(uploadsDir));
 
 ensureSuperAdminFromEnv();
 registerAuthRoutes(app);
@@ -517,180 +520,6 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/manager/booking-notify-settings", requireManager, (req, res) => {
-  const m = db
-    .prepare(`SELECT id, email, telegram_bot_token, telegram_chat_id FROM managers WHERE id = ?`)
-    .get(req.auth.sub);
-  if (!m) return res.status(404).json({ error: "not_found" });
-  const maskedToken =
-    m.telegram_bot_token && String(m.telegram_bot_token).length > 4
-      ? `••••${String(m.telegram_bot_token).slice(-4)}`
-      : m.telegram_bot_token
-      ? "••••"
-      : null;
-  res.json({
-    email: m.email || "",
-    telegram_chat_id: m.telegram_chat_id || "",
-    telegram_bot_token_set: !!m.telegram_bot_token,
-    telegram_bot_token_masked: maskedToken,
-  });
-});
-
-app.patch("/api/manager/booking-notify-settings", requireManager, (req, res) => {
-  const b = req.body && typeof req.body === "object" ? req.body : {};
-  const updates = {};
-  if ("telegram_chat_id" in b) updates.telegram_chat_id = String(b.telegram_chat_id || "").trim() || null;
-  if ("telegram_bot_token" in b) updates.telegram_bot_token = String(b.telegram_bot_token || "").trim() || null;
-  const keys = Object.keys(updates);
-  if (!keys.length) return res.status(400).json({ error: "no_fields" });
-  const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-  db.prepare(`UPDATE managers SET ${setClause} WHERE id = @id`).run({ ...updates, id: req.auth.sub });
-  writeSystemLog({
-    ...actorFromAuth(req.auth),
-    action: "manager_notify_settings_updated",
-    targetType: "manager",
-    targetId: req.auth.sub,
-    message: "Manager updated booking notification settings",
-    meta: { fields: keys },
-  });
-  const m = db
-    .prepare(`SELECT email, telegram_bot_token, telegram_chat_id FROM managers WHERE id = ?`)
-    .get(req.auth.sub);
-  res.json({
-    email: m?.email || "",
-    telegram_chat_id: m?.telegram_chat_id || "",
-    telegram_bot_token_set: !!m?.telegram_bot_token,
-    telegram_bot_token_masked:
-      m?.telegram_bot_token && String(m.telegram_bot_token).length > 4
-        ? `••••${String(m.telegram_bot_token).slice(-4)}`
-        : m?.telegram_bot_token
-        ? "••••"
-        : null,
-  });
-});
-
-app.post("/api/reservations", async (req, res) => {
-  const b = req.body && typeof req.body === "object" ? req.body : {};
-  const business_slug = String(b.business_slug || "").trim();
-  const customer_name = String(b.customer_name || "").trim();
-  const customer_email = String(b.customer_email || "").trim().toLowerCase();
-  const customer_phone = String(b.customer_phone || "").trim();
-  const reservation_date = String(b.reservation_date || "").trim();
-  const reservation_time = String(b.reservation_time || "").trim();
-  const notes = String(b.notes || "").trim();
-  const party_size = Math.max(1, Math.min(20, parseInt(String(b.party_size || "2"), 10) || 2));
-  if (!business_slug || !customer_name || !customer_email || !reservation_date || !reservation_time) {
-    return res.status(400).json({ error: "missing_fields" });
-  }
-  const biz = db
-    .prepare(
-      `SELECT b.slug, b.name_fa, b.manager_id, m.email AS manager_email, m.name AS manager_name, m.telegram_bot_token, m.telegram_chat_id
-       FROM businesses b LEFT JOIN managers m ON m.id = b.manager_id WHERE b.slug = ?`
-    )
-    .get(business_slug);
-  if (!biz) return res.status(404).json({ error: "business_not_found" });
-  const info = db
-    .prepare(
-      `INSERT INTO reservations (business_slug, customer_name, customer_email, customer_phone, reservation_date, reservation_time, party_size, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
-    )
-    .run(
-      business_slug,
-      customer_name,
-      customer_email,
-      customer_phone || null,
-      reservation_date,
-      reservation_time,
-      party_size,
-      notes || null
-    );
-  const row = db.prepare(`SELECT * FROM reservations WHERE id = ?`).get(info.lastInsertRowid);
-
-  void sendReservationEmails({
-    reservation: row,
-    businessName: biz.name_fa,
-    managerEmail: biz.manager_email,
-    managerName: biz.manager_name,
-    businessSlug: biz.slug,
-  }).catch((e) => console.warn("reservation email notify", e?.message || e));
-
-  void sendManagerTelegramBooking({
-    botToken: biz.telegram_bot_token,
-    chatId: biz.telegram_chat_id,
-    reservation: row,
-    businessName: biz.name_fa,
-  }).catch((e) => console.warn("reservation telegram notify", e?.message || e));
-
-  res.status(201).json({ ok: true, reservation_id: row.id, status: row.status });
-});
-
-app.get("/api/manager/reservations", requireManager, (req, res) => {
-  const month = String(req.query.month || "").trim();
-  const monthOk = /^\d{4}-\d{2}$/.test(month) ? month : "";
-  const managerId = Number(req.auth.sub);
-  const q = `
-    SELECT r.*, b.name_fa AS business_name
-    FROM reservations r
-    JOIN businesses b ON b.slug = r.business_slug
-    WHERE b.manager_id = ?
-      ${monthOk ? "AND substr(r.reservation_date, 1, 7) = ?" : ""}
-    ORDER BY r.reservation_date ASC, r.reservation_time ASC, r.id ASC
-  `;
-  const rows = monthOk
-    ? db.prepare(q).all(managerId, monthOk)
-    : db.prepare(q).all(managerId);
-  res.json(rows);
-});
-
-app.get("/api/manager/reservations/:id", requireManager, (req, res) => {
-  const id = parseInt(String(req.params.id || ""), 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const row = db
-    .prepare(
-      `SELECT r.*, b.name_fa AS business_name
-       FROM reservations r
-       JOIN businesses b ON b.slug = r.business_slug
-       WHERE r.id = ? AND b.manager_id = ?`
-    )
-    .get(id, req.auth.sub);
-  if (!row) return res.status(404).json({ error: "not_found" });
-  res.json(row);
-});
-
-app.patch("/api/manager/reservations/:id", requireManager, (req, res) => {
-  const id = parseInt(String(req.params.id || ""), 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const status = String((req.body && req.body.status) || "").trim().toLowerCase();
-  if (!["pending", "confirmed", "cancelled", "completed"].includes(status)) {
-    return res.status(400).json({ error: "bad_status" });
-  }
-  const row = db
-    .prepare(
-      `SELECT r.id
-       FROM reservations r
-       JOIN businesses b ON b.slug = r.business_slug
-       WHERE r.id = ? AND b.manager_id = ?`
-    )
-    .get(id, req.auth.sub);
-  if (!row) return res.status(404).json({ error: "not_found" });
-  db.prepare(`UPDATE reservations SET status = ? WHERE id = ?`).run(status, id);
-  writeSystemLog({
-    ...actorFromAuth(req.auth),
-    action: "reservation_status_updated",
-    targetType: "reservation",
-    targetId: id,
-    message: `Reservation #${id} status changed to ${status}`,
-  });
-  const updated = db
-    .prepare(
-      `SELECT r.*, b.name_fa AS business_name
-       FROM reservations r
-       JOIN businesses b ON b.slug = r.business_slug
-       WHERE r.id = ?`
-    )
-    .get(id);
-  res.json(updated);
-});
 
 function updateBusinessBySlug(req, res) {
   ensureRestaurantSafraDemo();

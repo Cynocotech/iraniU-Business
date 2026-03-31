@@ -32,6 +32,7 @@ export default function DashboardBusinessForm({
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
+  const [reservationLink, setReservationLink] = useState("");
   const [promoTitle, setPromoTitle] = useState("");
   const [promoDescription, setPromoDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -55,6 +56,7 @@ export default function DashboardBusinessForm({
       setPhone(b.phone || "");
       setAddress(b.address || "");
       setGoogleReviewUrl(b.google_review_url || "");
+      setReservationLink(b.reservation_link || "");
       setPromoTitle(b.promo_title || "");
       setPromoDescription(b.promo_description || "");
       setCoverImageUrl(b.cover_image_url || "");
@@ -129,6 +131,7 @@ export default function DashboardBusinessForm({
         phone,
         address,
         google_review_url: googleReviewUrl,
+        reservation_link: reservationLink,
         promo_title: promoTitle,
         promo_description: promoDescription,
         cover_image_url: coverImageUrl,
@@ -316,10 +319,23 @@ export default function DashboardBusinessForm({
               dir="ltr"
             />
           </div>
+          <div className="field field--block">
+            <label htmlFor="dash-res-link">لینک رزرو سفارشی (اختیاری)</label>
+            <input
+              id="dash-res-link"
+              type="url"
+              value={reservationLink}
+              onChange={(e) => setReservationLink(e.target.value)}
+              placeholder="https://example.com/book"
+              dir="ltr"
+            />
+            <p className="field-hint">
+              اگر پر شود، در صفحه عمومی دکمه «رزرو آنلاین» نمایش داده می‌شود و کاربر به این لینک منتقل می‌شود.
+            </p>
+          </div>
         </div>
 
-        <h3 style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>پیشنهاد و تبلیغ (بستهٔ ویژه)</h3>
-        <p className="field-hint">برای بستهٔ پایه این بخش در سایت مخفی می‌ماند.</p>
+        <h3 style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>پیشنهاد و تبلیغ</h3>
         <div className="form-grid">
           <div className="field field--block">
             <label htmlFor="dash-promo-title">عنوان پیشنهاد</label>

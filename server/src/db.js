@@ -78,6 +78,7 @@ function migrateBusinessesColumns() {
     ["biolink_json", "TEXT"],
     ["careers_title", "TEXT"],
     ["careers_text", "TEXT"],
+    ["reservation_link", "TEXT"],
   ];
   for (const [col, typ] of add) {
     if (!names.has(col)) {
@@ -196,6 +197,7 @@ function migrateAuthTables() {
     ["totp_enabled", "INTEGER NOT NULL DEFAULT 0"],
     ["telegram_bot_token", "TEXT"],
     ["telegram_chat_id", "TEXT"],
+    ["avatar_url", "TEXT"],
   ];
   for (const [col, typ] of mAdd) {
     if (!mNames.has(col)) {
@@ -217,6 +219,9 @@ function migrateAuthTables() {
   const saNames = new Set(saInfo.map((c) => c.name));
   if (!saNames.has("token_version")) {
     db.exec(`ALTER TABLE super_admins ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!saNames.has("avatar_url")) {
+    db.exec(`ALTER TABLE super_admins ADD COLUMN avatar_url TEXT`);
   }
   db.exec(`
     CREATE TABLE IF NOT EXISTS login_ip_throttle (

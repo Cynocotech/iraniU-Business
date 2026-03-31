@@ -19,7 +19,6 @@ function formatRatingDisplay(rating) {
 
 export default function DashboardOverviewPage() {
   const { dashSlug, biz, heroQr, phoneClickCount } = useDashboard();
-  const pkgLabel = biz?.package === "featured" ? "ویژه" : biz?.package === "basic" ? "پایه" : "—";
 
   return (
     <DashboardMain>
@@ -45,10 +44,9 @@ export default function DashboardOverviewPage() {
           <p className="app-shell__hero-value">منتشر شده</p>
           <p className="app-shell__hero-meta">
             در فهرست عمومی و نقشه دیده می‌شود
-            {biz?.package === "featured" ? " · بسته ویژه فعال" : ""}
           </p>
-          <Link className="app-shell__hero-btn" to="/advertise">
-            مدیریت بسته
+          <Link className="app-shell__hero-btn" to="/dashboard/edit">
+            مدیریت آگهی
           </Link>
         </div>
         <div className="app-shell__metrics">
@@ -62,20 +60,6 @@ export default function DashboardOverviewPage() {
               {heroQr}
             </p>
             <p className="app-shell__metric-hint">جزئیات در بخش «QR نظر Google»</p>
-          </div>
-          <div className="app-shell__metric app-shell__metric--purple">
-            <svg className="app-shell__metric-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-              />
-              <path stroke="#fff" strokeWidth="2" strokeLinecap="round" d="M3.27 6.96L12 12.01l8.73-5.05" />
-            </svg>
-            <p className="app-shell__metric-label">بسته فعلی</p>
-            <p className="app-shell__metric-value">{pkgLabel}</p>
           </div>
           <div className="app-shell__metric app-shell__metric--blue">
             <svg className="app-shell__metric-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">

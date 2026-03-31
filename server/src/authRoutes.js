@@ -1,4 +1,8 @@
 import { db } from "./db.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import multer from "multer";
 import {
   hashPassword,
   verifyPassword,
@@ -24,6 +28,30 @@ import {
   getEffectiveTelegramConfig,
 } from "./telegramSettings.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const avatarDir = path.join(__dirname, "..", "uploads", "avatars");
+if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, avatarDir),
+    filename: (req, file, cb) => {
+      const p = parseAuthHeader(req);
+      const role = p?.typ === "adm" ? "adm" : "mgr";
+      const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+      cb(null, `${role}-${p?.sub || "u"}-${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype || "")) {
+      cb(new Error("bad_file_type"));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 function attachLinkedBusinesses(managerRow) {
   const linked_businesses = db
@@ -177,6 +205,39 @@ export function registerAuthRoutes(app) {
 
   app.post("/api/auth/logout", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.post("/api/auth/profile-avatar", (req, res) => {
+    const p = parseAuthHeader(req);
+    if (!p || (p.typ !== "mgr" && p.typ !== "adm")) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    avatarUpload.single("avatar")(req, res, (err) => {
+      if (err) {
+        if (String(err.message || "").includes("File too large")) {
+          return res.status(400).json({ error: "file_too_large", hint: "حداکثر ۲ مگابایت" });
+        }
+        if (String(err.message || "").includes("bad_file_type")) {
+          return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif" });
+        }
+        return res.status(400).json({ error: "upload_failed" });
+      }
+      if (!req.file) return res.status(400).json({ error: "missing_file" });
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      if (p.typ === "mgr") {
+        db.prepare(`UPDATE managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
+      } else {
+        db.prepare(`UPDATE super_admins SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
+      }
+      writeSystemLog({
+        ...actorFromAuth(p),
+        action: "profile_avatar_uploaded",
+        targetType: p.typ === "adm" ? "superadmin" : "manager",
+        targetId: p.sub,
+        message: "Profile avatar updated",
+      });
+      res.json({ ok: true, avatar_url: avatarUrl });
+    });
   });
 
   /** شروع TOTP — ذخیرهٔ موقت secret تا تأیید با یک کد */

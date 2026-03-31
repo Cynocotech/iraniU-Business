@@ -13,12 +13,10 @@ import BusinessOnboardingPage from "./pages/BusinessOnboardingPage.jsx";
 import ManagerSignupPage from "./pages/ManagerSignupPage.jsx";
 import DashboardOverviewPage from "./pages/dashboard/DashboardOverviewPage.jsx";
 import DashboardEditPage from "./pages/dashboard/DashboardEditPage.jsx";
-import DashboardPackagePage from "./pages/dashboard/DashboardPackagePage.jsx";
 import DashboardMediaPage from "./pages/dashboard/DashboardMediaPage.jsx";
 import DashboardQrPage from "./pages/dashboard/DashboardQrPage.jsx";
 import DashboardBiolinkPage from "./pages/dashboard/DashboardBiolinkPage.jsx";
 import DashboardCareersPage from "./pages/dashboard/DashboardCareersPage.jsx";
-import DashboardReservationsPage from "./pages/dashboard/DashboardReservationsPage.jsx";
 import BiolinkPublicPage from "./pages/BiolinkPublicPage.jsx";
 import AdminHomePage from "./pages/admin/AdminHomePage.jsx";
 import AdminBusinessesPage from "./pages/admin/AdminBusinessesPage.jsx";
@@ -71,9 +69,7 @@ export default function App() {
         <Route index element={<DashboardOverviewPage />} />
         <Route path="edit" element={<DashboardEditPage />} />
         <Route path="careers" element={<DashboardCareersPage />} />
-        <Route path="package" element={<DashboardPackagePage />} />
         <Route path="media" element={<DashboardMediaPage />} />
-        <Route path="reservations" element={<DashboardReservationsPage />} />
         <Route path="qr" element={<DashboardQrPage />} />
         <Route path="biolink" element={<DashboardBiolinkPage />} />
       </Route>
