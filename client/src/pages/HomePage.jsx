@@ -6,20 +6,16 @@ import { apiGet } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
 import { getSiteUrl } from "../lib/siteUrl.js";
 import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
+import { LEGACY_CATEGORY_SELECT_OPTIONS } from "../lib/categoryFilters.js";
+import { useBusinessCategories } from "../hooks/useBusinessCategories.js";
 
-/** هم‌خوان با فیلتر «دسته» در /listings و فرم جستجوی قهرمان */
-const POPULAR_CATEGORIES = [
-  { cat: "food", label: "غذا و رستوران", hint: "رستوران، کافه، کترینگ", icon: "🍽", theme: "food" },
-  { cat: "market", label: "سوپرمارکت", hint: "مواد غذایی و خرده‌فروشی", icon: "🛒", theme: "market" },
-  { cat: "health", label: "سلامت و پزشکی", hint: "کلینیک، دندان، داروخانه", icon: "🩺", theme: "health" },
-  { cat: "legal", label: "حقوقی و مهاجرت", hint: "وکیل، مشاوره", icon: "⚖️", theme: "legal" },
-  { cat: "beauty", label: "زیبایی و آرایش", hint: "سالن، پوست، مو", icon: "✨", theme: "beauty" },
-  { cat: "auto", label: "خودرو و سرویس", hint: "مکانیک، کارواش", icon: "🚗", theme: "auto" },
-];
+const CATEGORY_CARD_THEMES = ["food", "market", "health", "legal", "beauty", "auto"];
+const CATEGORY_CARD_ICONS = ["🍽", "🛒", "🩺", "⚖️", "✨", "🚗", "📌", "🏷️"];
 
 export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { categories: categoryOptions } = useBusinessCategories();
   const [featured, setFeatured] = useState([]);
   const [showPendingBanner, setShowPendingBanner] = useState(
     () => !!location.state?.listingPendingReview
@@ -150,12 +146,18 @@ export default function HomePage() {
               </label>
               <select id="hero-search-cat" name="cat" aria-label="دسته">
                 <option value="">همه دسته‌ها</option>
-                <option value="food">غذا و رستوران</option>
-                <option value="market">سوپرمارکت و مواد غذایی</option>
-                <option value="health">سلامت و پزشکی</option>
-                <option value="legal">حقوقی و مهاجرت</option>
-                <option value="beauty">زیبایی و آرایشگاه</option>
-                <option value="auto">خودرو و سرویس</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+                <optgroup label="جستجوی موضوعی (لینک‌های قدیمی)">
+                  {LEGACY_CATEGORY_SELECT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
               <button type="submit" className="btn btn--accent">
                 جستجو
@@ -171,26 +173,30 @@ export default function HomePage() {
       >
         <div className="section__head section__head--home section__head--categories">
           <h2 id="cat-title" className="section__title section__title--home">
-            دسته‌بندی‌های پرطرفدار
+            دسته‌بندی‌ها
           </h2>
           <p className="section__lead section__lead--home section__lead--categories">
-            چند کلیک تا لیست آگهی‌های همان موضوع — همان فیلتر «دسته» در صفحهٔ لیست.
+            همهٔ دسته‌های ثبت‌شده در سایت؛ همان فیلتر «دسته» در صفحهٔ لیست.
           </p>
         </div>
         <div className="category-grid category-grid--home">
-          {POPULAR_CATEGORIES.map((c) => (
-            <Link
-              key={c.cat}
-              className={`category-card category-card--home category-card--cat-${c.theme}`}
-              to={`/listings?cat=${encodeURIComponent(c.cat)}`}
-            >
-              <span className="category-card__icon" aria-hidden="true">
-                {c.icon}
-              </span>
-              <span className="category-card__label">{c.label}</span>
-              <span className="category-card__hint">{c.hint}</span>
-            </Link>
-          ))}
+          {categoryOptions.map((c, i) => {
+            const theme = CATEGORY_CARD_THEMES[i % CATEGORY_CARD_THEMES.length];
+            const icon = CATEGORY_CARD_ICONS[i % CATEGORY_CARD_ICONS.length];
+            return (
+              <Link
+                key={c.id}
+                className={`category-card category-card--home category-card--cat-${theme}`}
+                to={`/listings?cat=${encodeURIComponent(c.name)}`}
+              >
+                <span className="category-card__icon" aria-hidden="true">
+                  {icon}
+                </span>
+                <span className="category-card__label">{c.name}</span>
+                <span className="category-card__hint">مشاهده آگهی‌ها</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../../api.js";
 import { useAdminPanelSearch } from "../../context/AdminPanelSearchContext.jsx";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200, 500];
+const DEFAULT_PAGE_SIZE = 10;
 
 function sortBusinessRows(list) {
   list.sort((a, b) => {
@@ -23,8 +24,15 @@ export default function AdminBusinessesPage() {
   const { query, setQuery } = useAdminPanelSearch();
   const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [rows, setRows] = useState([]);
-  const [listMeta, setListMeta] = useState({ total: 0, page: 1, totalPages: 1, pageSize: PAGE_SIZE });
+  const [selectedSlugs, setSelectedSlugs] = useState([]);
+  const [listMeta, setListMeta] = useState({
+    total: 0,
+    page: 1,
+    totalPages: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -32,10 +40,11 @@ export default function AdminBusinessesPage() {
   const [toast, setToast] = useState(null);
   const [rejectSlug, setRejectSlug] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const selectAllRef = useRef(null);
 
-  const fetchFromServer = useCallback(async (q, pageNum) => {
+  const fetchFromServer = useCallback(async (q, pageNum, limit) => {
     const raw = await apiGet(
-      `/api/admin/businesses-search?q=${encodeURIComponent(q)}&page=${pageNum}&limit=${PAGE_SIZE}`
+      `/api/admin/businesses-search?q=${encodeURIComponent(q)}&page=${pageNum}&limit=${limit}`
     );
     const items = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : [];
     sortBusinessRows(items);
@@ -45,7 +54,7 @@ export default function AdminBusinessesPage() {
         total: Number(raw.total) || 0,
         page: Number(raw.page) || 1,
         totalPages: Math.max(1, Number(raw.totalPages) || 1),
-        pageSize: Number(raw.pageSize) || PAGE_SIZE,
+        pageSize: Number(raw.pageSize) || limit,
       });
       if (Number.isFinite(raw.page)) setPage(Number(raw.page));
     } else {
@@ -53,7 +62,7 @@ export default function AdminBusinessesPage() {
         total: items.length,
         page: 1,
         totalPages: 1,
-        pageSize: PAGE_SIZE,
+        pageSize: limit,
       });
     }
   }, []);
@@ -83,7 +92,7 @@ export default function AdminBusinessesPage() {
         setLoading(true);
       }
       try {
-        await fetchFromServer(q, p);
+        await fetchFromServer(q, p, pageSize);
       } catch {
         if (!cancelled) setErr("بارگذاری یا جستجو ناموفق بود. سرور را بررسی کنید.");
       } finally {
@@ -96,13 +105,22 @@ export default function AdminBusinessesPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, page, fetchFromServer]);
+  }, [debouncedQuery, page, pageSize, fetchFromServer]);
+
+  useEffect(() => {
+    const el = selectAllRef.current;
+    if (!el) return;
+    const ps = rows.map((r) => r.slug);
+    const all = ps.length > 0 && ps.every((s) => selectedSlugs.includes(s));
+    const some = ps.some((s) => selectedSlugs.includes(s));
+    el.indeterminate = !all && some;
+  }, [rows, selectedSlugs]);
 
   const refetchAfterMutation = async () => {
     setErr(null);
     setSearching(true);
     try {
-      await fetchFromServer(debouncedQuery, page);
+      await fetchFromServer(debouncedQuery, page, pageSize);
     } catch {
       setErr("بارگذاری ناموفق بود.");
     } finally {
@@ -173,6 +191,51 @@ export default function AdminBusinessesPage() {
     }
   };
 
+  const pageSlugs = rows.map((r) => r.slug);
+  const allOnPageSelected = pageSlugs.length > 0 && pageSlugs.every((s) => selectedSlugs.includes(s));
+
+  const toggleSlug = (slug) => {
+    setSelectedSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+  };
+
+  const toggleSelectAllOnPage = () => {
+    if (allOnPageSelected) {
+      setSelectedSlugs((prev) => prev.filter((s) => !pageSlugs.includes(s)));
+    } else {
+      setSelectedSlugs((prev) => [...new Set([...prev, ...pageSlugs])]);
+    }
+  };
+
+  const bulkDeleteSelected = async () => {
+    if (selectedSlugs.length === 0) return;
+    if (
+      !window.confirm(
+        `حذف ${selectedSlugs.length} آگهی انتخاب‌شده؟ ردیف‌های وابسته (کلیک، گزارش، ادعا، …) هم پاک می‌شود. این کار برگشت‌پذیر نیست.`
+      )
+    ) {
+      return;
+    }
+    setToast(null);
+    setSearching(true);
+    try {
+      const data = await apiPost("/api/admin/businesses/bulk-delete", { slugs: selectedSlugs });
+      const n = data.deleted?.length ?? 0;
+      setSelectedSlugs([]);
+      setToast({
+        type: "ok",
+        text:
+          n > 0
+            ? `حذف شد: ${n} آگهی${data.not_found?.length ? ` (${data.not_found.length} نامک از قبل نبود)` : ""}`
+            : "هیچ آگهی حذف نشد.",
+      });
+      await refetchAfterMutation();
+    } catch (e) {
+      setToast({ type: "err", text: e.message || String(e) });
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const qTrim = query.trim();
   const dqTrim = debouncedQuery.trim();
   const hasFilter = dqTrim.length > 0;
@@ -193,9 +256,48 @@ export default function AdminBusinessesPage() {
         <h2>همه آگهی‌ها</h2>
         <p className="field-hint">
           آگهی‌های ثبت‌شده از فرم عمومی «ثبت کسب‌وکار» تا زمان تأیید شما در ستون «انتشار» در حالت «در انتظار» می‌مانند و در سایت دیده نمی‌شوند.
-          آگهی با وضعیت «غیرفعال» در سایت عمومی نمایش داده نمی‌شود. جستجو با تأخیر کوتاه (Ajax) از سرور انجام می‌شود؛ هر صفحه حداکثر {PAGE_SIZE}{" "}
-          آگهی است. فیلد زیر با نوار جستجوی بالای پنل یکی است.
+          آگهی با وضعیت «غیرفعال» در سایت عمومی نمایش داده نمی‌شود. جستجو با تأخیر کوتاه (Ajax) از سرور انجام می‌شود؛ تعداد آگهی در هر صفحه را از منوی زیر انتخاب کنید (حداکثر ۵۰۰). فیلد زیر با نوار جستجوی بالای پنل یکی است.
         </p>
+
+        <div
+          className="dashboard-actions"
+          style={{
+            marginBottom: "var(--space-md)",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            alignItems: "center",
+          }}
+        >
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="admin-businesses-page-size" style={{ marginInlineEnd: "0.5rem" }}>
+              تعداد در هر صفحه
+            </label>
+            <select
+              id="admin-businesses-page-size"
+              value={pageSize}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setPageSize(Number.isFinite(n) ? n : DEFAULT_PAGE_SIZE);
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={selectedSlugs.length === 0 || !!sendingSlug || searching}
+            onClick={bulkDeleteSelected}
+            title="حذف آگهی‌های تیک‌خورده"
+          >
+            حذف انتخاب‌شده‌ها ({selectedSlugs.length})
+          </button>
+        </div>
 
         <div className="field field--block" style={{ maxWidth: "min(100%, 28rem)", marginBottom: "var(--space-md)" }}>
           <label htmlFor="admin-businesses-ajax-search">جستجوی Ajax در آگهی‌ها</label>
@@ -223,8 +325,8 @@ export default function AdminBusinessesPage() {
               </>
             ) : (
               <>
-                مجموع <strong dir="ltr">{total}</strong> آگهی — صفحه <strong dir="ltr">{displayPage}</strong> از <strong dir="ltr">{totalPages}</strong> ({PAGE_SIZE}{" "}
-                آگهی در هر صفحه)
+                مجموع <strong dir="ltr">{total}</strong> آگهی — صفحه <strong dir="ltr">{displayPage}</strong> از <strong dir="ltr">{totalPages}</strong> (
+                <strong dir="ltr">{listMeta.pageSize || pageSize}</strong> آگهی در هر صفحه)
               </>
             )}
           </p>
@@ -257,6 +359,16 @@ export default function AdminBusinessesPage() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th scope="col" style={{ width: "2.5rem" }}>
+                    <span className="visually-hidden">انتخاب</span>
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="انتخاب همه در این صفحه"
+                    />
+                  </th>
                   <th>نام</th>
                   <th>نامک</th>
                   <th>دسته</th>
@@ -271,6 +383,14 @@ export default function AdminBusinessesPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.slug}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedSlugs.includes(r.slug)}
+                        onChange={() => toggleSlug(r.slug)}
+                        aria-label={`انتخاب ${r.name_fa || r.slug}`}
+                      />
+                    </td>
                     <td>{r.name_fa}</td>
                     <td>
                       <span lang="en" dir="ltr">

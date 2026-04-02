@@ -5,44 +5,17 @@ import Seo from "../components/Seo.jsx";
 import { apiGet } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
 import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
-
-/** هم‌خوان با مقادیر فرم صفحهٔ اصلی */
-const CAT_HINTS = {
-  food: ["رستوران", "غذا"],
-  market: ["سوپر", "خرده", "فروش"],
-  health: ["سلامت", "پزشک", "کلینیک"],
-  legal: ["حقوق"],
-  beauty: ["زیبایی", "آرایش"],
-  auto: ["خودرو"],
-};
+import { filterListingsByCategoryParams, LEGACY_CATEGORY_SELECT_OPTIONS } from "../lib/categoryFilters.js";
+import { useBusinessCategories } from "../hooks/useBusinessCategories.js";
 
 function filterRows(rows, searchParams) {
-  let out = [...rows];
-  const q = (searchParams.get("q") || "").trim().toLowerCase();
-  const city = (searchParams.get("city") || "").trim().toLowerCase();
-  const cat = (searchParams.get("cat") || "").trim();
-  if (city) {
-    out = out.filter((b) => (b.city || "").toLowerCase().includes(city));
-  }
-  if (cat && CAT_HINTS[cat]) {
-    const hints = CAT_HINTS[cat];
-    out = out.filter((b) => {
-      const c = b.category || "";
-      return hints.some((h) => c.includes(h));
-    });
-  }
-  if (q) {
-    out = out.filter((b) => {
-      const blob = `${b.name_fa || ""} ${b.category || ""} ${b.listing_title || ""} ${b.address || ""}`.toLowerCase();
-      return blob.includes(q);
-    });
-  }
-  return out;
+  return filterListingsByCategoryParams(rows, searchParams);
 }
 
 export default function ListingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { categories: categoryOptions } = useBusinessCategories();
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -150,12 +123,18 @@ export default function ListingsPage() {
             <label htmlFor="listings-cat">دسته</label>
             <select id="listings-cat" name="cat" aria-label="دسته" defaultValue={catDefault}>
               <option value="">همه دسته‌ها</option>
-              <option value="food">غذا و رستوران</option>
-              <option value="market">سوپرمارکت و مواد غذایی</option>
-              <option value="health">سلامت و پزشکی</option>
-              <option value="legal">حقوقی و مهاجرت</option>
-              <option value="beauty">زیبایی و آرایشگاه</option>
-              <option value="auto">خودرو و سرویس</option>
+              {categoryOptions.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+              <optgroup label="جستجوی موضوعی (لینک‌های قدیمی)">
+                {LEGACY_CATEGORY_SELECT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <div className="listings-search__actions">

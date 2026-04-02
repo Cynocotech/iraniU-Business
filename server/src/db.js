@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { applyPendingSqliteImportIfAny } from "./sqliteDbPending.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
@@ -10,6 +11,8 @@ const dbPath = process.env.SQLITE_PATH || path.join(dataDir, "iraniu.db");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+applyPendingSqliteImportIfAny(dbPath);
 
 const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");

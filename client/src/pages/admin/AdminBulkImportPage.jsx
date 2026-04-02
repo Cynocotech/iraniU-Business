@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import { apiPostMultipart } from "../../api.js";
 
 export default function AdminBulkImportPage() {
-  const [preset, setPreset] = useState("london");
+  const [preset, setPreset] = useState("iraniu");
   const [contactEmail, setContactEmail] = useState("");
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [result, setResult] = useState(null);
+  const [sqliteFile, setSqliteFile] = useState(null);
+  const [sqliteBusy, setSqliteBusy] = useState(false);
 
   const downloadTemplate = async (p) => {
     setMsg(null);
@@ -28,6 +30,69 @@ export default function AdminBulkImportPage() {
       URL.revokeObjectURL(url);
     } catch (e) {
       setMsg(String(e.message || e));
+    }
+  };
+
+  const downloadFullExport = async () => {
+    setMsg(null);
+    try {
+      const t = sessionStorage.getItem("iraniu_jwt");
+      const r = await fetch("/api/admin/businesses/export-csv?preset=iraniu", {
+        credentials: "include",
+        headers: t ? { Authorization: `Bearer ${t}` } : {},
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const day = new Date().toISOString().slice(0, 10);
+      a.download = `businesses-export-iraniu-${day}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg(String(e.message || e));
+    }
+  };
+
+  const downloadSqliteDb = async () => {
+    setMsg(null);
+    try {
+      const t = sessionStorage.getItem("iraniu_jwt");
+      const r = await fetch("/api/admin/database/sqlite", {
+        credentials: "include",
+        headers: t ? { Authorization: `Bearer ${t}` } : {},
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `iraniu-${new Date().toISOString().slice(0, 10)}.db`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg(String(e.message || e));
+    }
+  };
+
+  const submitSqlite = async (e) => {
+    e.preventDefault();
+    setMsg(null);
+    if (!sqliteFile) {
+      setMsg("فایل iraniu.db را انتخاب کنید.");
+      return;
+    }
+    setSqliteBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("db", sqliteFile);
+      const data = await apiPostMultipart("/api/admin/database/sqlite", fd);
+      setMsg(data.hint || "آپلود ذخیره شد؛ سرویس را ری‌استارت کنید.");
+    } catch (err) {
+      setMsg(err.message || String(err));
+    } finally {
+      setSqliteBusy(false);
     }
   };
 
@@ -68,33 +133,71 @@ export default function AdminBulkImportPage() {
         <Link to="/admin-businesses">همه آگهی‌ها</Link>
       </p>
       <section className="dashboard-panel">
+        <h2>پشتیبان و بازیابی SQLite</h2>
+        <p className="field-hint">
+          <strong>خروجی و ورود اصلی:</strong> فایل کامل دیتابیس <code dir="ltr">iraniu.db</code> (همهٔ جداول: آگهی‌ها، مدیران،
+          سوپرادمین، …). برای ورود، فایل باید SQLite معتبر با جدول <code dir="ltr">businesses</code> باشد.
+        </p>
+        <p className="field-hint">
+          بعد از <strong>آپلود</strong>، فایل در سرور ذخیره می‌شود و با <strong>اولین ری‌استارت</strong> سرویس (Docker / Dokploy)
+          جایگزین دیتابیس فعلی می‌شود؛ نسخهٔ قبلی به‌صورت <code dir="ltr">iraniu.db.bak.&lt;زمان&gt;</code> بک‌آپ می‌شود.
+        </p>
+        <div className="dashboard-actions" style={{ marginBottom: "var(--space-md)", flexWrap: "wrap", gap: "0.5rem" }}>
+          <button type="button" className="btn btn--accent" onClick={downloadSqliteDb}>
+            دانلود iraniu.db
+          </button>
+        </div>
+        <form onSubmit={submitSqlite} className="form-grid" style={{ marginTop: "var(--space-md)" }}>
+          <div className="field field--block">
+            <label htmlFor="sqlite-import-file">ورود فایل SQLite (.db)</label>
+            <input
+              id="sqlite-import-file"
+              type="file"
+              accept=".db,application/octet-stream"
+              onChange={(e) => setSqliteFile(e.target.files?.[0] || null)}
+            />
+            <span className="field-hint">سپس یک بار سرویس را ری‌استارت کنید.</span>
+          </div>
+          <div className="dashboard-actions">
+            <button type="submit" className="btn btn--primary" disabled={sqliteBusy}>
+              {sqliteBusy ? "در حال آپلود…" : "آپلود و ذخیره برای ری‌استارت"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="dashboard-panel">
+        <h2>خروجی CSV (فقط آگهی‌ها)</h2>
+        <p className="field-hint">
+          بک‌آپ سبک فقط ردیف‌های آگهی؛ برای انتقال کامل سایت از بخش SQLite بالا استفاده کنید.
+        </p>
+        <div className="dashboard-actions" style={{ marginBottom: "var(--space-md)", flexWrap: "wrap", gap: "0.5rem" }}>
+          <button type="button" className="btn btn--ghost" onClick={downloadFullExport}>
+            دانلود CSV (iraniu)
+          </button>
+        </div>
+      </section>
+
+      <section className="dashboard-panel">
         <h2>ورود دسته‌ای آگهی (CSV)</h2>
         <p className="field-hint">
-          فایل <strong>.sql</strong> را مستقیم نمی‌توان وارد کرد؛ از phpMyAdmin / MySQL Workbench خروجی{" "}
-          <strong>CSV</strong> بگیرید (یا از SQLite با <code dir="ltr">.mode csv / .output</code>).
+          برای افزودن یا به‌روزرسانی آگهی‌ها از فایل <strong>CSV</strong> استفاده کنید (خروجی از Excel، Google Sheets، یا
+          صادرات جدول).
         </p>
         <p className="field-hint">
-          دو فرمت پشتیبانی می‌شود: <strong>london</strong> — همان ستون‌های خروجی جدول{" "}
-          <code lang="en" dir="ltr">
-            London_Bussines_List
-          </code>{" "}
-          (مثلاً از phpMyAdmin → Export → CSV). <strong>iraniu</strong> — ستون‌های نزدیک به جدول{" "}
-          <code lang="en" dir="ltr">
-            businesses
-          </code>{" "}
-          در SQLite (نامک، نام، آدرس، …).
+          دو فرمت: <strong>london</strong> — ستون‌های نزدیک خروجی London (CSV). <strong>iraniu</strong> — ستون‌های جدول{" "}
+          <code dir="ltr">businesses</code> در همین پروژه.
         </p>
         <p className="field-hint">
-          نامک تکراری در دیتابیس <strong>رد می‌شود</strong> (ردیف نادیده). آگهی‌های واردشده با وضعیت{" "}
-          <strong>تأیید شده</strong> ثبت می‌شوند.
+          نامک تکراری <strong>رد می‌شود</strong>. آگهی‌های واردشده با وضعیت <strong>تأیید شده</strong> ثبت می‌شوند.
         </p>
 
         <div className="dashboard-actions" style={{ marginBottom: "var(--space-md)", flexWrap: "wrap", gap: "0.5rem" }}>
           <button type="button" className="btn btn--ghost" onClick={() => downloadTemplate("london")}>
-            دانلود الگوی London
+            دانلود الگوی london
           </button>
           <button type="button" className="btn btn--ghost" onClick={() => downloadTemplate("iraniu")}>
-            دانلود الگوی ایرانیو (SQLite)
+            دانلود الگوی iraniu
           </button>
         </div>
 
@@ -102,8 +205,8 @@ export default function AdminBulkImportPage() {
           <div className="field field--block">
             <label htmlFor="bulk-preset">فرمت فایل</label>
             <select id="bulk-preset" value={preset} onChange={(e) => setPreset(e.target.value)}>
-              <option value="london">London_Bussines_List (خروجی SQL/CSV شما)</option>
-              <option value="iraniu">ایرانیو / SQLite businesses</option>
+              <option value="london">london (CSV)</option>
+              <option value="iraniu">iraniu (CSV)</option>
             </select>
           </div>
           <div className="field field--block">

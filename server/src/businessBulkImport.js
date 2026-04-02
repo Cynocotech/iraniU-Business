@@ -25,7 +25,7 @@ const DEFAULT_HOURS_FALLBACK = JSON.stringify([
   { day: "جمعه", hours: "" },
 ]);
 
-/** هم‌تراز با London_Bussines_List.sql — شنبه … جمعه */
+/** هم‌تراز با خروجی CSV London — شنبه … جمعه */
 const LONDON_HOUR_KEYS = [
   "workingHours_Sat",
   "workingHours_Sun",

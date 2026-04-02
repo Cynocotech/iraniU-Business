@@ -4,7 +4,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { db, ensureRestaurantSafraDemo } from "./db.js";
+import { db, dbPath, ensureRestaurantSafraDemo } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword } from "./authUtil.js";
 import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
@@ -15,6 +15,9 @@ import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
 import { sendListingApprovedEmail, sendListingRejectedEmail } from "./listingDecisionEmail.js";
 import multer from "multer";
 import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
+import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
+import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
+import { validateIraniuSqliteFile } from "./sqliteDbPending.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -64,6 +67,19 @@ const LISTING_TERMS_VERSION = "1";
 const uploadCsv = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
+});
+
+const uploadSqlite = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /\.db$/i.test(String(file.originalname || ""));
+    if (!ok) {
+      cb(new Error("فقط فایل با پسوند .db مجاز است"));
+      return;
+    }
+    cb(null, true);
+  },
 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -151,7 +167,8 @@ function adminBusinessMatchesSearchTokens(row, tokens) {
 }
 
 const ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT = 10;
-const ADMIN_BUSINESSES_PAGE_SIZE_MAX = 100;
+const ADMIN_BUSINESSES_PAGE_SIZE_MAX = 500;
+const ADMIN_BULK_DELETE_MAX = 500;
 
 /** جستجوی Ajax برای پنل سوپرادمین — همهٔ آگهی‌ها با فیلتر اختیاری + صفحه‌بندی */
 app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
@@ -175,6 +192,51 @@ app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
   const offset = (page - 1) * limit;
   const items = filtered.slice(offset, offset + limit);
   res.json({ items, total, page, pageSize: limit, totalPages });
+});
+
+/** حذف دسته‌ای آگهی — فقط سوپرادمین؛ حداکثر ADMIN_BULK_DELETE_MAX نامک */
+app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, (req, res) => {
+  try {
+    const raw = req.body?.slugs;
+    if (!Array.isArray(raw)) {
+      return res.status(400).json({ error: "missing_slugs", hint: "آرایهٔ slugs لازم است" });
+    }
+    const slugs = [...new Set(raw.map((s) => String(s || "").trim()).filter(Boolean))];
+    if (slugs.length === 0) {
+      return res.status(400).json({ error: "empty_slugs", hint: "حداقل یک نامک معتبر بفرستید" });
+    }
+    if (slugs.length > ADMIN_BULK_DELETE_MAX) {
+      return res.status(400).json({
+        error: "too_many",
+        hint: `حداکثر ${ADMIN_BULK_DELETE_MAX} آگهی در هر درخواست`,
+      });
+    }
+    const deleted = [];
+    const not_found = [];
+    const failed = [];
+    for (const slug of slugs) {
+      try {
+        const r = cascadeDeleteBusinessBySlug(slug);
+        if (r.deleted) deleted.push(slug);
+        else if (r.reason === "not_found") not_found.push(slug);
+        else failed.push({ slug, error: r.reason || "unknown" });
+      } catch (e) {
+        failed.push({ slug, error: String(e.message || e) });
+      }
+    }
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "business_bulk_delete",
+      targetType: "business",
+      targetId: null,
+      message: `Bulk delete: removed ${deleted.length}, not_found ${not_found.length}, failed ${failed.length}`,
+      meta: { deleted_count: deleted.length, not_found_count: not_found.length, failed_count: failed.length },
+    });
+    res.json({ ok: true, deleted, not_found, failed });
+  } catch (e) {
+    console.error("bulk-delete", e);
+    res.status(500).json({ error: "bulk_delete_failed", hint: String(e.message || e) });
+  }
 });
 
 app.get("/api/categories", (_req, res) => {
@@ -509,6 +571,110 @@ app.get("/api/admin/businesses/csv-template", requireSuperAdmin, (req, res) => {
   }
   return res.status(400).json({ error: "invalid_preset" });
 });
+
+/** خروجی CSV همهٔ آگهی‌ها — همان فرمت iraniu برای ورود مجدد / بک‌آپ */
+app.get("/api/admin/businesses/export-csv", requireSuperAdmin, (req, res) => {
+  try {
+    const preset = String(req.query.preset || "iraniu").toLowerCase();
+    if (preset !== "iraniu") {
+      return res.status(400).json({
+        error: "invalid_preset",
+        hint: "فعلاً فقط preset=iraniu پشتیبانی می‌شود (خروجی مطابق جدول businesses)",
+      });
+    }
+    const { csvText, rowCount } = exportIraniuBusinessesCsv();
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `businesses-export-iraniu-${date}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "business_csv_export",
+      targetType: "business",
+      targetId: null,
+      message: `CSV export iraniu (${rowCount} rows)`,
+      meta: { preset: "iraniu", rowCount },
+    });
+    return res.send(csvText);
+  } catch (e) {
+    console.error("export-csv", e);
+    return res.status(500).json({ error: "export_failed", hint: String(e.message || e) });
+  }
+});
+
+/** دانلود فایل کامل SQLite (iraniu.db) — پس از checkpoint وال */
+app.get("/api/admin/database/sqlite", requireSuperAdmin, (req, res) => {
+  try {
+    db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
+    const buf = fs.readFileSync(dbPath);
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", 'attachment; filename="iraniu.db"');
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "sqlite_db_export",
+      targetType: "business",
+      targetId: null,
+      message: "SQLite iraniu.db export",
+      meta: { bytes: buf.length },
+    });
+    return res.send(buf);
+  } catch (e) {
+    console.error("sqlite-db-export", e);
+    return res.status(500).json({ error: "export_failed", hint: String(e.message || e) });
+  }
+});
+
+/** آپلود فایل SQLite — در کنار دیتابیس ذخیره می‌شود و با ری‌استارت بعدی اعمال می‌شود */
+app.post(
+  "/api/admin/database/sqlite",
+  requireSuperAdmin,
+  (req, res, next) => {
+    uploadSqlite.single("db")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: "upload_error", hint: String(err.message || err) });
+      }
+      next();
+    });
+  },
+  (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: "missing_file", hint: "فیلد db با فایل .db را بفرستید" });
+      }
+      const pending = path.join(path.dirname(dbPath), "iraniu.db.uploaded");
+      fs.writeFileSync(pending, req.file.buffer);
+      const v = validateIraniuSqliteFile(pending);
+      if (!v.ok) {
+        try {
+          fs.unlinkSync(pending);
+        } catch {
+          /* ignore */
+        }
+        return res.status(400).json({
+          error: "invalid_sqlite",
+          hint: v.error || "فایل باید SQLite معتبر با جدول businesses باشد",
+        });
+      }
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "sqlite_db_upload_pending",
+        targetType: "business",
+        targetId: null,
+        message: "SQLite upload pending until restart",
+        meta: { bytes: req.file.buffer.length },
+      });
+      return res.json({
+        ok: true,
+        restart_required: true,
+        hint:
+          "فایل ذخیره شد. یک بار سرویس را ری‌استارت کنید تا جایگزین شود. نسخهٔ قبلی به iraniu.db.bak.<زمان> تغییر نام می‌یابد.",
+      });
+    } catch (e) {
+      console.error("sqlite-db-upload", e);
+      return res.status(500).json({ error: "upload_failed", hint: String(e.message || e) });
+    }
+  }
+);
 
 app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single("csv"), (req, res) => {
   try {
