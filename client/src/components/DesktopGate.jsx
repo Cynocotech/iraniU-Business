@@ -1,8 +1,24 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-/** مسیرهایی که روی دسکتاپ هم بدون «فقط موبایل» نمایش داده می‌شوند (لینک عمومی، پنل، تبلیغات، ادمین). */
-const ALLOW = /^\/(login|dashboard|advertise|admin|l\/)/;
+/** مسیرهایی که روی دسکتاپ هم بدون «فقط موبایل» نمایش داده می‌شوند (صفحات عمومی، پنل، ادمین، لینک‌تک). */
+function allowDesktopPathname(pathname) {
+  const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : "/";
+  if (normalized.startsWith("/dashboard")) return true;
+  if (normalized.startsWith("/admin")) return true;
+  if (normalized.startsWith("/l/")) return true;
+  if (normalized.startsWith("/login")) return true;
+  const publicExact = new Set([
+    "/",
+    "/listings",
+    "/claim",
+    "/onboarding",
+    "/manager-signup",
+    "/business",
+    "/business-claimed",
+  ]);
+  return publicExact.has(normalized);
+}
 
 export default function DesktopGate() {
   const { pathname } = useLocation();
@@ -12,7 +28,7 @@ export default function DesktopGate() {
     let gate = null;
 
     function allowDesktop() {
-      return ALLOW.test(pathname);
+      return allowDesktopPathname(pathname);
     }
 
     function removeGate() {

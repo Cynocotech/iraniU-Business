@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost, apiPatchUrl } from "../../api.js";
+import { formatAdId } from "../../lib/businessIds.js";
 
 export default function AdminManagersPage() {
   const [rows, setRows] = useState([]);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState(null);
   const [rowPw, setRowPw] = useState({});
@@ -33,10 +35,17 @@ export default function AdminManagersPage() {
     e.preventDefault();
     setMsg(null);
     try {
-      await apiPost("/api/managers", { email, name, phone, password });
+      await apiPost("/api/managers", {
+        email,
+        name,
+        phone,
+        password,
+        login_username: loginUsername.trim(),
+      });
       setEmail("");
       setName("");
       setPhone("");
+      setLoginUsername("");
       setPassword("");
       load();
       setMsg("مدیر اضافه شد.");
@@ -109,8 +118,9 @@ export default function AdminManagersPage() {
           </p>
         ) : null}
         <p className="field-hint">
-          برای هر مدیر یک ایمیل و رمز (حداقل ۸ کاراکتر) تعریف کنید. مدیر از صفحهٔ{" "}
-          <Link to="/login">ورود مدیر</Link> وارد پنل می‌شود. می‌توانید Google Authenticator را از API تنظیم کنید (۲FA).
+          برای هر مدیر ایمیل، تلفن، نام کاربری (۳–۳۲ کاراکتر، a-z، ۰-۹، _) و رمز (حداقل ۸ کاراکتر) تعریف کنید. مدیر از صفحهٔ{" "}
+          <Link to="/login">ورود مدیر</Link> با ایمیل یا نام کاربری وارد می‌شود. ثبت‌نام عمومی:{" "}
+          <Link to="/manager-signup">ثبت‌نام مدیر</Link>.
         </p>
         <form onSubmit={submit} style={{ marginBottom: "1.5rem" }}>
           <div className="form-grid">
@@ -132,7 +142,21 @@ export default function AdminManagersPage() {
             </div>
             <div className="field field--block">
               <label htmlFor="mgr-phone">تلفن</label>
-              <input id="mgr-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
+              <input id="mgr-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="mgr-login-user">نام کاربری</label>
+              <input
+                id="mgr-login-user"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())}
+                dir="ltr"
+                autoComplete="off"
+                required
+                minLength={3}
+                maxLength={32}
+                placeholder="مثلاً admin_london"
+              />
             </div>
             <div className="field field--block">
               <label htmlFor="mgr-pass">رمز عبور (حداقل ۸ کاراکتر)</label>
@@ -161,6 +185,7 @@ export default function AdminManagersPage() {
                 <th>شناسه</th>
                 <th>نام</th>
                 <th>ایمیل</th>
+                <th>نام کاربری</th>
                 <th>رمز / ۲FA</th>
                 <th>تلفن</th>
                 <th>Twilio</th>
@@ -175,6 +200,7 @@ export default function AdminManagersPage() {
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>
                   <td dir="ltr">{r.email}</td>
+                  <td dir="ltr">{r.login_username || "—"}</td>
                   <td style={{ fontSize: "0.85rem" }}>
                     {r.password_set ? "رمز دارد" : "بدون رمز"}
                     {r.totp_enabled ? " · ۲FA" : ""}
@@ -271,7 +297,7 @@ export default function AdminManagersPage() {
                             <strong>{b.name_fa}</strong>
                             <span className="field-hint" dir="ltr">
                               {" "}
-                              ({b.slug})
+                              ({formatAdId(b.id) || b.slug})
                             </span>
                             {b.status === "inactive" ? (
                               <span className="field-hint"> · غیرفعال</span>

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiPost } from "../api.js";
+import { apiGet, apiPost } from "../api.js";
 import { DEFAULT_HOURS_ROWS } from "../lib/businessProfile.js";
+import { LISTING_TERMS_VERSION } from "../lib/listingTerms.js";
+import { ListingTermsScrollBox, ListingTermsCheckbox } from "../components/ListingTermsAgreement.jsx";
 
 const STEPS = [
   { id: "identity", title: "نام و نامک" },
@@ -12,6 +14,19 @@ const STEPS = [
 
 function slugPatternOk(s) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
+}
+
+function emailOk(s) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
+}
+
+function isHttpUrl(s) {
+  try {
+    const u = new URL(String(s || "").trim());
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export default function BusinessOnboardingPage() {
@@ -31,21 +46,62 @@ export default function BusinessOnboardingPage() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [cta, setCta] = useState("");
   const [priceRange, setPriceRange] = useState("");
+  const [listingContactEmail, setListingContactEmail] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  useEffect(() => {
+    apiGet("/api/categories")
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
+      .catch(() => setCategories([]));
+  }, []);
 
   const canGoNext = () => {
     if (step === 0) {
       const s = slug.trim().toLowerCase();
       return s.length > 0 && nameFa.trim().length > 0 && slugPatternOk(s);
     }
+    if (step === 1) {
+      return (
+        city.trim().length > 0 &&
+        phone.trim().length > 0 &&
+        address.trim().length > 0 &&
+        emailOk(listingContactEmail)
+      );
+    }
+    if (step === 2) {
+      return (
+        category.trim().length > 0 &&
+        priceRange.trim().length > 0 &&
+        listingTitle.trim().length > 0 &&
+        description.trim().length > 0 &&
+        isHttpUrl(googleReviewUrl) &&
+        cta.trim().length > 0
+      );
+    }
     return true;
   };
 
   const next = () => {
     setMsg(null);
-    if (!canGoNext()) {
+    if (step === 0 && !canGoNext()) {
       setMsg({
         ok: false,
         text: "نامک فقط با حروف انگلیسی کوچک، اعداد و خط تیره است (مثلاً my-cafe-london).",
+      });
+      return;
+    }
+    if (step === 1 && !canGoNext()) {
+      setMsg({
+        ok: false,
+        text: "شهر، تلفن، آدرس و ایمیل تماس (معتبر) را پر کنید.",
+      });
+      return;
+    }
+    if (step === 2 && !canGoNext()) {
+      setMsg({
+        ok: false,
+        text: "دسته، محدودهٔ قیمت، عنوان لیست، توضیحات، لینک معتبر Google و دکمهٔ فراخوان را پر کنید.",
       });
       return;
     }
@@ -64,6 +120,27 @@ export default function BusinessOnboardingPage() {
     const s = slug.trim().toLowerCase();
     if (!slugPatternOk(s) || !nameFa.trim()) {
       setMsg({ ok: false, text: "نام و نامک را درست پر کنید." });
+      setSaving(false);
+      return;
+    }
+    if (
+      !city.trim() ||
+      !phone.trim() ||
+      !address.trim() ||
+      !emailOk(listingContactEmail) ||
+      !category.trim() ||
+      !priceRange.trim() ||
+      !listingTitle.trim() ||
+      !description.trim() ||
+      !isHttpUrl(googleReviewUrl) ||
+      !cta.trim()
+    ) {
+      setMsg({ ok: false, text: "همهٔ فیلدهای مراحل قبل را کامل کنید." });
+      setSaving(false);
+      return;
+    }
+    if (!termsAccepted) {
+      setMsg({ ok: false, text: "برای ثبت باید شرایط و قوانین ثبت آگهی را بپذیرید." });
       setSaving(false);
       return;
     }
@@ -86,9 +163,16 @@ export default function BusinessOnboardingPage() {
       hours_json,
       gallery_json,
       status: "active",
+      accept_listing_terms: true,
+      listing_terms_version: LISTING_TERMS_VERSION,
+      listing_contact_email: listingContactEmail.trim(),
     };
     try {
-      await apiPost("/api/businesses", payload);
+      const created = await apiPost("/api/businesses", payload);
+      if (created && created.listing_approval === "pending") {
+        navigate("/", { replace: true, state: { listingPendingReview: true } });
+        return;
+      }
       navigate(`/business?slug=${encodeURIComponent(s)}`, {
         state: { onboardingComplete: true },
       });
@@ -99,6 +183,12 @@ export default function BusinessOnboardingPage() {
       else if (t.includes("invalid_slug")) text = "فرمت نامک نامعتبر است.";
       else if (t.includes("missing_slug_or_name")) text = "نامک و نام کسب‌وکار الزامی است.";
       else if (t.includes("invalid_json_field")) text = "خطا در دادهٔ ساختاری؛ دوباره تلاش کنید.";
+      else if (t.includes("terms_not_accepted")) text = "پذیرش شرایط و قوانین در سرور الزامی است.";
+      else if (t.includes("terms_version_mismatch")) text = "نسخهٔ شرایط عوض شده؛ صفحه را رفرش کنید و دوباره تلاش کنید.";
+      else if (t.includes("invalid_listing_contact_email")) text = "ایمیل تماس برای اطلاع‌رسانی نامعتبر است.";
+      else if (t.includes("missing_listing_contact_email")) text = "ایمیل تماس برای اطلاع‌رسانی الزامی است.";
+      else if (t.includes("missing_business_fields")) text = "همهٔ فیلدهای الزامی را پر کنید.";
+      else if (t.includes("invalid_google_review_url")) text = "لینک صفحهٔ نظر Google باید یک آدرس http یا https معتبر باشد.";
       setMsg({ ok: false, text });
     } finally {
       setSaving(false);
@@ -110,9 +200,9 @@ export default function BusinessOnboardingPage() {
       <header style={{ marginBottom: "1.25rem" }}>
         <h1 style={{ margin: "0 0 0.35rem" }}>ثبت کسب‌وکار</h1>
         <p className="field-hint" style={{ margin: 0 }}>
-          چند مرحلهٔ کوتاه؛ آگهی شما با بستهٔ پایه و بدون مالک ثبت می‌شود. بعداً می‌توانید از همان صفحهٔ آگهی{" "}
-          <strong>ادعای مالکیت</strong> کنید یا برای بستهٔ ویژه به{" "}
-          <Link to="/advertise">تبلیغات</Link> سر بزنید.
+          چند مرحلهٔ کوتاه؛ آگهی با بستهٔ پایه و بدون مالک ثبت می‌شود. پس از ارسال، <strong>تا تأیید مدیر در سایت نمایش داده نمی‌شود</strong>.
+          ایمیل تماس برای ارسال نتیجهٔ تأیید یا رد آگهی <strong>الزامی</strong> است.
+          بعد از تأیید می‌توانید از صفحهٔ آگهی <strong>ادعای مالکیت</strong> کنید و پس از آن از <Link to="/dashboard">پنل کسب‌وکار</Link> برای مدیریت آگهی استفاده کنید.
         </p>
       </header>
 
@@ -169,15 +259,28 @@ export default function BusinessOnboardingPage() {
             <div className="form-grid">
               <div className="field">
                 <label htmlFor="onb-city">شهر</label>
-                <input id="onb-city" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" />
+                <input id="onb-city" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" required />
               </div>
               <div className="field">
                 <label htmlFor="onb-phone">تلفن</label>
-                <input id="onb-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
+                <input id="onb-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
+              </div>
+              <div className="field field--block">
+                <label htmlFor="onb-list-email">ایمیل تماس (برای اطلاع تأیید یا رد آگهی)</label>
+                <input
+                  id="onb-list-email"
+                  type="email"
+                  value={listingContactEmail}
+                  onChange={(e) => setListingContactEmail(e.target.value)}
+                  dir="ltr"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  required
+                />
               </div>
               <div className="field field--block">
                 <label htmlFor="onb-address">آدرس کامل</label>
-                <textarea id="onb-address" rows={3} value={address} onChange={(e) => setAddress(e.target.value)} />
+                <textarea id="onb-address" rows={3} value={address} onChange={(e) => setAddress(e.target.value)} required />
               </div>
             </div>
           </>
@@ -187,18 +290,30 @@ export default function BusinessOnboardingPage() {
           <>
             <h2 className="onboarding-panel-title">معرفی و لینک‌ها</h2>
             <div className="form-grid">
-              <div className="field">
-                <label htmlFor="onb-cat">دسته (مثلاً رستوران، کلینیک)</label>
-                <input id="onb-cat" value={category} onChange={(e) => setCategory(e.target.value)} />
+              <div className="field field--block">
+                <label htmlFor="onb-cat">دسته</label>
+                <select id="onb-cat" value={category} onChange={(e) => setCategory(e.target.value)} required>
+                  <option value="">— انتخاب دسته —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {category && !categories.some((c) => c.name === category) ? (
+                    <option value={category}>{category}</option>
+                  ) : null}
+                </select>
+                <span className="field-hint">مثال: رستوران، کلینیک — از فهرست مدیریت‌شدهٔ سایت.</span>
               </div>
               <div className="field">
-                <label htmlFor="onb-price">محدودهٔ قیمت (اختیاری)</label>
+                <label htmlFor="onb-price">محدودهٔ قیمت</label>
                 <input
                   id="onb-price"
                   value={priceRange}
                   onChange={(e) => setPriceRange(e.target.value)}
                   dir="ltr"
                   placeholder="£10–25"
+                  required
                 />
               </div>
               <div className="field field--block">
@@ -208,6 +323,7 @@ export default function BusinessOnboardingPage() {
                   value={listingTitle}
                   onChange={(e) => setListingTitle(e.target.value)}
                   placeholder="مثلاً غذای خانگی ایرانی در منچستر"
+                  required
                 />
               </div>
               <div className="field field--block">
@@ -218,6 +334,7 @@ export default function BusinessOnboardingPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="خدمات، ویژگی‌ها، محله…"
+                  required
                 />
               </div>
               <div className="field field--block">
@@ -232,12 +349,13 @@ export default function BusinessOnboardingPage() {
                 />
               </div>
               <div className="field field--block">
-                <label htmlFor="onb-cta">دکمهٔ فراخوان (اختیاری)</label>
+                <label htmlFor="onb-cta">دکمهٔ فراخوان</label>
                 <input
                   id="onb-cta"
                   value={cta}
                   onChange={(e) => setCta(e.target.value)}
                   placeholder="مثلاً رزرو، تماس، وب‌سایت"
+                  required
                 />
               </div>
             </div>
@@ -246,32 +364,106 @@ export default function BusinessOnboardingPage() {
 
         {step === 3 && (
           <>
-            <h2 className="onboarding-panel-title">جمع‌بندی</h2>
-            <dl className="onboarding-summary">
-              <div>
-                <dt>نامک</dt>
-                <dd lang="en" dir="ltr">
-                  {slug.trim().toLowerCase() || "—"}
-                </dd>
+            <h2 className="onboarding-panel-title">جمع‌بندی و شرایط قانونی</h2>
+
+            <section
+              className="onboarding-review-card"
+              aria-labelledby="onboarding-summary-heading"
+              aria-describedby="onboarding-summary-desc"
+            >
+              <div className="onboarding-review-card__header">
+                <h3 id="onboarding-summary-heading" className="onboarding-review-card__title">
+                  خلاصهٔ اطلاعات
+                </h3>
+                <p id="onboarding-summary-desc" className="onboarding-review-card__sub">
+                  مرور نهایی فیلدهای ثبت‌شده قبل از ارسال
+                </p>
               </div>
-              <div>
-                <dt>نام</dt>
-                <dd>{nameFa.trim() || "—"}</dd>
+              <div className="onboarding-review-card__body onboarding-review-card__body--table">
+                <table className="onboarding-summary-table">
+                  <tbody>
+                    <tr>
+                      <th scope="row">نامک</th>
+                      <td lang="en" dir="ltr" className="onboarding-summary-table__mono">
+                        {slug.trim().toLowerCase() || "—"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">نام</th>
+                      <td>{nameFa.trim() || "—"}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">شهر / تلفن</th>
+                      <td>
+                        {[city.trim(), phone.trim()].filter(Boolean).length ? (
+                          <>
+                            {city.trim() && <span>{city.trim()}</span>}
+                            {city.trim() && phone.trim() ? <span className="onboarding-summary-table__sep"> · </span> : null}
+                            {phone.trim() && (
+                              <span dir="ltr" className="onboarding-summary-table__phone">
+                                {phone.trim()}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">دسته</th>
+                      <td>{category.trim() || "—"}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">ایمیل اطلاع‌رسانی</th>
+                      <td dir="ltr">{listingContactEmail.trim() || "—"}</td>
+                    </tr>
+                    {listingTitle.trim() ? (
+                      <tr>
+                        <th scope="row">عنوان در لیست</th>
+                        <td>{listingTitle.trim()}</td>
+                      </tr>
+                    ) : null}
+                    {address.trim() ? (
+                      <tr>
+                        <th scope="row">آدرس</th>
+                        <td className="onboarding-summary-table__multiline">{address.trim()}</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <dt>شهر / تلفن</dt>
-                <dd>
-                  {[city.trim(), phone.trim()].filter(Boolean).join(" · ") || "—"}
-                </dd>
+            </section>
+
+            <section
+              className="onboarding-review-card onboarding-review-card--terms"
+              aria-labelledby="onboarding-terms-heading"
+              aria-describedby="onboarding-terms-desc"
+            >
+              <div className="onboarding-review-card__header">
+                <h3 id="onboarding-terms-heading" className="onboarding-review-card__title">
+                  شرایط قانونی
+                </h3>
+                <p id="onboarding-terms-desc" className="onboarding-review-card__sub">
+                  متن قوانین را در باکس زیر بخوانید؛ سپس در ردیف پذیرش، موافقت خود را ثبت کنید.
+                </p>
               </div>
-              <div>
-                <dt>دسته</dt>
-                <dd>{category.trim() || "—"}</dd>
+              <div className="onboarding-review-card__body onboarding-review-card__body--terms">
+                <ListingTermsScrollBox id="onboarding-listing-terms" />
               </div>
-            </dl>
-            <p className="field-hint">
-              با زدن ثبت، آگهی در فهرست عمومی نمایش داده می‌شود (مگر بعداً وضعیت را غیرفعال کنید). برای مدیریت
-              پیشرفته بعداً می‌توانید از <Link to="/dashboard">پنل کسب‌وکار</Link> استفاده کنید.
+              <div className="onboarding-review-card__footer onboarding-review-card__footer--accept">
+                <ListingTermsCheckbox
+                  id="onboarding-terms-cb"
+                  checked={termsAccepted}
+                  onChange={setTermsAccepted}
+                  disabled={saving}
+                />
+              </div>
+            </section>
+
+            <p className="field-hint onboarding-review-footnote">
+              پس از ثبت، آگهی تا <strong>تأیید مدیر</strong> در فهرست و جستجو دیده نمی‌شود. بعد از تأیید می‌توانید برای مدیریت
+              بیشتر از <Link to="/dashboard">پنل کسب‌وکار</Link> (پس از ادعای مالکیت) استفاده کنید.
             </p>
           </>
         )}
@@ -294,7 +486,7 @@ export default function BusinessOnboardingPage() {
             </button>
           )}
           {step === STEPS.length - 1 && (
-            <button type="submit" className="btn btn--primary" disabled={saving}>
+            <button type="submit" className="btn btn--primary" disabled={saving || !termsAccepted}>
               {saving ? "در حال ثبت…" : "ثبت آگهی"}
             </button>
           )}

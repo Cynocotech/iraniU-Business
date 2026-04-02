@@ -43,7 +43,7 @@ export default function DashboardOverviewPage() {
           <p className="app-shell__hero-label">وضعیت آگهی</p>
           <p className="app-shell__hero-value">منتشر شده</p>
           <p className="app-shell__hero-meta">
-            در فهرست عمومی و نقشه دیده می‌شود
+            در فهرست عمومی دیده می‌شود
           </p>
           <Link className="app-shell__hero-btn" to="/dashboard/edit">
             مدیریت آگهی

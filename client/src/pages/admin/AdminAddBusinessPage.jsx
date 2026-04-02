@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "../../api.js";
 import { DEFAULT_HOURS_ROWS } from "../../lib/businessProfile.js";
+import { LISTING_TERMS_VERSION } from "../../lib/listingTerms.js";
+import { ListingTermsScrollBox, ListingTermsCheckbox } from "../../components/ListingTermsAgreement.jsx";
 
 export default function AdminAddBusinessPage() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ export default function AdminAddBusinessPage() {
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState("active");
   const [categories, setCategories] = useState([]);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     apiGet("/api/categories")
@@ -25,6 +28,10 @@ export default function AdminAddBusinessPage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (!termsAccepted) {
+      setMsg("برای ایجاد آگهی باید شرایط و قوانین را بپذیرید.");
+      return;
+    }
     setSaving(true);
     setMsg(null);
     try {
@@ -43,6 +50,8 @@ export default function AdminAddBusinessPage() {
         status,
         hours_json,
         gallery_json,
+        accept_listing_terms: true,
+        listing_terms_version: LISTING_TERMS_VERSION,
       };
       await apiPost("/api/businesses", payload);
       navigate(`/admin-edit?slug=${encodeURIComponent(payload.slug)}`);
@@ -133,6 +142,18 @@ export default function AdminAddBusinessPage() {
               </select>
             </div>
           </div>
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem", fontSize: "1.05rem" }}>شرایط و قوانین</h3>
+          <p className="field-hint" style={{ marginTop: 0 }}>
+            به‌عنوان سوپرادمین، با تأیید زیر اعلام می‌کنید که قوانین ثبت آگهی را مطالعه کرده‌اید و مسئولیت صحت اطلاعات
+            این آگهی را می‌پذیرید.
+          </p>
+          <ListingTermsScrollBox id="admin-add-listing-terms" />
+          <ListingTermsCheckbox
+            id="admin-add-terms-cb"
+            checked={termsAccepted}
+            onChange={setTermsAccepted}
+            disabled={saving}
+          />
           <div className="dashboard-actions" style={{ marginTop: "1rem" }}>
             <button type="submit" className="btn btn--primary" disabled={saving}>
               {saving ? "در حال ایجاد…" : "ایجاد آگهی"}

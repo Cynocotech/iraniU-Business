@@ -25,9 +25,6 @@ export default function SiteHeader() {
               <NavLink to="/listings">لیست کسب‌وکارها</NavLink>
             </li>
             <li>
-              <NavLink to="/advertise">تبلیغات و بسته‌ها</NavLink>
-            </li>
-            <li>
               <NavLink to="/dashboard">پنل کسب‌وکار</NavLink>
             </li>
           </ul>

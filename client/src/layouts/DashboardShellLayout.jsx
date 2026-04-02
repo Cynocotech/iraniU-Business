@@ -64,7 +64,7 @@ function ImpersonationBanner() {
 function DashboardChrome() {
   const { dashSlug, twilioModuleEnabled } = useDashboard();
   const navItems = NAV_BASE.filter((item) => !item.twilioOnly || twilioModuleEnabled);
-  const { logout, me } = useAuth();
+  const { logout, me, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const onLogout = () => {
     logout();
@@ -105,14 +105,16 @@ function DashboardChrome() {
                 </NavLink>
               </li>
             ))}
-            <li>
-              <Link to={previewTo}>
-                <span className="app-shell__nav-icon" aria-hidden="true">
-                  {dashboardIcons.preview}
-                </span>
-                <span>پیش‌نمایش صفحهٔ آگهی</span>
-              </Link>
-            </li>
+            {isSuperAdmin ? (
+              <li>
+                <Link to={previewTo}>
+                  <span className="app-shell__nav-icon" aria-hidden="true">
+                    {dashboardIcons.preview}
+                  </span>
+                  <span>پیش‌نمایش صفحهٔ آگهی</span>
+                </Link>
+              </li>
+            ) : null}
             <li>
               <Link to={biolinkPublicTo} target="_blank" rel="noreferrer">
                 <span className="app-shell__nav-icon" aria-hidden="true">

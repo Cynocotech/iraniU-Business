@@ -6,8 +6,6 @@ import HomePage from "./pages/HomePage.jsx";
 import ListingsPage from "./pages/ListingsPage.jsx";
 import BusinessPage from "./pages/BusinessPage.jsx";
 import BusinessClaimedPage from "./pages/BusinessClaimedPage.jsx";
-import MapPage from "./pages/MapPage.jsx";
-import AdvertisePage from "./pages/AdvertisePage.jsx";
 import ClaimPage from "./pages/ClaimPage.jsx";
 import BusinessOnboardingPage from "./pages/BusinessOnboardingPage.jsx";
 import ManagerSignupPage from "./pages/ManagerSignupPage.jsx";
@@ -27,6 +25,7 @@ import AdminAddBusinessPage from "./pages/admin/AdminAddBusinessPage.jsx";
 import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage.jsx";
 import AdminQrExportPage from "./pages/admin/AdminQrExportPage.jsx";
 import AdminClaimsPage from "./pages/admin/AdminClaimsPage.jsx";
+import AdminBusinessReportsPage from "./pages/admin/AdminBusinessReportsPage.jsx";
 import AdminLinkPage from "./pages/admin/AdminLinkPage.jsx";
 import AdminBillingPage from "./pages/admin/AdminBillingPage.jsx";
 import AdminManagersPage from "./pages/admin/AdminManagersPage.jsx";
@@ -49,8 +48,8 @@ export default function App() {
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/business" element={<BusinessPage />} />
         <Route path="/business-claimed" element={<BusinessClaimedPage />} />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/advertise" element={<AdvertisePage />} />
+        <Route path="/map" element={<Navigate to="/listings" replace />} />
+        <Route path="/advertise" element={<Navigate to="/" replace />} />
         <Route path="/claim" element={<ClaimPage />} />
         <Route path="/onboarding" element={<BusinessOnboardingPage />} />
         <Route path="/manager-signup" element={<ManagerSignupPage />} />
@@ -96,6 +95,7 @@ export default function App() {
         <Route path="/admin-qr-export" element={<AdminQrExportPage />} />
         <Route path="/admin-edit" element={<AdminEditBusinessPage />} />
         <Route path="/admin-claims" element={<AdminClaimsPage />} />
+        <Route path="/admin-business-reports" element={<AdminBusinessReportsPage />} />
         <Route path="/admin-link" element={<AdminLinkPage />} />
         <Route path="/admin-billing" element={<AdminBillingPage />} />
         <Route path="/admin-managers" element={<AdminManagersPage />} />

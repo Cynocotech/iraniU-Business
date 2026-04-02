@@ -38,6 +38,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarDir = path.join(__dirname, "..", "uploads", "avatars");
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
+/** نام کاربری ورود به پنل مدیر — فقط حروف کوچک انگلیسی، اعداد و زیرخط */
+const MANAGER_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
+
 const avatarUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, avatarDir),
@@ -61,7 +64,7 @@ const avatarUpload = multer({
 function attachLinkedBusinesses(managerRow) {
   const linked_businesses = db
     .prepare(
-      `SELECT slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
+      `SELECT id, slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
     )
     .all(managerRow.id);
   return {
@@ -104,19 +107,79 @@ export function ensureSuperAdminFromEnv() {
 }
 
 export function registerAuthRoutes(app) {
-  app.post("/api/auth/login/manager", (req, res) => {
+  /** ثبت‌نام عمومی مدیر — نام کاربری + رمز + ایمیل */
+  app.post("/api/auth/register/manager", (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const email = String(b.email || "")
       .trim()
       .toLowerCase();
+    const name = String(b.name || "").trim();
+    const phone = String(b.phone || "").trim();
+    const login_username = String(b.login_username || b.username || "")
+      .trim()
+      .toLowerCase();
+    const password = String(b.password || "").trim();
+    if (!email || !name || !login_username || !password || !phone) {
+      return res.status(400).json({
+        error: "missing_fields",
+        hint: "ایمیل، نام، تلفن، نام کاربری و رمز الزامی است",
+      });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "invalid_email", hint: "ایمیل نامعتبر است" });
+    }
+    if (!MANAGER_USERNAME_RE.test(login_username)) {
+      return res.status(400).json({
+        error: "invalid_username",
+        hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
+      });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر برای رمز" });
+    }
+    if (db.prepare(`SELECT id FROM managers WHERE email = ?`).get(email)) {
+      return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً ثبت شده" });
+    }
+    if (db.prepare(`SELECT id FROM managers WHERE login_username = ?`).get(login_username)) {
+      return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
+    }
+    const ph = hashPassword(password);
+    try {
+      const info = db
+        .prepare(`INSERT INTO managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
+        .run(email, name, phone, ph, login_username);
+      writeSystemLog({
+        level: "info",
+        actorType: "system",
+        action: "manager_self_registered",
+        targetType: "manager",
+        targetId: String(info.lastInsertRowid),
+        message: `Manager registered: ${email} (@${login_username})`,
+      });
+      res.status(201).json({ ok: true, id: info.lastInsertRowid });
+    } catch (e) {
+      if (String(e.message || "").includes("UNIQUE")) {
+        return res.status(409).json({ error: "username_or_email_taken" });
+      }
+      throw e;
+    }
+  });
+
+  app.post("/api/auth/login/manager", (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const identifier = String(b.email || b.login || "")
+      .trim()
+      .toLowerCase();
     const password = String(b.password || "");
     const totp = b.totp != null && b.totp !== "" ? String(b.totp).trim() : null;
-    if (!email || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({ error: "missing_credentials" });
     }
     if (!assertLoginNotBlocked(req, res)) return;
 
-    const m = db.prepare(`SELECT * FROM managers WHERE email = ?`).get(email);
+    const m = db
+      .prepare(`SELECT * FROM managers WHERE email = ? OR login_username = ?`)
+      .get(identifier, identifier);
     if (!m || !m.password_hash) {
       recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });

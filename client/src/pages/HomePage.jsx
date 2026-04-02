@@ -1,9 +1,32 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import ListingCard from "../components/ListingCard.jsx";
 import { apiGet } from "../api.js";
+import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
+
+/** هم‌خوان با فیلتر «دسته» در /listings و فرم جستجوی قهرمان */
+const POPULAR_CATEGORIES = [
+  { cat: "food", label: "غذا و رستوران", hint: "رستوران، کافه، کترینگ", icon: "🍽", theme: "food" },
+  { cat: "market", label: "سوپرمارکت", hint: "مواد غذایی و خرده‌فروشی", icon: "🛒", theme: "market" },
+  { cat: "health", label: "سلامت و پزشکی", hint: "کلینیک، دندان، داروخانه", icon: "🩺", theme: "health" },
+  { cat: "legal", label: "حقوقی و مهاجرت", hint: "وکیل، مشاوره", icon: "⚖️", theme: "legal" },
+  { cat: "beauty", label: "زیبایی و آرایش", hint: "سالن، پوست، مو", icon: "✨", theme: "beauty" },
+  { cat: "auto", label: "خودرو و سرویس", hint: "مکانیک، کارواش", icon: "🚗", theme: "auto" },
+];
 
 export default function HomePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [featured, setFeatured] = useState([]);
+  const [showPendingBanner, setShowPendingBanner] = useState(
+    () => !!location.state?.listingPendingReview
+  );
+
+  useEffect(() => {
+    if (location.state?.listingPendingReview) {
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     document.body.classList.add("page-home");
@@ -20,6 +43,31 @@ export default function HomePage() {
 
   return (
     <>
+      {showPendingBanner && (
+        <div className="container" style={{ paddingTop: "1rem" }}>
+          <div
+            role="status"
+            style={{
+              padding: "0.85rem 1rem",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid rgba(212, 184, 224, 0.85)",
+              background: "linear-gradient(145deg, rgba(250, 245, 252, 0.98), #fff)",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              <strong>آگهی شما ثبت شد و در انتظار تأیید مدیر است.</strong> بعد از تأیید، در لیست و جستجو نمایش داده می‌شود.
+            </p>
+            <button type="button" className="btn btn--ghost" onClick={() => setShowPendingBanner(false)}>
+              بستن
+            </button>
+          </div>
+        </div>
+      )}
       <section className="hero hero--home page-home" aria-labelledby="hero-title">
         <div className="hero__bg" aria-hidden="true"></div>
         <div className="hero__inner">
@@ -29,23 +77,18 @@ export default function HomePage() {
               کسب‌وکار ایرانی را پیدا کنید
             </h1>
             <p className="hero__tagline">نام، شهر یا دسته را انتخاب کنید؛ نتیجه در لیست دیده می‌شود.</p>
-            <div className="hero__map-row">
-              <Link className="btn btn--ghost hero__map-btn" to="/map">
-                <span className="hero__map-btn-ico" aria-hidden="true">
-                  🗺
-                </span>
-                نقشهٔ کسب‌وکارها
-              </Link>
-            </div>
           </header>
 
           <form
             id="hero-search-form"
             className="hero__form hero__panel"
-            action="/listings"
             method="get"
             role="search"
             aria-label="جستجو و فیلتر کسب‌وکار"
+            onSubmit={(e) => {
+              e.preventDefault();
+              navigate(getListingsLocationFromForm(e.currentTarget));
+            }}
           >
             <input type="hidden" name="adv" value="" id="hero-adv-flag" />
             <div className="search-bar hero__search search-bar--home">
@@ -86,22 +129,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section section--home container" aria-labelledby="cat-title">
-        <div className="section__head section__head--home">
+      <section
+        className="section section--home section--categories-home container"
+        aria-labelledby="cat-title"
+      >
+        <div className="section__head section__head--home section__head--categories">
           <h2 id="cat-title" className="section__title section__title--home">
             دسته‌بندی‌های پرطرفدار
           </h2>
+          <p className="section__lead section__lead--home section__lead--categories">
+            چند کلیک تا لیست آگهی‌های همان موضوع — همان فیلتر «دسته» در صفحهٔ لیست.
+          </p>
         </div>
         <div className="category-grid category-grid--home">
-          <Link className="category-card category-card--home" to="/listings">
-            غذا و رستوران
-          </Link>
-          <Link className="category-card category-card--home" to="/listings">
-            سلامت
-          </Link>
-          <Link className="category-card category-card--home" to="/listings">
-            حقوقی
-          </Link>
+          {POPULAR_CATEGORIES.map((c) => (
+            <Link
+              key={c.cat}
+              className={`category-card category-card--home category-card--cat-${c.theme}`}
+              to={`/listings?cat=${encodeURIComponent(c.cat)}`}
+            >
+              <span className="category-card__icon" aria-hidden="true">
+                {c.icon}
+              </span>
+              <span className="category-card__label">{c.label}</span>
+              <span className="category-card__hint">{c.hint}</span>
+            </Link>
+          ))}
         </div>
       </section>
 
@@ -111,7 +164,7 @@ export default function HomePage() {
             کسب‌وکارهای ویژه
           </h2>
         </div>
-        <div className="card-grid card-grid--home">
+        <div className="listing-cards page-home__listing-cards">
           {featured.length === 0 ? (
             <p className="field-hint" style={{ gridColumn: "1 / -1" }}>
               هنوز آگهی‌ای ثبت نشده.{" "}
@@ -119,22 +172,7 @@ export default function HomePage() {
             </p>
           ) : (
             featured.map((b) => (
-              <article key={b.slug} className="card card--home card--promoted">
-                <div className="card__body">
-                  <h3 className="card__title">
-                    <Link to={`/business?slug=${encodeURIComponent(b.slug)}`}>{b.name_fa}</Link>
-                  </h3>
-                  <p className="card__meta">{b.city || b.address || "—"}</p>
-                  <div className="card__actions">
-                    <Link
-                      className="btn btn--primary"
-                      to={`/business?slug=${encodeURIComponent(b.slug)}`}
-                    >
-                      مشاهده
-                    </Link>
-                  </div>
-                </div>
-              </article>
+              <ListingCard key={b.slug} b={b} titleHeading="h3" />
             ))
           )}
         </div>

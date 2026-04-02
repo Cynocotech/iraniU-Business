@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardBusinessForm from "../../components/DashboardBusinessForm.jsx";
 import { apiGet, apiPost } from "../../api.js";
+import { formatAdId } from "../../lib/businessIds.js";
 
 const DEFAULT_SLUG = "clinic-pars";
 
@@ -67,8 +68,8 @@ export default function AdminEditBusinessPage() {
           >
             <option value="">— انتخاب کنید —</option>
             {list.map((r) => (
-              <option key={r.slug} value={r.slug}>
-                {r.name_fa} ({r.slug})
+              <option key={r.slug} value={r.slug} title={r.slug}>
+                {r.name_fa} ({formatAdId(r.id) || r.slug})
               </option>
             ))}
             {slug && !list.some((r) => r.slug === slug) ? (

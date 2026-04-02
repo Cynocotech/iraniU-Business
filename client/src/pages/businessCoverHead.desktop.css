@@ -1,0 +1,121 @@
+/**
+ * Business profile: desktop hero — image only; title/logo/category/badge in primary bar below.
+ * (min-width: 1024px). Imported from BusinessPage.jsx.
+ */
+@media (min-width: 1024px) {
+  /* 100vw full-bleed + overflow-x: clip was cutting the right edge; allow bar + panel to paint fully */
+  body.business-page {
+    overflow-x: visible;
+  }
+
+  body.business-page article.section.container:has(.profile-cover) {
+    overflow-x: visible;
+  }
+
+  body.business-page .profile-panel:has(.profile-cover) {
+    overflow: hidden !important;
+    width: min(100%, 1120px) !important;
+    max-width: 1120px !important;
+    margin-inline: auto !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--color-border);
+  }
+
+  body.business-page .profile-hero-desktop-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    direction: rtl;
+    text-align: right;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    /* RTL: keep logo/title inset from both viewport edges (corners visible, not clipped) */
+    padding-block: 0.65rem;
+    padding-inline: max(1rem, env(safe-area-inset-inline-start, 0px), env(safe-area-inset-inline-end, 0px));
+    background: linear-gradient(
+      120deg,
+      var(--color-primary) 0%,
+      var(--color-primary-mid) 48%,
+      var(--color-primary-light) 100%
+    );
+    color: #fff;
+    box-shadow:
+      0 2px 12px rgba(58, 11, 71, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  body.business-page .profile-hero-desktop-bar__main {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    direction: rtl;
+  }
+
+  body.business-page .profile-hero-desktop-bar .profile-logo--desktop-bar {
+    flex-shrink: 0;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--color-primary);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    font-size: 1.35rem;
+    font-weight: 800;
+  }
+
+  body.business-page .profile-hero-desktop-bar__text {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Explicit title + subtitle classes so global .profile-title-block / article h1 rules never steal color */
+  body.business-page .profile-hero-desktop-bar__title,
+  body.business-page h1.profile-hero-desktop-bar__title {
+    margin: 0 0 0.15rem !important;
+    font-size: clamp(1.2rem, 1.85vw, 1.55rem) !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff;
+    line-height: 1.28 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  body.business-page .profile-hero-desktop-bar__category,
+  body.business-page p.profile-hero-desktop-bar__category {
+    margin: 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.9);
+    line-height: 1.4 !important;
+  }
+
+  body.business-page .profile-hero-desktop-bar__badge.badge--unclaimed {
+    flex-shrink: 0;
+    font-size: 0.82rem !important;
+    padding: 0.25rem 0.5rem !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+
+  body.business-page .profile-panel .profile-hero-desktop-cta {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-sm) max(var(--space-sm), env(safe-area-inset-inline-end, 0px));
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+}

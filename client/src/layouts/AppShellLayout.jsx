@@ -4,7 +4,6 @@ import { Outlet, Link, NavLink } from "react-router-dom";
 const nav = [
   { to: "/dashboard#panel-overview", label: "نمای کلی" },
   { to: "/dashboard#edit-ad", label: "ویرایش آگهی" },
-  { to: "/dashboard#package", label: "بسته تبلیغاتی" },
   { to: "/dashboard#media", label: "تصاویر" },
   { to: "/dashboard#qr-review", label: "QR نظر Google" },
   { to: "/business", label: "پیش‌نمایش عمومی" },
@@ -50,8 +49,6 @@ export default function AppShellLayout() {
           </ul>
           <div className="app-shell__sidebar-foot">
             <Link to="/listings">مشاهده در فهرست</Link>
-            {" · "}
-            <Link to="/advertise">ارتقای بسته</Link>
           </div>
         </aside>
 

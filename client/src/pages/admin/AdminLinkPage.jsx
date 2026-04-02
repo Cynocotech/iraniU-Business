@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPatchUrl } from "../../api.js";
+import { formatAdId } from "../../lib/businessIds.js";
 
 export default function AdminLinkPage() {
   const [businesses, setBusinesses] = useState([]);
@@ -9,11 +10,46 @@ export default function AdminLinkPage() {
   const [managerId, setManagerId] = useState("");
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [bizSearch, setBizSearch] = useState("");
+  const [mgrSearch, setMgrSearch] = useState("");
 
   useEffect(() => {
     apiGet("/api/businesses").then(setBusinesses).catch(() => {});
     apiGet("/api/managers").then(setManagers).catch(() => {});
   }, []);
+
+  const filteredBusinesses = useMemo(() => {
+    const q = bizSearch.trim().toLowerCase();
+    let list = businesses;
+    if (q) {
+      list = businesses.filter((b) => {
+        const blob = `${b.name_fa || ""} ${b.slug || ""} ${b.listing_title || ""} ${b.category || ""} ${b.city || ""}`.toLowerCase();
+        return blob.includes(q);
+      });
+    }
+    if (slug && !list.some((b) => b.slug === slug)) {
+      const sel = businesses.find((b) => b.slug === slug);
+      if (sel) list = [sel, ...list];
+    }
+    return list;
+  }, [businesses, bizSearch, slug]);
+
+  const filteredManagers = useMemo(() => {
+    const q = mgrSearch.trim().toLowerCase();
+    let list = managers;
+    if (q) {
+      list = managers.filter((m) => {
+        const blob = `${m.name || ""} ${m.email || ""}`.toLowerCase();
+        return blob.includes(q);
+      });
+    }
+    const mid = managerId === "" ? null : String(managerId);
+    if (mid && !list.some((m) => String(m.id) === mid)) {
+      const sel = managers.find((m) => String(m.id) === mid);
+      if (sel) list = [sel, ...list];
+    }
+    return list;
+  }, [managers, mgrSearch, managerId]);
 
   const selected = businesses.find((b) => b.slug === slug);
 
@@ -60,12 +96,34 @@ export default function AdminLinkPage() {
         <form onSubmit={save}>
           <div className="form-grid">
             <div className="field field--block">
+              <label htmlFor="link-biz-search">جستجوی آگهی</label>
+              <input
+                id="link-biz-search"
+                type="search"
+                autoComplete="off"
+                placeholder="نام، شناسه، دسته، شهر…"
+                value={bizSearch}
+                onChange={(e) => setBizSearch(e.target.value)}
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="link-mgr-search">جستجوی مدیر</label>
+              <input
+                id="link-mgr-search"
+                type="search"
+                autoComplete="off"
+                placeholder="نام یا ایمیل…"
+                value={mgrSearch}
+                onChange={(e) => setMgrSearch(e.target.value)}
+              />
+            </div>
+            <div className="field field--block">
               <label htmlFor="link-slug">آگهی</label>
               <select id="link-slug" value={slug} onChange={(e) => setSlug(e.target.value)} required>
                 <option value="">— انتخاب —</option>
-                {businesses.map((b) => (
-                  <option key={b.slug} value={b.slug}>
-                    {b.name_fa} ({b.slug})
+                {filteredBusinesses.map((b) => (
+                  <option key={b.slug} value={b.slug} title={b.slug}>
+                    {b.name_fa} · {formatAdId(b.id) || b.slug}
                   </option>
                 ))}
               </select>
@@ -78,7 +136,7 @@ export default function AdminLinkPage() {
                 onChange={(e) => setManagerId(e.target.value)}
               >
                 <option value="">— بدون مدیر —</option>
-                {managers.map((m) => (
+                {filteredManagers.map((m) => (
                   <option key={m.id} value={String(m.id)}>
                     {m.name} ({m.email})
                   </option>

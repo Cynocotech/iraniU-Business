@@ -12,6 +12,7 @@ import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
+import { sendListingApprovedEmail, sendListingRejectedEmail } from "./listingDecisionEmail.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -42,7 +43,21 @@ const PATCHABLE_BUSINESS = new Set([
   "call_tracking_enabled",
   "call_tracking_number",
   "call_forward_number",
+  "listing_contact_email",
 ]);
+
+/** گزارش‌های آگهی — کلیدها باید با کلاینت هم‌خوان باشند */
+const BUSINESS_REPORT_REASONS = [
+  { key: "wrong_info", label: "اطلاعات نادرست یا قدیمی" },
+  { key: "spam", label: "هرزنامه یا تبلیغ نامناسب" },
+  { key: "duplicate", label: "آگهی تکراری" },
+  { key: "impersonation", label: "جعل هویت یا سوءاستفاده" },
+  { key: "other", label: "سایر (توضیح دهید)" },
+];
+const BUSINESS_REPORT_REASON_KEYS = new Set(BUSINESS_REPORT_REASONS.map((r) => r.key));
+
+/** نسخهٔ شرایط ثبت آگهی — باید با مقدار ارسالی از کلاینت و listingTerms.js یکی باشد */
+const LISTING_TERMS_VERSION = "1";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
@@ -73,9 +88,86 @@ app.get("/api/twilio-module-status", (_req, res) => {
   res.json({ enabled: isTwilioModuleEnabled() });
 });
 
-app.get("/api/businesses", (_req, res) => {
-  const rows = db.prepare(`SELECT * FROM businesses ORDER BY name_fa`).all();
+function isListingApproved(row) {
+  const a = row && row.listing_approval;
+  return a === "approved" || a == null || a === "";
+}
+
+/** آگهی روی سایت عمومی — فقط فعال (یا بدون وضعیت = فعال) */
+function isBusinessActiveForPublic(row) {
+  if (!row) return false;
+  const s = row.status;
+  return s == null || s === "" || s === "active";
+}
+
+function isBusinessVisibleToPublic(row) {
+  return isListingApproved(row) && isBusinessActiveForPublic(row);
+}
+
+app.get("/api/businesses", (req, res) => {
+  const auth = parseAuthHeader(req);
+  const isAdmin = auth && auth.typ === "adm";
+  const rows = isAdmin
+    ? db.prepare(`SELECT * FROM businesses ORDER BY name_fa`).all()
+    : db
+        .prepare(
+          `SELECT * FROM businesses WHERE (listing_approval = 'approved' OR listing_approval IS NULL OR listing_approval = '')
+           AND (status IS NULL OR status = '' OR status = 'active')
+           ORDER BY name_fa`
+        )
+        .all();
   res.json(rows);
+});
+
+function adminBusinessMatchesSearchTokens(row, tokens) {
+  if (!tokens.length) return true;
+  const idStr = row.id != null ? String(row.id) : "";
+  const iu = row.id != null ? `iu-${String(row.id).padStart(8, "0")}` : "";
+  const iuDisplay = row.id != null ? `IU-${String(row.id).padStart(8, "0")}` : "";
+  const blob = [
+    row.name_fa,
+    row.slug,
+    row.category,
+    row.city,
+    row.phone,
+    row.address,
+    row.listing_title,
+    row.listing_contact_email,
+    idStr,
+    iu,
+    iuDisplay,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return tokens.every((t) => blob.includes(t));
+}
+
+const ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT = 10;
+const ADMIN_BUSINESSES_PAGE_SIZE_MAX = 100;
+
+/** جستجوی Ajax برای پنل سوپرادمین — همهٔ آگهی‌ها با فیلتر اختیاری + صفحه‌بندی */
+app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
+  const raw = String(req.query.q || "").trim();
+  let page = parseInt(String(req.query.page || "1"), 10);
+  if (!Number.isFinite(page) || page < 1) page = 1;
+  let limit = parseInt(String(req.query.limit || String(ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT)), 10);
+  if (!Number.isFinite(limit) || limit < 1) limit = ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT;
+  limit = Math.min(ADMIN_BUSINESSES_PAGE_SIZE_MAX, limit);
+
+  const all = db
+    .prepare(
+      `SELECT * FROM businesses ORDER BY CASE WHEN listing_approval = 'pending' THEN 0 ELSE 1 END, name_fa`
+    )
+    .all();
+  const tokens = raw ? raw.toLowerCase().split(/\s+/).filter(Boolean) : [];
+  const filtered = tokens.length ? all.filter((row) => adminBusinessMatchesSearchTokens(row, tokens)) : all;
+  const total = filtered.length;
+  const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+  if (page > totalPages) page = totalPages;
+  const offset = (page - 1) * limit;
+  const items = filtered.slice(offset, offset + limit);
+  res.json({ items, total, page, pageSize: limit, totalPages });
 });
 
 app.get("/api/categories", (_req, res) => {
@@ -93,8 +185,49 @@ app.get("/api/categories", (_req, res) => {
 app.get("/api/businesses/:slug", (req, res) => {
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(req.params.slug);
   if (!row) return res.status(404).json({ error: "not_found", slug: req.params.slug });
+  const auth = parseAuthHeader(req);
+  const publiclyVisible = isBusinessVisibleToPublic(row);
+  if (!publiclyVisible) {
+    const canSee =
+      (auth && auth.typ === "adm") ||
+      (auth &&
+        auth.typ === "mgr" &&
+        row.manager_id != null &&
+        Number(row.manager_id) === Number(auth.sub));
+    if (!canSee) return res.status(404).json({ error: "not_found", slug: req.params.slug });
+  }
   const twilioOn = isTwilioModuleEnabled();
   res.json({ ...row, twilio_module_enabled: twilioOn });
+});
+
+app.get("/api/business-report-reasons", (_req, res) => {
+  res.json({ reasons: BUSINESS_REPORT_REASONS });
+});
+
+app.post("/api/businesses/:slug/report", (req, res) => {
+  const business_slug = String(req.params.slug || "").trim();
+  const biz = db.prepare(`SELECT slug, listing_approval, status FROM businesses WHERE slug = ?`).get(business_slug);
+  if (!biz) return res.status(404).json({ error: "not_found" });
+  if (!isBusinessVisibleToPublic(biz)) return res.status(404).json({ error: "not_found" });
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+  const reason_key = String(b.reason_key || "").trim();
+  if (!BUSINESS_REPORT_REASON_KEYS.has(reason_key)) {
+    return res.status(400).json({ error: "invalid_reason", hint: "دلیل نامعتبر است" });
+  }
+  let details = String(b.details || "").trim();
+  if (details.length > 2000) details = details.slice(0, 2000);
+  let reporter_email = String(b.reporter_email || "").trim().toLowerCase();
+  if (reporter_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reporter_email)) {
+    return res.status(400).json({ error: "invalid_email", hint: "ایمیل نامعتبر است" });
+  }
+  if (!reporter_email) reporter_email = null;
+  const info = db
+    .prepare(
+      `INSERT INTO business_reports (business_slug, reason_key, details, reporter_email) VALUES (?, ?, ?, ?)`
+    )
+    .run(business_slug, reason_key, details || null, reporter_email);
+  const row = db.prepare(`SELECT * FROM business_reports WHERE id = ?`).get(info.lastInsertRowid);
+  res.status(201).json(row);
 });
 
 const DEFAULT_JSON_HOURS = "[]";
@@ -142,37 +275,101 @@ app.post("/api/businesses", (req, res) => {
     if (Number.isFinite(n)) rating = n;
   }
 
+  const auth = parseAuthHeader(req);
+  const listing_approval = auth && auth.typ === "adm" ? "approved" : "pending";
+
+  const acceptTerms =
+    b.accept_listing_terms === true ||
+    b.accept_listing_terms === 1 ||
+    String(b.accept_listing_terms || "").toLowerCase() === "true";
+  const termsVersionClient = String(b.listing_terms_version || "").trim();
+  if (!acceptTerms) {
+    return res.status(400).json({
+      error: "terms_not_accepted",
+      hint: "پذیرش شرایط و قوانین ثبت آگهی الزامی است",
+    });
+  }
+  if (termsVersionClient !== LISTING_TERMS_VERSION) {
+    return res.status(400).json({
+      error: "terms_version_mismatch",
+      hint: "نسخهٔ شرایط قدیمی است؛ صفحه را تازه‌سازی کنید و دوباره تلاش کنید",
+    });
+  }
+  const listing_terms_accepted_at = new Date().toISOString();
+  const listing_terms_version = LISTING_TERMS_VERSION;
+  let listing_contact_email = String(b.listing_contact_email ?? "").trim().toLowerCase();
+  if (!listing_contact_email) {
+    return res.status(400).json({
+      error: "missing_listing_contact_email",
+      hint: "ایمیل تماس برای اطلاع‌رسانی الزامی است",
+    });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(listing_contact_email)) {
+    return res.status(400).json({ error: "invalid_listing_contact_email", hint: "ایمیل تماس برای اطلاع‌رسانی نامعتبر است" });
+  }
+
+  const city = String(b.city ?? "").trim();
+  const phone = String(b.phone ?? "").trim();
+  const address = String(b.address ?? "").trim();
+  const category = String(b.category ?? "").trim();
+  const listing_title = String(b.listing_title ?? "").trim();
+  const description = String(b.description ?? "").trim();
+  const google_review_url = String(b.google_review_url ?? "").trim();
+  const cta = String(b.cta ?? "").trim();
+  const price_range = String(b.price_range ?? "").trim();
+  if (!city || !phone || !address || !category || !listing_title || !description || !google_review_url || !cta || !price_range) {
+    return res.status(400).json({
+      error: "missing_business_fields",
+      hint: "شهر، تلفن، آدرس، دسته، عنوان، توضیحات، لینک Google، دکمهٔ فراخوان و محدودهٔ قیمت الزامی است",
+    });
+  }
+  try {
+    const u = new URL(google_review_url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+  } catch {
+    return res.status(400).json({
+      error: "invalid_google_review_url",
+      hint: "لینک صفحهٔ نظر Google باید http یا https باشد",
+    });
+  }
+
   db.prepare(
     `INSERT INTO businesses (
       slug, name_fa, description, category, phone, address, google_review_url, claimed, package,
       subtitle, hours_json, promo_title, promo_description, cover_image_url, gallery_json,
-      listing_title, city, price_range, rating, cta, status, manager_id, biolink_json
+      listing_title, city, price_range, rating, cta, status, manager_id, biolink_json, listing_approval,
+      listing_terms_accepted_at, listing_terms_version, listing_contact_email
     ) VALUES (
       @slug, @name_fa, @description, @category, @phone, @address, @google_review_url, 0, 'basic',
       @subtitle, @hours_json, @promo_title, @promo_description, @cover_image_url, @gallery_json,
-      @listing_title, @city, @price_range, @rating, @cta, @status, NULL, @biolink_json
+      @listing_title, @city, @price_range, @rating, @cta, @status, NULL, @biolink_json, @listing_approval,
+      @listing_terms_accepted_at, @listing_terms_version, @listing_contact_email
     )`
   ).run({
     slug,
     name_fa,
-    description: String(b.description ?? ""),
-    category: String(b.category ?? ""),
-    phone: String(b.phone ?? ""),
-    address: String(b.address ?? ""),
-    google_review_url: String(b.google_review_url ?? ""),
+    description,
+    category,
+    phone,
+    address,
+    google_review_url,
     subtitle: String(b.subtitle ?? ""),
     hours_json,
     promo_title: String(b.promo_title ?? ""),
     promo_description: String(b.promo_description ?? ""),
     cover_image_url: String(b.cover_image_url ?? ""),
     gallery_json,
-    listing_title: String(b.listing_title ?? ""),
-    city: String(b.city ?? ""),
-    price_range: String(b.price_range ?? ""),
+    listing_title,
+    city,
+    price_range,
     rating,
-    cta: String(b.cta ?? ""),
+    cta,
     status: String(b.status || "active") || "active",
     biolink_json,
+    listing_approval,
+    listing_terms_accepted_at,
+    listing_terms_version,
+    listing_contact_email,
   });
 
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
@@ -186,11 +383,17 @@ app.post("/api/claim-requests", (req, res) => {
   const email = String(b.email || "").trim();
   const phone = String(b.phone || "").trim();
   const message = String(b.message || "").trim();
-  if (!business_slug || !applicant_name || !email) {
+  if (!business_slug || !applicant_name || !email || !phone || !message) {
     return res.status(400).json({ error: "missing_fields" });
   }
-  const biz = db.prepare(`SELECT slug, claimed FROM businesses WHERE slug = ?`).get(business_slug);
+  const biz = db.prepare(`SELECT slug, claimed, listing_approval, status FROM businesses WHERE slug = ?`).get(business_slug);
   if (!biz) return res.status(404).json({ error: "business_not_found" });
+  if (!isBusinessVisibleToPublic(biz)) {
+    return res.status(400).json({
+      error: "listing_not_public",
+      hint: "این آگهی در سایت منتشر نشده، رد شده یا غیرفعال است",
+    });
+  }
   if (biz.claimed) return res.status(400).json({ error: "already_claimed" });
   const dup = db
     .prepare(
@@ -219,6 +422,79 @@ app.get("/api/admin/claim-requests", requireSuperAdmin, (req, res) => {
     rows = db.prepare(`SELECT * FROM claim_requests ORDER BY created_at DESC`).all();
   }
   res.json(rows);
+});
+
+app.get("/api/admin/business-reports", requireSuperAdmin, (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT r.id, r.business_slug, r.reason_key, r.details, r.reporter_email, r.created_at,
+              b.name_fa AS business_name_fa, b.id AS business_id
+       FROM business_reports r
+       LEFT JOIN businesses b ON b.slug = r.business_slug
+       ORDER BY r.created_at DESC`
+    )
+    .all();
+  const labelByKey = Object.fromEntries(BUSINESS_REPORT_REASONS.map((x) => [x.key, x.label]));
+  res.json(rows.map((r) => ({ ...r, reason_label: labelByKey[r.reason_key] || r.reason_key })));
+});
+
+app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, async (req, res) => {
+  const slug = decodeURIComponent(String(req.params.slug || "").trim());
+  if (!slug) return res.status(400).json({ error: "missing_slug" });
+  const rowBefore = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  if (!rowBefore) return res.status(404).json({ error: "not_found" });
+  const info = db.prepare(`UPDATE businesses SET listing_approval = 'approved', listing_rejection_reason = NULL WHERE slug = ?`).run(slug);
+  if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "listing_approved",
+    targetType: "business",
+    targetId: slug,
+    message: `Listing approved: ${slug}`,
+  });
+  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  try {
+    await sendListingApprovedEmail({
+      to: row.listing_contact_email,
+      nameFa: row.name_fa,
+      slug: row.slug,
+    });
+  } catch (e) {
+    console.error("listing approve email", e);
+  }
+  res.json(row);
+});
+
+app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, async (req, res) => {
+  const slug = decodeURIComponent(String(req.params.slug || "").trim());
+  if (!slug) return res.status(400).json({ error: "missing_slug" });
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const reason = String(body.reason ?? "").trim();
+  const rowBefore = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  if (!rowBefore) return res.status(404).json({ error: "not_found" });
+  const info = db
+    .prepare(`UPDATE businesses SET listing_approval = 'rejected', listing_rejection_reason = ? WHERE slug = ?`)
+    .run(reason || null, slug);
+  if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "listing_rejected",
+    targetType: "business",
+    targetId: slug,
+    message: `Listing rejected: ${slug}`,
+  });
+  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  try {
+    await sendListingRejectedEmail({
+      to: row.listing_contact_email,
+      nameFa: row.name_fa,
+      slug: row.slug,
+      reason: reason || "دلیلی توسط مدیر ثبت نشده است.",
+    });
+  } catch (e) {
+    console.error("listing reject email", e);
+  }
+  res.json(row);
 });
 
 app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, (req, res) => {
@@ -250,7 +526,7 @@ app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, (req, res) =
 function attachLinkedBusinesses(managerRow) {
   const linked_businesses = db
     .prepare(
-      `SELECT slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
+      `SELECT id, slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
     )
     .all(managerRow.id);
   return {
@@ -274,20 +550,40 @@ app.get("/api/managers/:id", requireSuperAdmin, (req, res) => {
   res.json(attachLinkedBusinesses(m));
 });
 
+const MANAGER_LOGIN_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
+
 app.post("/api/managers", requireSuperAdmin, (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const email = String(b.email || "").trim().toLowerCase();
   const name = String(b.name || "").trim();
   const password = String(b.password || "").trim();
+  const login_username_raw = String(b.login_username || b.username || "").trim().toLowerCase();
+  const phone = String(b.phone || "").trim();
   if (!email || !name) return res.status(400).json({ error: "missing_email_or_name" });
+  if (!phone) return res.status(400).json({ error: "missing_phone", hint: "تلفن الزامی است" });
+  if (!login_username_raw) {
+    return res.status(400).json({ error: "missing_username", hint: "نام کاربری الزامی است" });
+  }
   if (password.length < 8) {
     return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر برای رمز مدیر" });
+  }
+  const login_username = login_username_raw;
+  if (!MANAGER_LOGIN_USERNAME_RE.test(login_username)) {
+    return res.status(400).json({
+      error: "invalid_username",
+      hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
+    });
+  }
+  if (db.prepare(`SELECT id FROM managers WHERE login_username = ?`).get(login_username)) {
+    return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
   }
   try {
     const ph = hashPassword(password);
     const info = db
-      .prepare(`INSERT INTO managers (email, name, phone, password_hash) VALUES (?, ?, ?, ?)`)
-      .run(email, name, String(b.phone || "").trim() || null, ph);
+      .prepare(
+        `INSERT INTO managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(email, name, phone, ph, login_username);
     const row = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(info.lastInsertRowid);
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -299,7 +595,10 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
     res.status(201).json(attachLinkedBusinesses(row));
   } catch (e) {
     if (String(e.message || "").includes("UNIQUE")) {
-      return res.status(409).json({ error: "email_taken" });
+      return res.status(409).json({
+        error: "email_or_username_taken",
+        hint: "ایمیل یا نام کاربری تکراری است",
+      });
     }
     throw e;
   }
@@ -616,6 +915,14 @@ function updateBusinessBySlug(req, res) {
       updates[key] = n;
       continue;
     }
+    if (key === "listing_contact_email") {
+      const e = val === null || val === "" ? null : String(val).trim().toLowerCase();
+      if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        return res.status(400).json({ error: "invalid_listing_contact_email", hint: "ایمیل نامعتبر است" });
+      }
+      updates[key] = e;
+      continue;
+    }
     if (key === "hours_json" || key === "gallery_json" || key === "biolink_json") {
       if (typeof val !== "string") {
         try {
@@ -687,6 +994,9 @@ app.get("/api/admin/stats", requireSuperAdmin, (_req, res) => {
     const featured_businesses = db
       .prepare(`SELECT COUNT(*) AS c FROM businesses WHERE package = 'featured'`)
       .get().c;
+    const pending_listing_approvals = db
+      .prepare(`SELECT COUNT(*) AS c FROM businesses WHERE listing_approval = 'pending'`)
+      .get().c;
     const total_qr_scans = db.prepare(`SELECT COUNT(*) AS c FROM qr_scans`).get().c;
     const qr_scans_7d = db
       .prepare(`SELECT COUNT(*) AS c FROM qr_scans WHERE scanned_at >= datetime('now', '-7 days')`)
@@ -696,6 +1006,7 @@ app.get("/api/admin/stats", requireSuperAdmin, (_req, res) => {
       active_businesses,
       inactive_businesses,
       featured_businesses,
+      pending_listing_approvals,
       total_qr_scans,
       qr_scans_7d,
     });
@@ -728,7 +1039,8 @@ app.post("/api/phone-click", (req, res) => {
     .trim()
     .toLowerCase();
   if (!slug) return res.status(400).json({ error: "missing_slug" });
-  if (!db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(slug)) {
+  const bizPhone = db.prepare(`SELECT slug, listing_approval, status FROM businesses WHERE slug = ?`).get(slug);
+  if (!bizPhone || !isBusinessVisibleToPublic(bizPhone)) {
     return res.status(404).json({ error: "not_found" });
   }
   try {

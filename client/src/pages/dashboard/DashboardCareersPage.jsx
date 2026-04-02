@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiPatch } from "../../api.js";
 import { useDashboard } from "../../context/DashboardContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
 
 export default function DashboardCareersPage() {
+  const { isSuperAdmin } = useAuth();
   const { dashSlug, biz, setBiz } = useDashboard();
   const [careersTitle, setCareersTitle] = useState("");
   const [careersText, setCareersText] = useState("");
@@ -46,10 +48,18 @@ export default function DashboardCareersPage() {
           icon={dashboardIcons.careers}
         />
         <p className="field-hint" style={{ marginTop: 0 }}>
-          اگر متن بگذارید، بخش «فرصت‌های شغلی» روی{" "}
-          <Link to={previewHref} target="_blank" rel="noreferrer">
-            صفحهٔ عمومی آگهی
-          </Link>{" "}
+          اگر متن بگذارید، بخش «فرصت‌های شغلی»
+          {isSuperAdmin ? (
+            <>
+              {" "}
+              روی{" "}
+              <Link to={previewHref} target="_blank" rel="noreferrer">
+                صفحهٔ عمومی آگهی
+              </Link>{" "}
+            </>
+          ) : (
+            " "
+          )}
           نمایش داده می‌شود.
         </p>
 
@@ -81,9 +91,11 @@ export default function DashboardCareersPage() {
             <button type="submit" className="btn btn--primary" disabled={saving}>
               {saving ? "در حال ذخیره…" : "ذخیره در سرور"}
             </button>
-            <Link className="btn btn--ghost" to={previewHref} target="_blank" rel="noreferrer">
-              پیش‌نمایش بخش استخدام
-            </Link>
+            {isSuperAdmin ? (
+              <Link className="btn btn--ghost" to={previewHref} target="_blank" rel="noreferrer">
+                پیش‌نمایش بخش استخدام
+              </Link>
+            ) : null}
           </div>
           {saveMsg && <p className="field-hint">{saveMsg}</p>}
         </form>

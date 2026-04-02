@@ -82,11 +82,11 @@ export default function ManagerLoginPage() {
 
   const footer = (
     <p className="auth-login__links">
-      <Link to="/">بازگشت به خانه</Link>
+      <Link to="/manager-signup">ثبت‌نام مدیر</Link>
       <span className="auth-login__links-sep" aria-hidden="true">
         ·
       </span>
-      <Link to="/admin/login">ورود سوپرادمین</Link>
+      <Link to="/">بازگشت به خانه</Link>
     </p>
   );
 
@@ -97,7 +97,7 @@ export default function ManagerLoginPage() {
       title={phase === "password" ? "ورود مدیر" : "کد تأیید"}
       description={
         phase === "password"
-          ? "ایمیل و رمز عبور را وارد کنید. اگر ورود دو مرحله‌ای فعال باشد، در مرحلهٔ بعد کد را می‌گیرید."
+          ? "ایمیل یا نام کاربری و رمز عبور را وارد کنید. اگر ورود دو مرحله‌ای فعال باشد، در مرحلهٔ بعد کد را می‌گیرید."
           : "کد ۶ رقمی از Google Authenticator را وارد کنید."
       }
       footer={footer}
@@ -106,17 +106,17 @@ export default function ManagerLoginPage() {
         {phase === "password" ? (
           <div key="step-pw" className="auth-login__step-panel">
             <div className="field field--block">
-              <label htmlFor="ml-email">ایمیل</label>
+              <label htmlFor="ml-email">ایمیل یا نام کاربری</label>
               <input
                 id="ml-email"
-                type="email"
+                type="text"
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 dir="ltr"
                 className="auth-login__input"
-                placeholder="name@example.com"
+                placeholder="name@example.com یا ali_london"
               />
             </div>
             <div className="field field--block">
@@ -153,7 +153,7 @@ export default function ManagerLoginPage() {
               />
             </div>
             <button type="button" className="btn btn--ghost auth-login__back-step" onClick={backToPassword} disabled={pending}>
-              ویرایش ایمیل و رمز
+              ویرایش ایمیل/نام کاربری و رمز
             </button>
           </div>
         )}

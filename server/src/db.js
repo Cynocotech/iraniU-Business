@@ -82,6 +82,11 @@ function migrateBusinessesColumns() {
     ["call_tracking_enabled", "INTEGER NOT NULL DEFAULT 0"],
     ["call_tracking_number", "TEXT"],
     ["call_forward_number", "TEXT"],
+    ["listing_approval", "TEXT NOT NULL DEFAULT 'approved'"],
+    ["listing_terms_accepted_at", "TEXT"],
+    ["listing_terms_version", "TEXT"],
+    ["listing_contact_email", "TEXT"],
+    ["listing_rejection_reason", "TEXT"],
   ];
   for (const [col, typ] of add) {
     if (!names.has(col)) {
@@ -182,6 +187,16 @@ function ensureAdminTables() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_business_categories_active_order ON business_categories(is_active, sort_order, name);
+    CREATE TABLE IF NOT EXISTS business_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_slug TEXT NOT NULL,
+      reason_key TEXT NOT NULL,
+      details TEXT,
+      reporter_email TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_business_reports_slug ON business_reports(business_slug);
+    CREATE INDEX IF NOT EXISTS idx_business_reports_created ON business_reports(created_at DESC);
   `);
 }
 
@@ -208,6 +223,7 @@ function migrateAuthTables() {
   const mInfo = db.prepare("PRAGMA table_info(managers)").all();
   const mNames = new Set(mInfo.map((c) => c.name));
   const mAdd = [
+    ["login_username", "TEXT"],
     ["password_hash", "TEXT"],
     ["totp_secret", "TEXT"],
     ["totp_enabled", "INTEGER NOT NULL DEFAULT 0"],
@@ -222,6 +238,13 @@ function migrateAuthTables() {
     if (!mNames.has(col)) {
       db.exec(`ALTER TABLE managers ADD COLUMN ${col} ${typ}`);
     }
+  }
+  try {
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_login_username ON managers(login_username) WHERE login_username IS NOT NULL AND length(trim(login_username)) > 0`
+    );
+  } catch (e) {
+    console.warn("[db] idx_managers_login_username:", e?.message || e);
   }
   db.exec(`
     CREATE TABLE IF NOT EXISTS super_admins (
@@ -526,5 +549,53 @@ function applySofrehGalleryImages() {
 }
 
 applySofrehGalleryImages();
+
+/**
+ * یک‌بار: نامک‌های واردات لندن به شکل lb-{هش بلند} → iu- + ۸ رقم (همان عدد آگهی، با فرمت شبیه IU-… در UI).
+ * جداول وابسته به business_slug را هم به‌روز می‌کند.
+ */
+function migrateLbHashSlugsToIuIdSlugs() {
+  const key = "migrate_lb_slug_to_iu_v1";
+  if (db.prepare(`SELECT 1 FROM app_meta WHERE key = ?`).get(key)) return;
+
+  const candidates = db
+    .prepare(
+      `SELECT id, slug FROM businesses
+       WHERE slug LIKE 'lb-%' AND length(slug) >= 40`
+    )
+    .all();
+
+  if (candidates.length === 0) {
+    db.prepare(`INSERT OR IGNORE INTO app_meta (key, value) VALUES (?, ?)`).run(key, new Date().toISOString());
+    return;
+  }
+
+  const tx = db.transaction(() => {
+    for (const { id, slug: oldSlug } of candidates) {
+      const newSlug = `iu-${String(id).padStart(8, "0")}`;
+      const clash = db.prepare(`SELECT id FROM businesses WHERE slug = ? AND id != ?`).get(newSlug, id);
+      if (clash) {
+        console.warn(`[db] migrate lb→iu: skip id=${id}, slug ${newSlug} already used`);
+        continue;
+      }
+      for (const t of [
+        "qr_scans",
+        "phone_clicks",
+        "claim_requests",
+        "billing_records",
+        "reservations",
+        "call_logs",
+        "business_reports",
+      ]) {
+        db.prepare(`UPDATE ${t} SET business_slug = ? WHERE business_slug = ?`).run(newSlug, oldSlug);
+      }
+      db.prepare(`UPDATE businesses SET slug = ? WHERE id = ?`).run(newSlug, id);
+    }
+    db.prepare(`INSERT OR IGNORE INTO app_meta (key, value) VALUES (?, ?)`).run(key, new Date().toISOString());
+  });
+  tx();
+}
+
+migrateLbHashSlugsToIuIdSlugs();
 
 export { db, dbPath, ensureRestaurantSafraDemo };

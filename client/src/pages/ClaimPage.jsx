@@ -1,11 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiPost } from "../api.js";
+import { apiGet, apiPost } from "../api.js";
+import { formatAdId } from "../lib/businessIds.js";
 
 export default function ClaimPage() {
   const [searchParams] = useSearchParams();
   const slug = (searchParams.get("slug") || "").trim();
   const businessLabel = searchParams.get("business") || slug || "این آگهی";
+
+  const [adId, setAdId] = useState(null);
+
+  useEffect(() => {
+    if (!slug) {
+      setAdId(null);
+      return;
+    }
+    apiGet(`/api/businesses/${encodeURIComponent(slug)}`)
+      .then((row) => {
+        setAdId(row?.id != null ? formatAdId(row.id) : null);
+      })
+      .catch(() => setAdId(null));
+  }, [slug]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,6 +56,9 @@ export default function ClaimPage() {
       if (t.includes("already_claimed")) text = "این آگهی قبلاً مالک دارد.";
       else if (t.includes("duplicate_pending")) text = "برای این ایمیل و آگهی درخواست در انتظار دارید.";
       else if (t.includes("business_not_found")) text = "آگهی پیدا نشد.";
+      else if (t.includes("listing_not_public") || t.includes("listing_not_approved")) {
+        text = "این آگهی در سایت منتشر نشده یا غیرفعال است؛ فقط آگهی‌های فعال و منتشرشده قابل ادعا هستند.";
+      }
       setStatus({ ok: false, text });
     } finally {
       setSending(false);
@@ -52,10 +70,10 @@ export default function ClaimPage() {
       <h1>ادعای مالکیت</h1>
       <p className="field-hint">
         آگهی: <strong>{businessLabel}</strong>
-        {slug && (
+        {adId && (
           <>
             {" "}
-            (<span lang="en" dir="ltr">{slug}</span>)
+            (<span lang="en" dir="ltr">{adId}</span>)
           </>
         )}
       </p>
@@ -88,11 +106,11 @@ export default function ClaimPage() {
             </div>
             <div className="field field--block">
               <label htmlFor="claim-phone">تلفن</label>
-              <input id="claim-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
+              <input id="claim-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
             </div>
             <div className="field field--block">
-              <label htmlFor="claim-msg">توضیح (اختیاری)</label>
-              <textarea id="claim-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
+              <label htmlFor="claim-msg">توضیح</label>
+              <textarea id="claim-msg" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} required />
             </div>
           </div>
           <button type="submit" className="btn btn--primary" disabled={sending}>

@@ -1,28 +1,38 @@
 import { Link, useSearchParams, useLocation } from "react-router-dom";
+import BusinessReportModal from "../components/BusinessReportModal.jsx";
 import { useEffect, useMemo, useState } from "react";
-import { apiGet } from "../api.js";
+import "./businessCoverHead.desktop.css";
+import { apiGet, apiPost } from "../api.js";
 import {
   parseGalleryJson,
   parseHoursJson,
   resolveBusinessImageUrl,
   pickHeroImageUrlFromBusiness,
 } from "../lib/businessProfile.js";
+import { useMediaQuery } from "../lib/useMediaQuery.js";
 
-const COVER_BY_CATEGORY = {
-  رستوران: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80",
-  سلامت: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=80",
-  خرده‌فروشی: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
-  default: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
-};
-
-function profileCoverUrl(category) {
-  if (!category) return COVER_BY_CATEGORY.default;
-  return COVER_BY_CATEGORY[category] || COVER_BY_CATEGORY.default;
-}
+const FALLBACK_LONDON_COVER =
+  "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1600&q=80&auto=format&fit=crop";
 
 function trackBusinessPhoneClick(slug) {
   if (!slug) return;
   apiPost("/api/phone-click", { slug }).catch(() => {});
+}
+
+/** Short lead for profile; full text available on demand (long directory imports). */
+function summarizeAboutText(raw, maxLen = 280) {
+  const original = String(raw ?? "").trim();
+  if (!original) return { summary: "", hasMore: false };
+  const flat = original
+    .replace(/\r\n/g, "\n")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (flat.length <= maxLen) return { summary: flat, hasMore: false };
+  const slice = flat.slice(0, maxLen);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > maxLen * 0.55 ? slice.slice(0, lastSpace) : slice;
+  return { summary: `${cut.trim()}…`, hasMore: true };
 }
 
 /** Inline SVG defs (IDs match css / legacy business.html) */
@@ -49,12 +59,6 @@ function ProfileSprites() {
               d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
             />
           </symbol>
-          <symbol id="section-map" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-            />
-          </symbol>
           <symbol id="section-promote" viewBox="0 0 24 24">
             <path
               fill="currentColor"
@@ -77,24 +81,6 @@ function ProfileSprites() {
               d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"
             />
           </symbol>
-          <symbol id="contact-mobile" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M15.5 1h-8C6.12 1 5 2.12 5 3.5v17C5 21.88 6.12 23 7.5 23h8c1.38 0 2.5-1.12 2.5-2.5v-17C18 2.12 16.88 1 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z"
-            />
-          </symbol>
-          <symbol id="contact-globe" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93h2c0 2.76 2.24 5 5 5v2zm6.9-3h-2.08c-.41 2.63-1.41 4.93-2.82 6.56A9.97 9.97 0 0 0 17.93 17zM12 6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5.9 8h2a9.87 9.87 0 0 1-3.55 5.56c1.41-1.63 2.41-3.93 2.82-6.56z"
-            />
-          </symbol>
-          <symbol id="contact-mail" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"
-            />
-          </symbol>
         </defs>
       </svg>
     </>
@@ -102,7 +88,7 @@ function ProfileSprites() {
 }
 
 export default function BusinessPage() {
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const location = useLocation();
   const slug = params.get("slug") || "clinic-pars";
   const [b, setB] = useState(null);
@@ -110,6 +96,12 @@ export default function BusinessPage() {
   const [showOnboardingWelcome, setShowOnboardingWelcome] = useState(
     () => !!location.state?.onboardingComplete
   );
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  useEffect(() => {
+    setAboutExpanded(false);
+  }, [slug]);
 
   useEffect(() => {
     setB(null);
@@ -124,6 +116,15 @@ export default function BusinessPage() {
         setLoadState("error");
       });
   }, [slug]);
+
+  useEffect(() => {
+    if (loadState !== "ok" || !b) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("report") !== "1") return;
+    setReportOpen(true);
+    sp.delete("report");
+    setSearchParams(sp, { replace: true });
+  }, [loadState, b, setSearchParams]);
 
   const logoMark = useMemo(() => {
     if (!b?.name_fa) return "؟";
@@ -149,24 +150,21 @@ export default function BusinessPage() {
     };
   }, [b]);
 
-  const mapsSearchUrl = b?.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`
-    : "https://www.google.com/maps";
   const reservationLink = String(b?.reservation_link || "").trim();
   const twilioModuleOn = b?.twilio_module_enabled !== false;
   const trackedEnabled = twilioModuleOn && !!b?.call_tracking_enabled;
   const trackedNumber = String(b?.call_tracking_number || "").trim();
   const phoneForCall = trackedEnabled && trackedNumber ? trackedNumber : String(b?.phone || "").trim();
 
-  const coverStyleUrl = useMemo(() => {
-    if (!b) return COVER_BY_CATEGORY.default;
+  const coverView = useMemo(() => {
+    if (!b) return { url: FALLBACK_LONDON_COVER, fallback: true };
     const custom = pickHeroImageUrlFromBusiness(b);
-    if (custom) return resolveBusinessImageUrl(custom);
-    return profileCoverUrl(b.category);
+    if (custom) return { url: resolveBusinessImageUrl(custom), fallback: false };
+    return { url: FALLBACK_LONDON_COVER, fallback: true };
   }, [b]);
 
-  const leadTitle =
-    b?.listing_title && String(b.listing_title).trim() ? String(b.listing_title).trim() : "";
+  const leadTitleRaw = b?.listing_title && String(b.listing_title).trim() ? String(b.listing_title).trim() : "";
+  const leadTitle = leadTitleRaw && leadTitleRaw !== String(b?.name_fa || "").trim() ? leadTitleRaw : "";
   const secondLine =
     (b?.subtitle && String(b.subtitle).trim()) ||
     [b?.category, b?.city].filter(Boolean).join(" — ") ||
@@ -183,6 +181,13 @@ export default function BusinessPage() {
   const careersBody = b?.careers_text && String(b.careers_text).trim();
   const careersSubtitle = b?.careers_title && String(b.careers_title).trim();
   const showCareers = !!careersBody;
+
+  const aboutLead = useMemo(() => summarizeAboutText(b?.description), [b?.description]);
+  const desktopLayout = useMediaQuery("(min-width: 1024px)");
+  const categoryOnly =
+    b?.category && String(b.category).trim() ? String(b.category).trim() : "";
+  /** Desktop bar: category, else subtitle / location line (same as mobile second line). */
+  const desktopBarSubtitle = categoryOnly || secondLine || "";
 
   if (loadState === "loading") {
     return (
@@ -261,53 +266,87 @@ export default function BusinessPage() {
       )}
 
       <div className="profile-panel">
-        <div className="profile-hero">
+        <div className="profile-hero" id="biz-profile-cover">
           <div
-            className="profile-cover"
-            id="biz-profile-cover"
+            className={`profile-cover ${coverView.fallback ? "profile-cover--fallback" : ""}`}
+            aria-hidden="true"
             style={{
-              backgroundImage: `url(${coverStyleUrl})`,
+              backgroundImage: `url(${coverView.url})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}
-            aria-hidden="true"
           />
-          <div className="profile-head">
-            <div className="profile-logo" id="biz-profile-logo" aria-hidden="true">
-              {logoMark}
+          {!desktopLayout && (
+            <div className="profile-head profile-head--cover-card">
+              <div className="profile-logo" id="biz-profile-logo" aria-hidden="true">
+                {logoMark}
+              </div>
+              <div className="profile-title-block">
+                <h1 id="biz-name">{b.name_fa}</h1>
+                {leadTitle && (
+                  <p className="profile-listing-lead" id="biz-listing-title">
+                    {leadTitle}
+                  </p>
+                )}
+                {secondLine && <p id="biz-subtitle">{secondLine}</p>}
+                {metaParts.length > 0 && (
+                  <p className="profile-meta-line" id="biz-meta" lang="en">
+                    {metaParts.join(" · ")}
+                  </p>
+                )}
+                <p>
+                  {!isActive && <span className="badge">غیرفعال</span>}
+                  {!b.claimed && <span className="badge badge--unclaimed">بدون مالک</span>}
+                  {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
+                </p>
+                {isActive && b.cta && String(b.cta).trim() && phoneForCall && (
+                  <p className="profile-cta-row">
+                    <a
+                      className="btn btn--primary"
+                      href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
+                      onClick={() => trackBusinessPhoneClick(b.slug)}
+                    >
+                      {String(b.cta).trim()}
+                    </a>
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="profile-title-block">
-              <h1 id="biz-name">{b.name_fa}</h1>
-              {leadTitle && (
-                <p className="profile-listing-lead" id="biz-listing-title">
-                  {leadTitle}
-                </p>
-              )}
-              {secondLine && <p id="biz-subtitle">{secondLine}</p>}
-              {metaParts.length > 0 && (
-                <p className="profile-meta-line" id="biz-meta" lang="en">
-                  {metaParts.join(" · ")}
-                </p>
-              )}
-              <p>
-                {!isActive && <span className="badge">غیرفعال</span>}
-                {!b.claimed && <span className="badge badge--unclaimed">بدون مالک</span>}
-                {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
-              </p>
-              {isActive && b.cta && String(b.cta).trim() && phoneForCall && (
-                <p className="profile-cta-row">
-                  <a
-                    className="btn btn--primary"
-                    href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
-                    onClick={() => trackBusinessPhoneClick(b.slug)}
-                  >
-                    {String(b.cta).trim()}
-                  </a>
-                </p>
-              )}
-            </div>
-          </div>
+          )}
         </div>
+        {desktopLayout && (
+          <div className="profile-hero-desktop-bar">
+            <div className="profile-hero-desktop-bar__main">
+              <div className="profile-logo profile-logo--desktop-bar" id="biz-profile-logo" aria-hidden="true">
+                {logoMark}
+              </div>
+              <div className="profile-hero-desktop-bar__text">
+                <h1 id="biz-name" className="profile-hero-desktop-bar__title">
+                  {b.name_fa}
+                </h1>
+                {desktopBarSubtitle && (
+                  <p className="profile-hero-desktop-bar__category" id="biz-subtitle">
+                    {desktopBarSubtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+            {!b.claimed && (
+              <span className="badge badge--unclaimed profile-hero-desktop-bar__badge">بدون مالک</span>
+            )}
+          </div>
+        )}
+        {desktopLayout && isActive && b.cta && String(b.cta).trim() && phoneForCall && (
+          <div className="profile-hero-desktop-cta">
+            <a
+              className="btn btn--primary"
+              href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
+              onClick={() => trackBusinessPhoneClick(b.slug)}
+            >
+              {String(b.cta).trim()}
+            </a>
+          </div>
+        )}
       </div>
 
       <div className="layout-split">
@@ -341,18 +380,48 @@ export default function BusinessPage() {
             </section>
           )}
 
-          <section className="profile-panel profile-body profile-about" aria-labelledby="about-title">
+          <section
+            className="profile-panel profile-body profile-about profile-about--compact"
+            aria-labelledby="about-title"
+          >
             <h2 id="about-title" className="profile-section-heading">
               <span className="profile-section-heading__icon" aria-hidden="true">
                 <svg className="profile-section-heading__svg" aria-hidden="true">
                   <use href="#section-about" />
                 </svg>
               </span>
-              درباره کسب‌وکار
+              در یک نگاه
             </h2>
-            <p id="biz-about" className="biz-text-pre">
-              {b.description || "توضیحی ثبت نشده است."}
-            </p>
+            {!b.claimed ? (
+              <p className="profile-about__empty">
+                این کسب‌وکار هنوز ادعا نشده است. اگر مدیر این کسب‌وکار هستید، لطفاً{" "}
+                <Link to={claimHref}>مالکیت آن را ثبت کنید</Link>.
+              </p>
+            ) : !aboutLead.summary ? (
+              <p className="profile-about__empty">توضیحی ثبت نشده است.</p>
+            ) : (
+              <>
+                {aboutExpanded && aboutLead.hasMore ? (
+                  <p id="biz-about" className="biz-text-pre profile-about__full">
+                    {b.description}
+                  </p>
+                ) : (
+                  <p id="biz-about" className="profile-about__summary">
+                    {aboutLead.summary}
+                  </p>
+                )}
+                {aboutLead.hasMore && (
+                  <button
+                    type="button"
+                    className="profile-about__toggle"
+                    onClick={() => setAboutExpanded((v) => !v)}
+                    aria-expanded={aboutExpanded}
+                  >
+                    {aboutExpanded ? "نمایش خلاصه" : "ادامهٔ متن"}
+                  </button>
+                )}
+              </>
+            )}
           </section>
 
           {showCareers && (
@@ -428,25 +497,6 @@ export default function BusinessPage() {
             </div>
           </section>
 
-          <section className="profile-panel profile-body" aria-labelledby="map-title">
-            <h2 id="map-title" className="profile-section-heading">
-              <span className="profile-section-heading__icon" aria-hidden="true">
-                <svg className="profile-section-heading__svg" aria-hidden="true">
-                  <use href="#section-map" />
-                </svg>
-              </span>
-              موقعیت روی نقشه
-            </h2>
-            <p className="profile-map__address" id="biz-map-address">
-              <span className="profile-map__address-label">آدرس</span> {b.address || "—"}
-            </p>
-            <div id="biz-map-box">
-              <a className="btn btn--primary btn--block" href={mapsSearchUrl} target="_blank" rel="noopener noreferrer">
-                مسیریابی در Google Maps
-              </a>
-            </div>
-          </section>
-
           {reservationLink && (
             <section className="profile-panel profile-body" aria-labelledby="booking-title">
               <h2 id="booking-title" className="profile-section-heading">
@@ -503,24 +553,16 @@ export default function BusinessPage() {
                   </div>
                 </li>
               )}
-              <li className="contact-list__item contact-list__item--icon-row">
-                <div className="contact-list__icon-row-inner" role="group" aria-label="وب‌سایت">
-                  <a
-                    className="contact-list__icon-link"
-                    href={mapsSearchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="مشاهده روی نقشه"
-                  >
-                    <span className="contact-list__icon-wrap" aria-hidden="true">
-                      <svg className="contact-list__svg" aria-hidden="true">
-                        <use href="#contact-globe" />
-                      </svg>
-                    </span>
-                  </a>
-                </div>
-              </li>
             </ul>
+            <p style={{ marginTop: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn--ghost btn--block"
+                onClick={() => setReportOpen(true)}
+              >
+                <i className="fa-solid fa-flag" aria-hidden="true" /> گزارش مشکل در این آگهی
+              </button>
+            </p>
           </section>
           <div className="ad-slot ad-slot--sidebar" role="complementary" aria-label="جای تبلیغ">
             تبلیغ کنار پروفایل — ۳۰۰×۲۵۰ یا ستون ثابت
@@ -531,6 +573,13 @@ export default function BusinessPage() {
       <p style={{ marginTop: "1.5rem" }}>
         <Link to="/listings">بازگشت به لیست</Link>
       </p>
+
+      <BusinessReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        slug={b.slug}
+        businessName={b.name_fa}
+      />
     </article>
   );
 }

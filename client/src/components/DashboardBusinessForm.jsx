@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPatch } from "../api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "./DashboardPanelHead.jsx";
 import { DEFAULT_HOURS_ROWS, parseHoursJson, parseGalleryJson } from "../lib/businessProfile.js";
 
@@ -14,6 +15,7 @@ export default function DashboardBusinessForm({
   /** در پنل سوپرادمین وقتی نامک از منوی کشویی است */
   hideSlugPicker,
 }) {
+  const { isSuperAdmin } = useAuth();
   const [slugInput, setSlugInput] = useState(slug);
   const [loadErr, setLoadErr] = useState(null);
   const [saveMsg, setSaveMsg] = useState(null);
@@ -30,6 +32,7 @@ export default function DashboardBusinessForm({
   const [status, setStatus] = useState("active");
   const [subtitle, setSubtitle] = useState("");
   const [phone, setPhone] = useState("");
+  const [listingContactEmail, setListingContactEmail] = useState("");
   const [address, setAddress] = useState("");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [reservationLink, setReservationLink] = useState("");
@@ -70,6 +73,7 @@ export default function DashboardBusinessForm({
       setStatus(b.status || "active");
       setSubtitle(b.subtitle || "");
       setPhone(b.phone || "");
+      setListingContactEmail(b.listing_contact_email || "");
       setAddress(b.address || "");
       setGoogleReviewUrl(b.google_review_url || "");
       setReservationLink(b.reservation_link || "");
@@ -148,6 +152,7 @@ export default function DashboardBusinessForm({
         status,
         subtitle,
         phone,
+        listing_contact_email: listingContactEmail.trim() || null,
         address,
         google_review_url: googleReviewUrl,
         reservation_link: reservationLink,
@@ -196,13 +201,28 @@ export default function DashboardBusinessForm({
         icon={dashboardIcons.edit}
       />
       <p className="field-hint">
-        {hideSlugPicker
-          ? "فیلدها را ویرایش و ذخیره کنید. پیش‌نمایش:"
-          : "نامک آگهی را انتخاب کنید، بارگذاری کنید، سپس فیلدها را ویرایش و ذخیره کنید. تغییرات در SQLite و همان لحظه روی"}{" "}
-        <Link to={previewHref} target="_blank" rel="noreferrer">
-          پیش‌نمایش
-        </Link>
-        {!hideSlugPicker && " دیده می‌شود."}
+        {hideSlugPicker ? (
+          isSuperAdmin ? (
+            <>
+              فیلدها را ویرایش و ذخیره کنید. پیش‌نمایش:{" "}
+              <Link to={previewHref} target="_blank" rel="noreferrer">
+                پیش‌نمایش
+              </Link>
+            </>
+          ) : (
+            "فیلدها را ویرایش و ذخیره کنید."
+          )
+        ) : isSuperAdmin ? (
+          <>
+            نامک آگهی را انتخاب کنید، بارگذاری کنید، سپس فیلدها را ویرایش و ذخیره کنید. تغییرات در SQLite و همان لحظه روی{" "}
+            <Link to={previewHref} target="_blank" rel="noreferrer">
+              پیش‌نمایش
+            </Link>{" "}
+            دیده می‌شود.
+          </>
+        ) : (
+          "نامک آگهی را انتخاب کنید، بارگذاری کنید، سپس فیلدها را ویرایش و ذخیره کنید. تغییرات پس از ذخیره در سرور اعمال می‌شود."
+        )}
       </p>
 
       {!hideSlugPicker && (
@@ -306,6 +326,18 @@ export default function DashboardBusinessForm({
           <div className="field field--block">
             <label htmlFor="dash-phone">تلفن</label>
             <input id="dash-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="phone-ltr" />
+          </div>
+          <div className="field field--block">
+            <label htmlFor="dash-listing-email">ایمیل اطلاع تأیید/رد آگهی</label>
+            <input
+              id="dash-listing-email"
+              type="email"
+              value={listingContactEmail}
+              onChange={(e) => setListingContactEmail(e.target.value)}
+              dir="ltr"
+              placeholder="برای اطلاع‌رسانی هنگام تأیید یا رد توسط مدیر"
+            />
+            <span className="field-hint">اختیاری؛ همان ایمیل فرم ثبت کسب‌وکار.</span>
           </div>
           <div className="field field--block">
             <label htmlFor="dash-address">آدرس (نقشه و تماس)</label>
@@ -461,9 +493,11 @@ export default function DashboardBusinessForm({
           <button type="submit" className="btn btn--primary" disabled={saving}>
             {saving ? "در حال ذخیره…" : "ذخیره در سرور"}
           </button>
-          <Link className="btn btn--ghost" to={previewHref} target="_blank" rel="noreferrer">
-            پیش‌نمایش صفحهٔ عمومی
-          </Link>
+          {isSuperAdmin ? (
+            <Link className="btn btn--ghost" to={previewHref} target="_blank" rel="noreferrer">
+              پیش‌نمایش صفحهٔ عمومی
+            </Link>
+          ) : null}
         </div>
         {saveMsg && <p className="field-hint">{saveMsg}</p>}
       </form>

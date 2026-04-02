@@ -76,6 +76,18 @@ export default function AdminHomePage() {
 
       <div className="app-shell__metrics" style={{ marginBottom: "var(--space-lg)" }}>
         <div className="app-shell__metric app-shell__metric--coral">
+          <p className="app-shell__metric-label">در انتظار تأیید انتشار</p>
+          <p className="app-shell__metric-value" dir="ltr">
+            {stats ? formatNum(stats.pending_listing_approvals) : "…"}
+          </p>
+          <p className="app-shell__metric-hint">ثبت از فرم عمومی؛ در لیست سایت نیستند</p>
+          {stats && stats.pending_listing_approvals > 0 ? (
+            <Link className="app-shell__hero-btn" to="/admin-businesses" style={{ marginTop: "0.5rem" }}>
+              بررسی در همه آگهی‌ها
+            </Link>
+          ) : null}
+        </div>
+        <div className="app-shell__metric app-shell__metric--coral">
           <p className="app-shell__metric-label">غیرفعال</p>
           <p className="app-shell__metric-value" dir="ltr">
             {stats ? formatNum(stats.inactive_businesses) : "…"}

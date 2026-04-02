@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { AdminPanelSearchProvider, useAdminPanelSearch } from "../context/AdminPanelSearchContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
@@ -14,12 +15,41 @@ const adminNav = [
   { to: "/admin-categories", label: "دسته‌بندی‌ها", icon: "categories" },
   { to: "/admin-qr-export", label: "خروجی QR", icon: "qrExport" },
   { to: "/admin-claims", label: "درخواست‌های ادعا", icon: "claims" },
+  { to: "/admin-business-reports", label: "گزارش‌های آگهی", icon: "report" },
   { to: "/admin-link", label: "لینک آگهی ↔ مدیر", icon: "link" },
   { to: "/admin-billing", label: "صورت‌حساب", icon: "billing" },
   { to: "/admin-managers", label: "حساب‌های مدیر", icon: "managers" },
   { to: "/admin-chat-log", label: "گفتگو و لاگ سایت", icon: "chatLog" },
   { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
 ];
+
+function AdminShellSearchInput() {
+  const { query, setQuery } = useAdminPanelSearch();
+  const location = useLocation();
+  const onBusinesses = location.pathname === "/admin-businesses";
+  return (
+    <div className="app-shell__search-wrap">
+      <label className="visually-hidden" htmlFor="admin-global-search">
+        {onBusinesses ? "جستجو در فهرست آگهی‌ها" : "جستجو در پنل"}
+      </label>
+      <input
+        type="search"
+        id="admin-global-search"
+        className="app-shell__search"
+        placeholder={onBusinesses ? "جستجو در آگهی‌ها — نام، نامک، شهر، تلفن…" : "جستجو در پنل…"}
+        autoComplete="off"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-describedby={onBusinesses ? "admin-search-hint" : undefined}
+      />
+      {onBusinesses && (
+        <span id="admin-search-hint" className="visually-hidden">
+          فیلتر زنده روی جدول «همه آگهی‌ها»
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function AdminShellLayout() {
   const { logout, me } = useAuth();
@@ -36,7 +66,7 @@ export default function AdminShellLayout() {
   };
 
   return (
-    <>
+    <AdminPanelSearchProvider>
       <AdminIdleSessionGuard />
       <a className="skip-link" href="#main">
         پرش به محتوا
@@ -98,18 +128,7 @@ export default function AdminShellLayout() {
               <h1>پنل سوپرادمین</h1>
               <p>سلام! خوش آمدید — همان چیدمان داشبورد کسب‌وکار</p>
             </div>
-            <div className="app-shell__search-wrap">
-              <label className="visually-hidden" htmlFor="admin-global-search">
-                جستجو در پنل
-              </label>
-              <input
-                type="search"
-                id="admin-global-search"
-                className="app-shell__search"
-                placeholder="جستجو در پنل…"
-                autoComplete="off"
-              />
-            </div>
+            <AdminShellSearchInput />
             <div className="app-shell__header-actions">
               <button type="button" className="btn btn--ghost" onClick={onLogout}>
                 خروج
@@ -146,6 +165,6 @@ export default function AdminShellLayout() {
           </div>
         </div>
       </div>
-    </>
+    </AdminPanelSearchProvider>
   );
 }
