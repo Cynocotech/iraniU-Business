@@ -206,6 +206,41 @@ export default function AdminBusinessesPage() {
     }
   };
 
+  const dedupeByName = async () => {
+    setToast(null);
+    setSearching(true);
+    try {
+      const preview = await apiGet("/api/admin/businesses/duplicate-names");
+      const n = Number(preview.total_remove) || 0;
+      if (n === 0) {
+        setToast({ type: "ok", text: "آگهی با نام تکراری پیدا نشد." });
+        return;
+      }
+      const ok = window.confirm(
+        `نام‌های تکراری: ${preview.duplicate_name_count}\n` +
+          `تعداد آگهی‌هایی که حذف می‌شوند: ${n}\n\n` +
+          `در هر گروه، آگهی با شناسهٔ کم‌تر (قدیمی‌تر) نگه داشته می‌شود؛ بقیه با وابستگی‌ها (کلیک، گزارش، …) حذف می‌شوند.\n` +
+          `این کار برگشت‌پذیر نیست. ادامه؟`
+      );
+      if (!ok) return;
+      const data = await apiPost("/api/admin/businesses/dedupe-by-name", {});
+      const removed = data.removed_count ?? 0;
+      const fc = data.failed?.length ?? 0;
+      setToast({
+        type: "ok",
+        text:
+          fc > 0
+            ? `حذف شد: ${removed} آگهی؛ ${fc} مورد خطا (جزئیات در لاگ سرور).`
+            : `حذف شد: ${removed} آگهی تکراری (${preview.duplicate_name_count} نام تکراری).`,
+      });
+      await refetchAfterMutation();
+    } catch (e) {
+      setToast({ type: "err", text: e.message || String(e) });
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const bulkDeleteSelected = async () => {
     if (selectedSlugs.length === 0) return;
     if (
@@ -296,6 +331,15 @@ export default function AdminBusinessesPage() {
             title="حذف آگهی‌های تیک‌خورده"
           >
             حذف انتخاب‌شده‌ها ({selectedSlugs.length})
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={!!sendingSlug || searching}
+            onClick={dedupeByName}
+            title="آگهی‌هایی که پس از یکسان‌سازی نام، تکراری‌اند؛ قدیمی‌ترین (id کم‌تر) می‌ماند"
+          >
+            حذف تکراری‌ها (نام یکسان)
           </button>
         </div>
 

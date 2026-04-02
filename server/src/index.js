@@ -17,6 +17,7 @@ import multer from "multer";
 import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
 import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
+import { analyzeDuplicateNames, executeDedupeByName } from "./dedupeBusinessesByName.js";
 import { validateIraniuSqliteFile } from "./sqliteDbPending.js";
 
 const PATCHABLE_BUSINESS = new Set([
@@ -236,6 +237,64 @@ app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, (req, res) => {
   } catch (e) {
     console.error("bulk-delete", e);
     res.status(500).json({ error: "bulk_delete_failed", hint: String(e.message || e) });
+  }
+});
+
+/** پیش‌نمایش آگهی‌های با نام تکراری (پس از یکسان‌سازی فاصله و حروف لاتین) */
+app.get("/api/admin/businesses/duplicate-names", requireSuperAdmin, (_req, res) => {
+  try {
+    const { groups, total_remove } = analyzeDuplicateNames();
+    res.json({
+      ok: true,
+      groups: groups.map((g) => ({
+        name_display: g.name_display,
+        keep: { slug: g.keep.slug, id: g.keep.id },
+        remove: g.remove.map((r) => ({ slug: r.slug, id: r.id })),
+      })),
+      total_remove,
+      duplicate_name_count: groups.length,
+    });
+  } catch (e) {
+    console.error("duplicate-names", e);
+    res.status(500).json({ error: "duplicate_names_failed", hint: String(e.message || e) });
+  }
+});
+
+/**
+ * حذف آگهی‌های تکراری با همان نام؛ نسخه با id کم‌تر (قدیمی‌تر) نگه داشته می‌شود.
+ * وابستگی‌ها با cascadeDeleteBusinessBySlug پاک می‌شوند.
+ */
+app.post("/api/admin/businesses/dedupe-by-name", requireSuperAdmin, (req, res) => {
+  try {
+    const maxRemovals = Math.min(
+      50000,
+      Math.max(1, Number(req.body?.max_removals) || 5000)
+    );
+    const result = executeDedupeByName({ maxRemovals });
+    if (result.error === "too_many") {
+      return res.status(400).json({
+        error: "too_many_duplicates",
+        hint: `تعداد ردیف‌های قابل حذف ${result.total_remove} است؛ حداکثر مجاز هر بار ${result.maxRemovals}. اگر عمدی است با پشتیبان تماس بگیرید.`,
+        total_remove: result.total_remove,
+        maxRemovals: result.maxRemovals,
+      });
+    }
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "business_dedupe_by_name",
+      targetType: "business",
+      targetId: null,
+      message: `Dedupe by name: removed ${result.removed_count} listings (${result.kept_groups} نام تکراری)`,
+      meta: {
+        removed_count: result.removed_count,
+        kept_groups: result.kept_groups,
+        failed_count: result.failed?.length ?? 0,
+      },
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error("dedupe-by-name", e);
+    res.status(500).json({ error: "dedupe_failed", hint: String(e.message || e) });
   }
 });
 
