@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ListingCard from "../components/ListingCard.jsx";
+import Seo from "../components/Seo.jsx";
 import { apiGet } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
+import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 
 /** هم‌خوان با مقادیر فرم صفحهٔ اصلی */
 const CAT_HINTS = {
@@ -76,11 +78,29 @@ export default function ListingsPage() {
   const cityDefault = searchParams.get("city") || "";
   const catDefault = searchParams.get("cat") || "";
 
+  const listingsSeo = useMemo(() => {
+    const q = (searchParams.get("q") || "").trim();
+    const city = (searchParams.get("city") || "").trim();
+    const cat = (searchParams.get("cat") || "").trim();
+    const parts = [];
+    if (q) parts.push(`«${q}»`);
+    if (city) parts.push(city);
+    if (cat) parts.push(cat);
+    const title =
+      parts.length > 0 ? `لیست کسب‌وکارها (${parts.join(" · ")})` : "لیست کسب‌وکارها";
+    const desc =
+      parts.length > 0
+        ? `نتایج فیلترشده در ایرانیو: ${parts.join("، ")}. جستجو در فهرست کسب‌وکارهای ایرانی در بریتانیا.`
+        : "جستجو و فیلتر بر اساس نام، شهر و دسته؛ کارت‌های کسب‌وکار ایرانی در بریتانیا.";
+    return { title, description: desc.slice(0, 320) };
+  }, [searchParams]);
+
   return (
     <section
       className="section container listings-page listings-page--plain"
       aria-labelledby="listings-title"
     >
+      <Seo title={listingsSeo.title} description={listingsSeo.description || SEO_DEFAULT_DESCRIPTION} />
       <div className="listings-page__intro">
         <p className="listings-page__eyebrow">فهرست ایرانیو</p>
         <h1 id="listings-title">لیست کسب‌وکارها</h1>

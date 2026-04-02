@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
 import { AdminPanelSearchProvider, useAdminPanelSearch } from "../context/AdminPanelSearchContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
@@ -12,6 +13,7 @@ const adminNav = [
   { to: "/admin-businesses", label: "همه آگهی‌ها", icon: "businesses" },
   { to: "/admin-edit", label: "ویرایش آگهی", icon: "edit" },
   { to: "/admin-add", label: "افزودن آگهی", icon: "add" },
+  { to: "/admin-import", label: "ورود دسته‌ای CSV", icon: "importCsv" },
   { to: "/admin-categories", label: "دسته‌بندی‌ها", icon: "categories" },
   { to: "/admin-qr-export", label: "خروجی QR", icon: "qrExport" },
   { to: "/admin-claims", label: "درخواست‌های ادعا", icon: "claims" },
@@ -67,6 +69,7 @@ export default function AdminShellLayout() {
 
   return (
     <AdminPanelSearchProvider>
+      <Seo title="پنل سوپرادمین" noindex description="پنل مدیریت سایت ایرانیو — فقط برای مدیران." />
       <AdminIdleSessionGuard />
       <a className="skip-link" href="#main">
         پرش به محتوا

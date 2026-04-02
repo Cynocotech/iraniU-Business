@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import AuthLoginLayout from "../components/AuthLoginLayout.jsx";
+import Seo from "../components/Seo.jsx";
 
 function totpErrMessage(code, fallback) {
   if (code === "invalid_totp") return "کد شش‌رقمی نادرست است. دوباره تلاش کنید.";
@@ -91,6 +92,8 @@ export default function ManagerLoginPage() {
   );
 
   return (
+    <>
+      <Seo title="ورود مدیر" noindex description="ورود به پنل کسب‌وکار ایرانیو." />
     <AuthLoginLayout
       variant="manager"
       badge="پنل کسب‌وکار"
@@ -177,5 +180,6 @@ export default function ManagerLoginPage() {
         </button>
       </form>
     </AuthLoginLayout>
+    </>
   );
 }

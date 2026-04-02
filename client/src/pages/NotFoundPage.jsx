@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import SiteHeader from "../components/SiteHeader.jsx";
+import Seo from "../components/Seo.jsx";
+import FloatingBackButton from "../components/FloatingBackButton.jsx";
 
 /**
  * تمام‌مسیرهای ناشناخته — بیرون از MainLayout تا با /admin و /dashboard تداخل نکند.
@@ -8,6 +10,7 @@ import SiteHeader from "../components/SiteHeader.jsx";
 export default function NotFoundPage() {
   return (
     <>
+      <Seo title="صفحه پیدا نشد" noindex description="این آدرس در ایرانیو وجود ندارد." />
       <a className="skip-link" href="#main">
         پرش به محتوا
       </a>
@@ -36,6 +39,7 @@ export default function NotFoundPage() {
           </div>
         </div>
       </main>
+      <FloatingBackButton />
     </>
   );
 }

@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import ListingCard from "../components/ListingCard.jsx";
+import Seo from "../components/Seo.jsx";
 import { apiGet } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
+import { getSiteUrl } from "../lib/siteUrl.js";
+import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 
 /** هم‌خوان با فیلتر «دسته» در /listings و فرم جستجوی قهرمان */
 const POPULAR_CATEGORIES = [
@@ -41,8 +44,41 @@ export default function HomePage() {
       .catch(() => setFeatured([]));
   }, []);
 
+  const homeJsonLd = useMemo(() => {
+    const site = getSiteUrl();
+    if (!site) return null;
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          name: "ایرانیو",
+          url: site,
+          logo: `${site}/images/iraniu-logo-header.png`,
+        },
+        {
+          "@type": "WebSite",
+          name: "ایرانیو",
+          url: site,
+          inLanguage: "fa-IR",
+          publisher: { "@type": "Organization", name: "ایرانیو" },
+          potentialAction: {
+            "@type": "SearchAction",
+            target: `${site}/listings?q={search_term_string}`,
+            "query-input": "required name=search_term_string",
+          },
+        },
+      ],
+    };
+  }, []);
+
   return (
     <>
+      <Seo
+        description={SEO_DEFAULT_DESCRIPTION}
+        keywords="ایرانیو, کسب و کار ایرانی, لندن, بریتانیا, دایرکتوری ایرانی, رستوران ایرانی"
+        jsonLd={homeJsonLd}
+      />
       {showPendingBanner && (
         <div className="container" style={{ paddingTop: "1rem" }}>
           <div

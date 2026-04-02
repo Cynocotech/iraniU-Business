@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
 import { apiPost } from "../api.js";
 
 export default function ManagerSignupPage() {
@@ -59,6 +60,8 @@ export default function ManagerSignupPage() {
   };
 
   return (
+    <>
+      <Seo title="ثبت‌نام مدیر" noindex description="ایجاد حساب مدیر برای اتصال به آگهی در ایرانیو." />
     <main className="container" style={{ padding: "2rem 0", maxWidth: "32rem" }}>
       <h1>ثبت‌نام مدیر</h1>
       <p className="field-hint">
@@ -144,5 +147,6 @@ export default function ManagerSignupPage() {
         <Link to="/">خانه</Link>
       </p>
     </main>
+    </>
   );
 }

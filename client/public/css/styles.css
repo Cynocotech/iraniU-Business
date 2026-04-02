@@ -245,17 +245,23 @@ textarea:focus-visible {
 }
 
 .logo {
-  font-weight: 700;
-  font-size: 1.15rem;
-  color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  flex-shrink: 0;
+  line-height: 0;
 }
 
 .logo:hover {
   text-decoration: none;
-  color: var(--color-primary);
+  opacity: 0.92;
+}
+
+.logo__img {
+  display: block;
+  height: auto;
+  width: auto;
+  max-height: 48px;
+  max-width: min(200px, 52vw);
 }
 
 .logo__mark {

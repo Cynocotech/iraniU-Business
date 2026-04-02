@@ -34,6 +34,21 @@ export async function apiPost(path, body) {
   return data;
 }
 
+/** multipart/form-data — بدون Content-Type تا boundary تنظیم شود */
+export async function apiPostMultipart(path, formData) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+    ...fetchOpts,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(data.hint || data.error || String(r.status));
+  }
+  return data;
+}
+
 export async function apiPatchJson(path, body) {
   const r = await fetch(path, {
     method: "PATCH",

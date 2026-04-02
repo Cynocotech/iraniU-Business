@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import SiteHeader from "../components/SiteHeader.jsx";
+import FloatingBackButton from "../components/FloatingBackButton.jsx";
 
 export default function MainLayout() {
   return (
@@ -11,6 +12,7 @@ export default function MainLayout() {
       <main id="main">
         <Outlet />
       </main>
+      <FloatingBackButton />
     </>
   );
 }

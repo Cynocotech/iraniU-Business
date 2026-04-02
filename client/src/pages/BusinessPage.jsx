@@ -1,8 +1,11 @@
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import BusinessReportModal from "../components/BusinessReportModal.jsx";
+import Seo from "../components/Seo.jsx";
 import { useEffect, useMemo, useState } from "react";
 import "./businessCoverHead.desktop.css";
 import { apiGet, apiPost } from "../api.js";
+import { getSiteUrl } from "../lib/siteUrl.js";
+import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 import {
   parseGalleryJson,
   parseHoursJson,
@@ -19,9 +22,18 @@ function trackBusinessPhoneClick(slug) {
   apiPost("/api/phone-click", { slug }).catch(() => {});
 }
 
+/** یکدست‌سازی توضیحات: حذف خط خالی پشت‌سرهم، تبدیل \\n ذخیره‌شده به خط جدید */
+function normalizeAboutDescription(raw) {
+  let s = String(raw ?? "");
+  s = s.replace(/\\n/g, "\n");
+  s = s.replace(/\r\n/g, "\n");
+  s = s.replace(/\n{3,}/g, "\n\n");
+  return s.trim();
+}
+
 /** Short lead for profile; full text available on demand (long directory imports). */
 function summarizeAboutText(raw, maxLen = 280) {
-  const original = String(raw ?? "").trim();
+  const original = normalizeAboutDescription(raw);
   if (!original) return { summary: "", hasMore: false };
   const flat = original
     .replace(/\r\n/g, "\n")
@@ -144,10 +156,18 @@ export default function BusinessPage() {
     const claimed = !!b.claimed;
     document.body.classList.toggle("business-page--claimed", claimed);
     document.body.classList.toggle("business-page--unclaimed", !claimed);
-    document.title = `${b.name_fa} — پروفایل کسب‌وکار — ایرانیو`;
     return () => {
       document.body.classList.remove("business-page--claimed", "business-page--unclaimed");
     };
+  }, [b]);
+
+  const businessSeoDescription = useMemo(() => {
+    if (!b) return SEO_DEFAULT_DESCRIPTION;
+    const norm = normalizeAboutDescription(b.description);
+    const flat = norm.replace(/\s+/g, " ").trim();
+    if (flat) return flat.slice(0, 320);
+    const line = [b.listing_title, b.category, b.city].filter(Boolean).join(" — ");
+    return `${b.name_fa || "کسب‌وکار"}${line ? ` — ${line}` : ""}`.slice(0, 320);
   }, [b]);
 
   const reservationLink = String(b?.reservation_link || "").trim();
@@ -162,6 +182,31 @@ export default function BusinessPage() {
     if (custom) return { url: resolveBusinessImageUrl(custom), fallback: false };
     return { url: FALLBACK_LONDON_COVER, fallback: true };
   }, [b]);
+
+  const businessJsonLd = useMemo(() => {
+    if (!b) return null;
+    const site = getSiteUrl();
+    const url = site ? `${site}/business?slug=${encodeURIComponent(b.slug)}` : undefined;
+    let imageUrl = coverView.url;
+    if (imageUrl && !/^https?:\/\//i.test(imageUrl) && site) {
+      imageUrl = `${site}${imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`}`;
+    }
+    const addr = {};
+    if (b.address) addr.streetAddress = String(b.address).trim();
+    if (b.city) addr.addressLocality = String(b.city).trim();
+    const out = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      name: (b.name_fa || "").trim() || "کسب‌وکار",
+      ...(url ? { url } : {}),
+      ...(imageUrl && /^https?:\/\//i.test(imageUrl) ? { image: imageUrl } : {}),
+      ...(b.phone && String(b.phone).trim() ? { telephone: String(b.phone).trim() } : {}),
+    };
+    if (Object.keys(addr).length) {
+      out.address = { "@type": "PostalAddress", ...addr };
+    }
+    return out;
+  }, [b, coverView.url]);
 
   const leadTitleRaw = b?.listing_title && String(b.listing_title).trim() ? String(b.listing_title).trim() : "";
   const leadTitle = leadTitleRaw && leadTitleRaw !== String(b?.name_fa || "").trim() ? leadTitleRaw : "";
@@ -183,6 +228,7 @@ export default function BusinessPage() {
   const showCareers = !!careersBody;
 
   const aboutLead = useMemo(() => summarizeAboutText(b?.description), [b?.description]);
+  const descriptionNormalized = useMemo(() => normalizeAboutDescription(b?.description), [b?.description]);
   const desktopLayout = useMediaQuery("(min-width: 1024px)");
   const categoryOnly =
     b?.category && String(b.category).trim() ? String(b.category).trim() : "";
@@ -191,27 +237,44 @@ export default function BusinessPage() {
 
   if (loadState === "loading") {
     return (
-      <article className="section container" style={{ padding: "2rem 0" }}>
-        <p className="field-hint">در حال بارگذاری…</p>
-      </article>
+      <>
+        <Seo title="پروفایل کسب‌وکار" description={SEO_DEFAULT_DESCRIPTION} />
+        <article className="section container" style={{ padding: "2rem 0" }}>
+          <p className="field-hint">در حال بارگذاری…</p>
+        </article>
+      </>
     );
   }
 
   if (loadState === "error" || !b) {
     return (
-      <article className="section container" style={{ padding: "2rem 0" }}>
+      <>
+        <Seo
+          title="کسب‌وکار پیدا نشد"
+          noindex
+          description="این آگهی در فهرست نیست یا آدرس نامعتبر است."
+        />
+        <article className="section container" style={{ padding: "2rem 0" }}>
         <h1>کسب‌وکار پیدا نشد</h1>
         <p className="field-hint">آدرس نامعتبر است یا داده‌ای برای این شناسه نیست.</p>
         <p>
           <Link to="/listings">بازگشت به لیست</Link>
         </p>
       </article>
+      </>
     );
   }
 
   const claimHref = `/claim?slug=${encodeURIComponent(b.slug)}&business=${encodeURIComponent(b.name_fa)}`;
 
   return (
+    <>
+      <Seo
+        title={`${b.name_fa} — پروفایل کسب‌وکار`}
+        description={businessSeoDescription}
+        image={coverView.url}
+        jsonLd={businessJsonLd}
+      />
     <article className="section container">
       {showOnboardingWelcome && (
         <div
@@ -294,11 +357,12 @@ export default function BusinessPage() {
                     {metaParts.join(" · ")}
                   </p>
                 )}
-                <p>
-                  {!isActive && <span className="badge">غیرفعال</span>}
-                  {!b.claimed && <span className="badge badge--unclaimed">بدون مالک</span>}
-                  {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
-                </p>
+                {(!isActive || b.claimed) && (
+                  <p>
+                    {!isActive && <span className="badge">غیرفعال</span>}
+                    {!!b.claimed && <span className="badge badge--claimed-owner">مالک ثبت‌شده</span>}
+                  </p>
+                )}
                 {isActive && b.cta && String(b.cta).trim() && phoneForCall && (
                   <p className="profile-cta-row">
                     <a
@@ -331,9 +395,6 @@ export default function BusinessPage() {
                 )}
               </div>
             </div>
-            {!b.claimed && (
-              <span className="badge badge--unclaimed profile-hero-desktop-bar__badge">بدون مالک</span>
-            )}
           </div>
         )}
         {desktopLayout && isActive && b.cta && String(b.cta).trim() && phoneForCall && (
@@ -393,9 +454,12 @@ export default function BusinessPage() {
               در یک نگاه
             </h2>
             {!b.claimed ? (
-              <p className="profile-about__empty">
-                این کسب‌وکار هنوز ادعا نشده است. اگر مدیر این کسب‌وکار هستید، لطفاً{" "}
-                <Link to={claimHref}>مالکیت آن را ثبت کنید</Link>.
+              <p className="profile-about__empty profile-about__claim-prompt">
+                معرفی در این بخش نمایش داده نمی‌شود. برای افزودن و ویرایش متن معرفی،{" "}
+                <Link to={claimHref} className="profile-about__claim-link">
+                  مالکیت این آگهی را ادعا کنید
+                </Link>
+                .
               </p>
             ) : !aboutLead.summary ? (
               <p className="profile-about__empty">توضیحی ثبت نشده است.</p>
@@ -403,7 +467,7 @@ export default function BusinessPage() {
               <>
                 {aboutExpanded && aboutLead.hasMore ? (
                   <p id="biz-about" className="biz-text-pre profile-about__full">
-                    {b.description}
+                    {descriptionNormalized}
                   </p>
                 ) : (
                   <p id="biz-about" className="profile-about__summary">
@@ -581,5 +645,6 @@ export default function BusinessPage() {
         businessName={b.name_fa}
       />
     </article>
+    </>
   );
 }

@@ -13,6 +13,8 @@ import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
 import { sendListingApprovedEmail, sendListingRejectedEmail } from "./listingDecisionEmail.js";
+import multer from "multer";
+import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -58,6 +60,11 @@ const BUSINESS_REPORT_REASON_KEYS = new Set(BUSINESS_REPORT_REASONS.map((r) => r
 
 /** نسخهٔ شرایط ثبت آگهی — باید با مقدار ارسالی از کلاینت و listingTerms.js یکی باشد */
 const LISTING_TERMS_VERSION = "1";
+
+const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
@@ -436,6 +443,150 @@ app.get("/api/admin/business-reports", requireSuperAdmin, (_req, res) => {
     .all();
   const labelByKey = Object.fromEntries(BUSINESS_REPORT_REASONS.map((x) => [x.key, x.label]));
   res.json(rows.map((r) => ({ ...r, reason_label: labelByKey[r.reason_key] || r.reason_key })));
+});
+
+/** الگوی CSV — یک خط هدر؛ preset=london مطابق London_Bussines_List، preset=iraniu مطابق جدول businesses */
+app.get("/api/admin/businesses/csv-template", requireSuperAdmin, (req, res) => {
+  const preset = String(req.query.preset || "london").toLowerCase();
+  if (preset === "iraniu") {
+    const header = [
+      "slug",
+      "name_fa",
+      "description",
+      "category",
+      "phone",
+      "address",
+      "city",
+      "google_review_url",
+      "listing_title",
+      "price_range",
+      "cta",
+      "hours_json",
+      "gallery_json",
+      "cover_image_url",
+      "subtitle",
+      "package",
+      "listing_approval",
+      "claimed",
+    ].join(",");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="iraniu-businesses-template.csv"');
+    return res.send("\uFEFF" + header + "\n");
+  }
+  if (preset === "london") {
+    const header = [
+      "id",
+      "name",
+      "category_1",
+      "category_2",
+      "description",
+      "updated_description",
+      "phone",
+      "mobile",
+      "address",
+      "postcode",
+      "googleMap",
+      "imageUrl",
+      "instagram",
+      "website",
+      "facebook",
+      "twitter",
+      "linkedin",
+      "telegram",
+      "calendarUrl",
+      "workingHours_Sat",
+      "workingHours_Sun",
+      "workingHours_Mon",
+      "workingHours_Tue",
+      "workingHours_Wed",
+      "workingHours_Thu",
+      "workingHours_Fri",
+      "borough",
+    ].join(",");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="london-businesses-template.csv"');
+    return res.send("\uFEFF" + header + "\n");
+  }
+  return res.status(400).json({ error: "invalid_preset" });
+});
+
+app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single("csv"), (req, res) => {
+  try {
+    const preset = String(req.body?.preset || "london").toLowerCase();
+    if (preset !== "iraniu" && preset !== "london") {
+      return res.status(400).json({ error: "invalid_preset", hint: "london یا iraniu" });
+    }
+    const default_contact_email = String(req.body?.default_contact_email || "").trim().toLowerCase();
+    if (!default_contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(default_contact_email)) {
+      return res.status(400).json({
+        error: "missing_default_contact_email",
+        hint: "ایمیل تماس برای فیلد listing_contact_email الزامی است",
+      });
+    }
+    let csvText = "";
+    if (req.file?.buffer) {
+      csvText = req.file.buffer.toString("utf8");
+    } else if (typeof req.body?.csv_text === "string") {
+      csvText = req.body.csv_text;
+    }
+    if (!csvText || !String(csvText).trim()) {
+      return res.status(400).json({ error: "missing_csv", hint: "فایل csv یا متن csv_text" });
+    }
+
+    let parsed;
+    try {
+      parsed = parseBusinessCsv({
+        csvText,
+        preset,
+        defaultContactEmail: default_contact_email,
+        listingTermsVersion: LISTING_TERMS_VERSION,
+      });
+    } catch (e) {
+      const msg = String(e.message || e);
+      if (msg === "invalid_default_contact_email") {
+        return res.status(400).json({ error: "invalid_default_contact_email" });
+      }
+      if (msg.startsWith("csv_parse_error:")) {
+        return res.status(400).json({ error: "csv_parse_error", hint: msg.replace(/^csv_parse_error:\s*/i, "") });
+      }
+      if (msg === "csv_empty") {
+        return res.status(400).json({ error: "csv_empty" });
+      }
+      throw e;
+    }
+
+    const { rows, errors } = parsed;
+    if (!rows.length) {
+      return res.status(400).json({
+        error: "no_valid_rows",
+        parse_errors: errors,
+      });
+    }
+
+    const { inserted, skipped, failed } = runBulkInsert(rows, { onDuplicate: "skip" });
+
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "business_csv_import",
+      targetType: "business",
+      targetId: null,
+      message: `CSV import preset=${preset} inserted=${inserted.length} skipped=${skipped.length} failed=${failed.length}`,
+      meta: { preset, inserted: inserted.length, skipped: skipped.length, failed: failed.length },
+    });
+
+    res.json({
+      ok: true,
+      preset,
+      parse_errors: errors,
+      inserted_count: inserted.length,
+      inserted_slugs: inserted,
+      skipped,
+      failed,
+    });
+  } catch (e) {
+    console.error("import-csv", e);
+    res.status(500).json({ error: "import_failed", hint: String(e.message || e) });
+  }
 });
 
 app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, async (req, res) => {

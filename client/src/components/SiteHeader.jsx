@@ -4,11 +4,16 @@ export default function SiteHeader() {
   return (
     <header className="site-header">
       <div className="site-header__inner">
-        <Link className="logo" to="/">
-          <span className="logo__mark" aria-hidden="true">
-            ای
-          </span>
-          <span>ایرانیو</span>
+        <Link className="logo" to="/" title="ایرانیو — صفحهٔ اصلی">
+          <img
+            className="logo__img"
+            src="/images/iraniu-logo-header.png"
+            alt=""
+            width={200}
+            height={52}
+            decoding="async"
+          />
+          <span className="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
         </Link>
         <input type="checkbox" id="site-nav-toggle" className="site-nav-cb" />
         <label htmlFor="site-nav-toggle" className="nav-toggle" aria-label="باز و بسته کردن منو">

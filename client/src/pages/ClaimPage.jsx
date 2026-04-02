@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
 import { formatAdId } from "../lib/businessIds.js";
 
@@ -66,6 +67,11 @@ export default function ClaimPage() {
   };
 
   return (
+    <>
+      <Seo
+        title="ادعای مالکیت آگهی"
+        description={`درخواست تأیید مالکیت برای «${businessLabel}» در فهرست ایرانیو.`}
+      />
     <main className="container" style={{ padding: "2rem 0", maxWidth: "36rem" }}>
       <h1>ادعای مالکیت</h1>
       <p className="field-hint">
@@ -128,5 +134,6 @@ export default function ClaimPage() {
         <Link to="/listings">بازگشت به فهرست</Link>
       </p>
     </main>
+    </>
   );
 }

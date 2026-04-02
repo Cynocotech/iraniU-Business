@@ -1,0 +1,13 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Private / app surfaces (also set noindex via meta)
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /login
+Disallow: /onboarding
+Disallow: /manager-signup
+
+# Optional: uncomment when you serve a sitemap
+# Sitemap: https://YOUR_DOMAIN/sitemap.xml

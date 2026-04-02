@@ -22,6 +22,7 @@ import AdminHomePage from "./pages/admin/AdminHomePage.jsx";
 import AdminBusinessesPage from "./pages/admin/AdminBusinessesPage.jsx";
 import AdminEditBusinessPage from "./pages/admin/AdminEditBusinessPage.jsx";
 import AdminAddBusinessPage from "./pages/admin/AdminAddBusinessPage.jsx";
+import AdminBulkImportPage from "./pages/admin/AdminBulkImportPage.jsx";
 import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage.jsx";
 import AdminQrExportPage from "./pages/admin/AdminQrExportPage.jsx";
 import AdminClaimsPage from "./pages/admin/AdminClaimsPage.jsx";
@@ -91,6 +92,7 @@ export default function App() {
         <Route path="/admin-notes" element={<AdminNotesTasksPage />} />
         <Route path="/admin-businesses" element={<AdminBusinessesPage />} />
         <Route path="/admin-add" element={<AdminAddBusinessPage />} />
+        <Route path="/admin-import" element={<AdminBulkImportPage />} />
         <Route path="/admin-categories" element={<AdminCategoriesPage />} />
         <Route path="/admin-qr-export" element={<AdminQrExportPage />} />
         <Route path="/admin-edit" element={<AdminEditBusinessPage />} />

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
 import { DashboardProvider, useDashboard } from "../context/DashboardContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
@@ -75,6 +76,7 @@ function DashboardChrome() {
 
   return (
     <>
+      <Seo title="پنل کسب‌وکار" noindex description="ورود مدیران آگهی برای ویرایش اطلاعات در ایرانیو." />
       <a className="skip-link" href="#main">
         پرش به محتوا
       </a>

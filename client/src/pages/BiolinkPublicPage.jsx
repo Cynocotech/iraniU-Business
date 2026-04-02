@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
+import FloatingBackButton from "../components/FloatingBackButton.jsx";
 import { apiGet } from "../api.js";
 import { parseBiolinkJson } from "../lib/biolink.js";
 import BiolinkPublicView from "../components/BiolinkPublicView.jsx";
-
-const BASE_TITLE = "ایرانیو";
+import { pickHeroImageUrlFromBusiness, resolveBusinessImageUrl } from "../lib/businessProfile.js";
+import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 
 export default function BiolinkPublicPage() {
   const { slug } = useParams();
@@ -33,63 +35,68 @@ export default function BiolinkPublicPage() {
     };
   }, [slug]);
 
-  useEffect(() => {
-    if (!slug) {
-      document.title = BASE_TITLE;
-      return;
-    }
-    if (err) {
-      document.title = `صفحه یافت نشد · ${BASE_TITLE}`;
-      return () => {
-        document.title = BASE_TITLE;
-      };
-    }
-    if (!biz) {
-      document.title = `${BASE_TITLE}`;
-      return;
-    }
-    const bl = parseBiolinkJson(biz.biolink_json);
-    const pageTitle = (bl.headline || biz.name_fa || "").trim() || "—";
-    const t = pageTitle && pageTitle !== "—" ? `${pageTitle} · ${BASE_TITLE}` : BASE_TITLE;
-    document.title = t;
-    return () => {
-      document.title = BASE_TITLE;
-    };
-  }, [slug, err, biz]);
-
   if (!slug) {
     return (
-      <div className="biolink-public biolink-public--center">
-        <p>آدرس نامعتبر است.</p>
-        <Link to="/listings">بازگشت به فهرست</Link>
-      </div>
+      <>
+        <Seo title="آدرس نامعتبر" noindex description="لینک Biolink نامعتبر است." />
+        <FloatingBackButton />
+        <div className="biolink-public biolink-public--center">
+          <p>آدرس نامعتبر است.</p>
+          <Link to="/listings">بازگشت به فهرست</Link>
+        </div>
+      </>
     );
   }
 
   if (err) {
     return (
-      <div className="biolink-public biolink-public--center">
-        <p>این صفحه یافت نشد.</p>
-        <Link to="/listings">بازگشت به فهرست</Link>
-      </div>
+      <>
+        <Seo title="صفحه یافت نشد" noindex description="این صفحهٔ لینک در ایرانیو وجود ندارد." />
+        <FloatingBackButton />
+        <div className="biolink-public biolink-public--center">
+          <p>این صفحه یافت نشد.</p>
+          <Link to="/listings">بازگشت به فهرست</Link>
+        </div>
+      </>
     );
   }
 
   if (biz === null) {
     return (
-      <div className="biolink-public biolink-public--center">
-        <p>در حال بارگذاری…</p>
-      </div>
+      <>
+        <Seo title="صفحهٔ لینک" description={SEO_DEFAULT_DESCRIPTION} />
+        <FloatingBackButton />
+        <div className="biolink-public biolink-public--center">
+          <p>در حال بارگذاری…</p>
+        </div>
+      </>
     );
   }
 
   const data = parseBiolinkJson(biz.biolink_json);
+  const pageTitle = (data.headline || biz.name_fa || "").trim() || "صفحهٔ لینک";
+  const bio = (data.bio || "").replace(/\s+/g, " ").trim();
+  const seoDesc =
+    bio.slice(0, 300) ||
+    `${biz.name_fa || "کسب‌وکار"} — لینک‌های تماس و شبکه‌های اجتماعی در ایرانیو.`.slice(0, 300);
+  const hero = pickHeroImageUrlFromBusiness(biz);
+  const ogImage = hero ? resolveBusinessImageUrl(hero) : "";
+
   return (
-    <BiolinkPublicView
-      slug={slug}
-      businessName={biz.name_fa || ""}
-      coverFallback={biz.cover_image_url || ""}
-      data={data}
-    />
+    <>
+      <Seo
+        title={`${pageTitle} · صفحهٔ لینک`}
+        description={seoDesc}
+        image={ogImage || undefined}
+        ogType="website"
+      />
+      <BiolinkPublicView
+        slug={slug}
+        businessName={biz.name_fa || ""}
+        coverFallback={biz.cover_image_url || ""}
+        data={data}
+      />
+      <FloatingBackButton />
+    </>
   );
 }

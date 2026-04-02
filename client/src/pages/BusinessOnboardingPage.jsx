@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
 import { DEFAULT_HOURS_ROWS } from "../lib/businessProfile.js";
 import { LISTING_TERMS_VERSION } from "../lib/listingTerms.js";
@@ -196,6 +197,12 @@ export default function BusinessOnboardingPage() {
   };
 
   return (
+    <>
+      <Seo
+        title="ثبت کسب‌وکار"
+        noindex
+        description="ثبت آگهی جدید در ایرانیو؛ پس از تأیید مدیر در فهرست نمایش داده می‌شود."
+      />
     <div className="container onboarding-page" style={{ padding: "2rem 0", maxWidth: "40rem" }}>
       <header style={{ marginBottom: "1.25rem" }}>
         <h1 style={{ margin: "0 0 0.35rem" }}>ثبت کسب‌وکار</h1>
@@ -499,5 +506,6 @@ export default function BusinessOnboardingPage() {
         <Link to="/">خانه</Link>
       </p>
     </div>
+    </>
   );
 }
