@@ -90,6 +90,7 @@ function migrateBusinessesColumns() {
     ["listing_terms_version", "TEXT"],
     ["listing_contact_email", "TEXT"],
     ["listing_rejection_reason", "TEXT"],
+    ["google_place_id", "TEXT"],
   ];
   for (const [col, typ] of add) {
     if (!names.has(col)) {

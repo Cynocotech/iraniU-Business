@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
@@ -6,8 +6,19 @@ import { DEFAULT_HOURS_ROWS } from "../lib/businessProfile.js";
 import { LISTING_TERMS_VERSION } from "../lib/listingTerms.js";
 import { ListingTermsScrollBox, ListingTermsCheckbox } from "../components/ListingTermsAgreement.jsx";
 
+function suggestSlugFromPlaceName(name) {
+  const base = String(name || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (base.length >= 2) return base.slice(0, 48);
+  return `biz-${Date.now().toString(36).slice(-10)}`;
+}
+
 const STEPS = [
-  { id: "identity", title: "نام و نامک" },
+  { id: "identity", title: "نام کسب‌وکار" },
   { id: "contact", title: "تماس و مکان" },
   { id: "profile", title: "معرفی و لینک‌ها" },
   { id: "review", title: "ثبت" },
@@ -15,6 +26,10 @@ const STEPS = [
 
 function slugPatternOk(s) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
+}
+
+function autoSlugFromNameFa(nameFa) {
+  return suggestSlugFromPlaceName(String(nameFa || "").trim()).toLowerCase();
 }
 
 function emailOk(s) {
@@ -36,7 +51,6 @@ export default function BusinessOnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  const [slug, setSlug] = useState("");
   const [nameFa, setNameFa] = useState("");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
@@ -57,10 +71,11 @@ export default function BusinessOnboardingPage() {
       .catch(() => setCategories([]));
   }, []);
 
+  const derivedSlugPreview = useMemo(() => autoSlugFromNameFa(nameFa), [nameFa]);
+
   const canGoNext = () => {
     if (step === 0) {
-      const s = slug.trim().toLowerCase();
-      return s.length > 0 && nameFa.trim().length > 0 && slugPatternOk(s);
+      return nameFa.trim().length > 0;
     }
     if (step === 1) {
       return (
@@ -88,7 +103,7 @@ export default function BusinessOnboardingPage() {
     if (step === 0 && !canGoNext()) {
       setMsg({
         ok: false,
-        text: "نامک فقط با حروف انگلیسی کوچک، اعداد و خط تیره است (مثلاً my-cafe-london).",
+        text: "نام کسب‌وکار را وارد کنید.",
       });
       return;
     }
@@ -118,9 +133,8 @@ export default function BusinessOnboardingPage() {
     e.preventDefault();
     setSaving(true);
     setMsg(null);
-    const s = slug.trim().toLowerCase();
-    if (!slugPatternOk(s) || !nameFa.trim()) {
-      setMsg({ ok: false, text: "نام و نامک را درست پر کنید." });
+    if (!nameFa.trim()) {
+      setMsg({ ok: false, text: "نام کسب‌وکار را وارد کنید." });
       setSaving(false);
       return;
     }
@@ -149,8 +163,7 @@ export default function BusinessOnboardingPage() {
       DEFAULT_HOURS_ROWS.map((r) => ({ day: r.day, hours: r.hours }))
     );
     const gallery_json = JSON.stringify(["", "", "", ""]);
-    const payload = {
-      slug: s,
+    const basePayload = {
       name_fa: nameFa.trim(),
       description: description.trim(),
       category: category.trim(),
@@ -168,19 +181,34 @@ export default function BusinessOnboardingPage() {
       listing_terms_version: LISTING_TERMS_VERSION,
       listing_contact_email: listingContactEmail.trim(),
     };
+    let slugAttempt = autoSlugFromNameFa(nameFa);
+    if (!slugPatternOk(slugAttempt)) {
+      slugAttempt = `biz-${Date.now().toString(36)}`;
+    }
     try {
-      const created = await apiPost("/api/businesses", payload);
+      let created;
+      let finalSlug = slugAttempt;
+      for (let i = 0; i < 12; i++) {
+        try {
+          created = await apiPost("/api/businesses", { ...basePayload, slug: finalSlug });
+          break;
+        } catch (err) {
+          const t = String(err.message || "");
+          if (!t.includes("slug_taken") || i === 11) throw err;
+          finalSlug = `${autoSlugFromNameFa(nameFa)}-${Date.now().toString(36).slice(-8)}`;
+        }
+      }
       if (created && created.listing_approval === "pending") {
         navigate("/", { replace: true, state: { listingPendingReview: true } });
         return;
       }
-      navigate(`/business?slug=${encodeURIComponent(s)}`, {
+      navigate(`/business?slug=${encodeURIComponent(finalSlug)}`, {
         state: { onboardingComplete: true },
       });
     } catch (err) {
       const t = String(err.message || "");
       let text = t;
-      if (t.includes("slug_taken")) text = "این نامک قبلاً گرفته شده؛ نامک دیگری انتخاب کنید.";
+      if (t.includes("slug_taken")) text = "ساخت آدرس صفحه با خطا مواجه شد؛ دوباره تلاش کنید.";
       else if (t.includes("invalid_slug")) text = "فرمت نامک نامعتبر است.";
       else if (t.includes("missing_slug_or_name")) text = "نامک و نام کسب‌وکار الزامی است.";
       else if (t.includes("invalid_json_field")) text = "خطا در دادهٔ ساختاری؛ دوباره تلاش کنید.";
@@ -234,24 +262,12 @@ export default function BusinessOnboardingPage() {
       <form className="dashboard-panel" onSubmit={step === STEPS.length - 1 ? submit : (e) => e.preventDefault()}>
         {step === 0 && (
           <>
-            <h2 className="onboarding-panel-title">نام نمایشی و آدرس اینترنتی</h2>
+            <h2 className="onboarding-panel-title">نام کسب‌وکار</h2>
             <p className="field-hint" style={{ marginTop: 0 }}>
-              نامک در آدرس سایت دیده می‌شود و بعد از ثبت به‌سادگی عوض نمی‌شود.
+              آدرس صفحهٔ شما در سایت <strong>به‌صورت خودکار</strong> از روی نام ساخته می‌شود (حروف لاتین یا شناسهٔ کوتاه).
             </p>
+
             <div className="form-grid">
-              <div className="field field--block">
-                <label htmlFor="onb-slug">نامک (انگلیسی)</label>
-                <input
-                  id="onb-slug"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  lang="en"
-                  dir="ltr"
-                  autoComplete="off"
-                  placeholder="my-business-london"
-                  required
-                />
-              </div>
               <div className="field field--block">
                 <label htmlFor="onb-name">نام کسب‌وکار (فارسی)</label>
                 <input id="onb-name" value={nameFa} onChange={(e) => setNameFa(e.target.value)} required />
@@ -390,9 +406,9 @@ export default function BusinessOnboardingPage() {
                 <table className="onboarding-summary-table">
                   <tbody>
                     <tr>
-                      <th scope="row">نامک</th>
+                      <th scope="row">آدرس صفحه (خودکار)</th>
                       <td lang="en" dir="ltr" className="onboarding-summary-table__mono">
-                        {slug.trim().toLowerCase() || "—"}
+                        {derivedSlugPreview || "—"}
                       </td>
                     </tr>
                     <tr>

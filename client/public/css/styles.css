@@ -5261,7 +5261,7 @@ body.page-home main#main > *:not(.hero) {
 
 .page-home .hero.hero--home {
   display: grid;
-  justify-items: center;
+  justify-items: stretch;
   position: relative;
   overflow: hidden;
   padding: clamp(2.25rem, 7vw, 4.25rem) 0;
@@ -5297,8 +5297,13 @@ body.page-home main#main > *:not(.hero) {
   flex-direction: column;
   align-items: stretch;
   gap: clamp(var(--space-lg), 4vw, var(--space-xl));
-  margin-left: 0;
-  margin-right: 0;
+  width: min(100%, var(--max-width));
+  margin-inline: auto;
+  box-sizing: border-box;
+  min-width: 0;
+  --hero-pad-x: max(var(--space-md), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  padding-left: var(--hero-pad-x);
+  padding-right: var(--hero-pad-x);
 }
 
 .page-home .hero__intro {
@@ -5367,6 +5372,7 @@ body.page-home main#main > *:not(.hero) {
   max-width: 720px;
   width: 100%;
   margin-inline: auto;
+  box-sizing: border-box;
   padding: var(--space-md);
   background: rgba(255, 255, 255, 0.11);
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -5379,6 +5385,8 @@ body.page-home main#main > *:not(.hero) {
 }
 
 .page-home .search-bar--home {
+  max-width: 100%;
+  width: 100%;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 8px 32px rgba(26, 8, 32, 0.12);
@@ -5406,8 +5414,10 @@ body.page-home main#main > *:not(.hero) {
 }
 
 .page-home .hero__search {
-  max-width: none;
-  margin-inline: 0;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+  box-sizing: border-box;
 }
 
 .page-home .hero__filters-extra--home {
@@ -5788,6 +5798,120 @@ body.page-home main#main > *:not(.hero) {
   .page-home .page-home__listing-cards {
     grid-template-columns: 1fr;
     gap: var(--space-md);
+  }
+}
+
+/* خانه + لیست: موبایل باریک — فاصله، تایپ، یک ستونهٔ دسته‌ها */
+@media (max-width: 480px) {
+  .page-home .hero.hero--home {
+    padding-top: max(clamp(1.35rem, 5.5vw, 2.75rem), calc(var(--space-xs) + env(safe-area-inset-top, 0px)));
+    padding-bottom: clamp(1.2rem, 4vw, 2rem);
+    border-radius: 0 0 16px 16px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-home .hero__inner {
+    gap: clamp(var(--space-md), 3.5vw, var(--space-lg));
+    --hero-pad-x: max(var(--space-sm), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
+  .page-home .hero__intro {
+    max-width: 100%;
+    padding-inline: 0;
+  }
+
+  .page-home .hero__eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+  }
+
+  .page-home .hero__display {
+    font-size: clamp(1.42rem, 6.5vw, 2.15rem);
+    line-height: 1.28;
+  }
+
+  .page-home .hero__tagline {
+    font-size: clamp(0.88rem, 3.2vw, 1.02rem);
+    line-height: 1.58;
+  }
+
+  .page-home .hero__panel {
+    padding: var(--space-sm);
+    border-radius: 14px;
+  }
+
+  .page-home .search-bar--home {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+    border-radius: 12px;
+  }
+
+  .page-home .search-bar--home input,
+  .page-home .search-bar--home select {
+    font-size: 16px;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .page-home .search-bar--home .btn--accent {
+    min-height: 46px;
+  }
+
+  .page-home .section--home {
+    padding: clamp(1.25rem, 4vw, 2.25rem) 0;
+  }
+
+  .page-home .section__title--home {
+    font-size: clamp(1.2rem, 4.5vw, 1.55rem);
+  }
+
+  .page-home .section__lead--home {
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+
+  .page-home .section--categories-home {
+    padding-inline: max(var(--space-xs), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+    margin-block: var(--space-sm);
+    border-radius: 14px;
+  }
+
+  .page-home .category-grid--home {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .page-home .category-card--home {
+    min-height: 0;
+    padding: var(--space-md);
+    border-radius: 14px;
+  }
+
+  .page-home .category-card--home .category-card__icon {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.45rem;
+  }
+
+  .page-home .category-card--home .category-card__hint {
+    max-width: none;
+  }
+
+  .listings-page {
+    padding-top: var(--space-md);
+  }
+
+  .listings-page__intro,
+  .listings-search {
+    padding: var(--space-md);
+    border-radius: 14px;
+  }
+
+  .listings-page__intro h1 {
+    font-size: clamp(1.15rem, 5vw, 1.45rem);
+  }
+
+  .listings-toolbar {
+    margin-top: var(--space-sm);
   }
 }
 
