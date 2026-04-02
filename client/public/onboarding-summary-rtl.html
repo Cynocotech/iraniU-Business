@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>جمع‌بندی و شرایط قانونی — پیش‌نمایش</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-page: #f1f3f6;
+        --bg-card: #ffffff;
+        --text: #1a1d21;
+        --text-muted: #5c6370;
+        --border: #e4e7ec;
+        --border-strong: #d1d5dc;
+        --intro-bg: #fef2f2;
+        --intro-border: #fecaca;
+        --intro-text: #7f1d1d;
+        --accent-bar: #2563eb;
+        --missing-bg: #fef2f2;
+        --missing-border: #fca5a5;
+        --feature-head: #111827;
+        --check: #15803d;
+        --shadow: 0 4px 24px rgba(15, 23, 42, 0.07);
+        --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.1);
+        --radius: 14px;
+        --radius-sm: 10px;
+        --font: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        font-family: var(--font);
+        font-size: 1rem;
+        line-height: 1.75;
+        color: var(--text);
+        background: var(--bg-page);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: clamp(1rem, 4vw, 2rem);
+      }
+
+      .shell {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid rgba(228, 231, 236, 0.9);
+        padding: clamp(1.25rem, 4vw, 2rem);
+      }
+
+      header.page__head {
+        margin-bottom: 1.5rem;
+      }
+
+      .page__title {
+        margin: 0 0 0.5rem;
+        font-size: clamp(1.35rem, 4vw, 1.75rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text);
+      }
+
+      .intro {
+        margin: 0 0 1.75rem;
+        padding: 1rem 1.15rem;
+        background: var(--intro-bg);
+        border: 1px solid var(--intro-border);
+        border-radius: var(--radius-sm);
+        color: var(--intro-text);
+        font-size: 0.9375rem;
+        line-height: 1.7;
+      }
+
+      .intro p {
+        margin: 0;
+      }
+
+      main {
+        display: block;
+      }
+
+      section.summary-section {
+        margin-bottom: 2rem;
+      }
+
+      section.summary-section:last-of-type {
+        margin-bottom: 0;
+      }
+
+      .summary-section__title {
+        margin: 0 0 0.85rem;
+        padding-right: 0.65rem;
+        border-right: 4px solid var(--accent-bar);
+        font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+        font-weight: 700;
+        color: #1f2937;
+        line-height: 1.4;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        box-shadow: var(--shadow);
+      }
+
+      table.data-table {
+        width: 100%;
+        min-width: min(100%, 20rem);
+        border-collapse: collapse;
+        font-size: 0.9375rem;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 0.85rem 1rem;
+        text-align: right;
+        vertical-align: top;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .data-table tr:last-child th,
+      .data-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .data-table th[scope="row"] {
+        width: 36%;
+        min-width: 7.5rem;
+        max-width: 14rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: #f8fafc;
+      }
+
+      .data-table td {
+        background: #fff;
+        font-weight: 500;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .data-table td.missing {
+        background: var(--missing-bg);
+        box-shadow: inset 0 0 0 2px var(--missing-border);
+        border-radius: 8px;
+        color: #7f1d1d;
+      }
+
+      .data-table a {
+        color: #1d4ed8;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        word-break: break-all;
+      }
+
+      .data-table a:hover {
+        color: #1e40af;
+      }
+
+      .package-caption {
+        margin: 0 0 0.75rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      table.feature-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9375rem;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-strong);
+        box-shadow: var(--shadow);
+      }
+
+      .feature-table thead th {
+        padding: 0.75rem 1rem;
+        background: var(--feature-head);
+        color: #fff;
+        font-weight: 600;
+        text-align: center;
+        border: none;
+      }
+
+      .feature-table thead th:first-child {
+        text-align: right;
+      }
+
+      .feature-table tbody td {
+        padding: 0.75rem 1rem;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+        background: #fff;
+      }
+
+      .feature-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .feature-table tbody td:first-child {
+        text-align: right;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .feature-table .check {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--check);
+        font-weight: 700;
+        font-size: 1.15rem;
+        line-height: 1;
+      }
+
+      .table-wrap--feature {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+        border: 1px solid var(--border-strong);
+        box-shadow: var(--shadow);
+        background: var(--bg-card);
+      }
+
+      footer.page__foot {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      @media (max-width: 640px) {
+        .data-table th[scope="row"],
+        .data-table td {
+          display: block;
+          width: 100%;
+          max-width: none;
+        }
+
+        .data-table tr {
+          display: block;
+          border-bottom: 1px solid var(--border);
+          padding: 0.5rem 0;
+        }
+
+        .data-table tr:last-child {
+          border-bottom: none;
+        }
+
+        .data-table th[scope="row"] {
+          padding-bottom: 0.25rem;
+          border-bottom: none;
+          background: transparent;
+          font-size: 0.78rem;
+          text-transform: none;
+          letter-spacing: 0;
+        }
+
+        .data-table td {
+          padding-top: 0.15rem;
+          border-bottom: none;
+          font-size: 0.92rem;
+        }
+
+        .feature-table {
+          font-size: 0.85rem;
+        }
+
+        .feature-table thead th,
+        .feature-table tbody td {
+          padding: 0.65rem 0.6rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="shell">
+        <header class="page__head">
+          <h1 class="page__title">جمع‌بندی و شرایط قانونی</h1>
+          <div class="intro" role="note">
+            <p>
+              مرور نهایی فیلدهای ثبت‌شده قبل از ارسال. برای اصلاح، از دکمهٔ «قبلی» استفاده کنید.
+            </p>
+          </div>
+        </header>
+
+        <main>
+          <section class="summary-section" aria-labelledby="sec-identity">
+            <h2 class="summary-section__title" id="sec-identity">۱. هویت و آدرس صفحه</h2>
+            <div class="table-wrap">
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <th scope="row">آدرس صفحه (خودکار)</th>
+                    <td>biz-mni10815</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">نام کسب‌وکار</th>
+                    <td class="missing">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="summary-section" aria-labelledby="sec-contact">
+            <h2 class="summary-section__title" id="sec-contact">۲. تماس و مکان</h2>
+            <div class="table-wrap">
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <th scope="row">شهر</th>
+                    <td class="missing">—</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">تلفن</th>
+                    <td class="missing">—</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">ایمیل اطلاع‌رسانی</th>
+                    <td>y@gmai.com</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">آدرس کامل</th>
+                    <td class="missing">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="summary-section" aria-labelledby="sec-listing">
+            <h2 class="summary-section__title" id="sec-listing">۳. معرفی در لیست</h2>
+            <div class="table-wrap">
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <th scope="row">دسته</th>
+                    <td>سلامت</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">محدودهٔ قیمت</th>
+                    <td>10 100</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">عنوان در لیست</th>
+                    <td class="missing">—</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">توضیحات</th>
+                    <td class="missing">—</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">دکمهٔ فراخوان</th>
+                    <td class="missing">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="summary-section" aria-labelledby="sec-google">
+            <h2 class="summary-section__title" id="sec-google">۴. لینک Google</h2>
+            <div class="table-wrap">
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <th scope="row">لینک صفحهٔ نظر / نقشه</th>
+                    <td>
+                      <a href="https://yahoo.com" target="_blank" rel="noopener noreferrer">https://yahoo.com</a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="summary-section" aria-labelledby="sec-package">
+            <h2 class="summary-section__title" id="sec-package">۵. بستهٔ پایه — امکانات</h2>
+            <p class="package-caption">آگهی شما با بستهٔ پایه ثبت می‌شود.</p>
+            <div class="table-wrap table-wrap--feature">
+              <table class="feature-table">
+                <thead>
+                  <tr>
+                    <th scope="col">امکان</th>
+                    <th scope="col">بستهٔ پایه (فعلی)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>ثبت آگهی و نمایش در فهرست پس از تأیید مدیر</td>
+                    <td><span class="check" aria-label="بله">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td>صفحهٔ اختصاصی با آدرس ثابت</td>
+                    <td><span class="check" aria-label="بله">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td>دسترسی به پنل مدیریت پس از ادعای مالکیت</td>
+                    <td><span class="check" aria-label="بله">✓</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+
+        <footer class="page__foot">صفحهٔ نمونهٔ استاتیک — RTL — فقط برای نمایش چیدمان و استایل</footer>
+      </div>
+    </div>
+  </body>
+</html>

@@ -3056,6 +3056,13 @@ body.app-shell-body .admin-topbar {
   text-decoration: underline;
 }
 
+.app-shell__sidebar-foot--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
 .app-shell__body {
   min-width: 0;
   display: flex;
@@ -7058,4 +7065,287 @@ body.biolink-public-body #root {
 .floating-back__ico {
   font-size: 1rem;
   line-height: 1;
+}
+
+/*
+ * ثبت کسب‌وکار — مرحلهٔ جمع‌بندی (styles.css ریشه؛ همراه Vite بارگذاری می‌شود)
+ * شمارهٔ بخش و عنوان نباید به هم بچسبند — از flex + span استفاده می‌شود.
+ */
+.onboarding-page .onboarding-review-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-page .onboarding-review-summary__intro {
+  padding: 1rem 1.1rem;
+  background: linear-gradient(135deg, rgba(250, 245, 252, 0.65) 0%, rgba(255, 255, 255, 0.95) 100%);
+  border: 1px solid rgba(58, 11, 71, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 2px 14px rgba(45, 8, 50, 0.05);
+}
+
+.onboarding-page .onboarding-review-summary__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: var(--color-text, #1a1a1a);
+  letter-spacing: -0.02em;
+}
+
+.onboarding-page .onboarding-review-summary__lead {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--color-muted, #5c5661);
+}
+
+.onboarding-page .onboarding-review-block__title {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--color-primary, #3a0b47);
+}
+
+.onboarding-page .onboarding-review-block__title-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.onboarding-page .onboarding-review-block__title--no-step .onboarding-review-block__title-label {
+  flex: none;
+  width: 100%;
+}
+
+.onboarding-page .onboarding-review-block__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: linear-gradient(145deg, var(--color-primary-mid, #5c1f6e), var(--color-primary, #3a0b47));
+  box-shadow: 0 2px 8px rgba(58, 11, 71, 0.22);
+}
+
+.onboarding-page .onboarding-review-card__title {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text, #1a1a1a);
+}
+
+.onboarding-page .onboarding-review-card__title .onboarding-review-block__step--in-heading {
+  margin-inline-end: 0;
+}
+
+/* غلبه بر .dashboard-panel h3 برای عنوان کارت شرایط */
+.onboarding-page .dashboard-panel .onboarding-review-card h3.onboarding-review-card__title {
+  margin: 0;
+  color: var(--color-text, #1a1a1a);
+  font-size: 1.05rem;
+}
+
+/* ثبت کسب‌وکار — جمع‌بندی: یک قاب برای جدول (بدون قاب دوبل با Tailwind) */
+.onboarding-page .onboarding-review-block--clean {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.onboarding-page .onboarding-review-block--clean .onboarding-review-block__head {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border, rgba(58, 11, 71, 0.12));
+  padding: 0.5rem 0 0.65rem;
+}
+
+.onboarding-page .onboarding-review-block--clean .onboarding-review-block__table-wrap {
+  padding: 0.4rem 0 0;
+}
+
+.onboarding-page .onboarding-review-block--clean .onboarding-review-block__kv-wrap {
+  width: 100%;
+  padding: 0.35rem 0 0;
+}
+
+.onboarding-page .onboarding-review-card--legal.onboarding-review-card--clean {
+  box-shadow: 0 1px 2px rgba(45, 8, 50, 0.06);
+  border-color: var(--color-border, rgba(58, 11, 71, 0.12));
+}
+
+/* ثبت کسب‌وکار — فیلد خالی پس از تلاش برای ادامه/ثبت: حاشیهٔ قرمز چشمک‌زن */
+@keyframes onboarding-invalid-field-blink {
+  0%,
+  100% {
+    border-color: rgba(185, 28, 28, 0.95);
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.55);
+  }
+  50% {
+    border-color: rgba(248, 113, 113, 0.98);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.45);
+  }
+}
+
+@keyframes onboarding-invalid-value-blink {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.55) inset, 0 0 0 1px rgba(185, 28, 28, 0.65);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.55) inset, 0 0 0 2px rgba(239, 68, 68, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-page .field.field--invalid-blink :is(input, select, textarea),
+  .onboarding-page .onboarding-review-value--invalid-blink,
+  .onboarding-page .onboarding-terms-accept--invalid-blink {
+    animation: none;
+    border-color: var(--color-danger, #b00020);
+  }
+}
+
+.onboarding-page .field.field--invalid-blink :is(input, select, textarea) {
+  border-width: 2px;
+  border-style: solid;
+  border-color: rgba(185, 28, 28, 0.9);
+  animation: onboarding-invalid-field-blink 1.1s ease-in-out infinite;
+}
+
+.onboarding-page .onboarding-review-value--invalid-blink {
+  animation: onboarding-invalid-value-blink 1.1s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+.onboarding-page .onboarding-terms-accept--invalid-blink {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 2px solid rgba(185, 28, 28, 0.85);
+  animation: onboarding-invalid-field-blink 1.1s ease-in-out infinite;
+}
+
+/*
+ * فقط داخل مرحلهٔ «جمع‌بندی و شرایط قانونی» — پس‌زمینهٔ بنفش ملایم روی عنوان بخش و برچسب فیلدها + فاصلهٔ برچسب / : / مقدار
+ */
+.onboarding-page .onboarding-review-summary .onboarding-review-block__title .onboarding-review-block__title-label {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.4rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-primary, #3a0b47);
+  background: rgba(237, 233, 254, 0.97);
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  box-shadow: 0 1px 2px rgba(58, 11, 71, 0.06);
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-block__title--no-step .onboarding-review-block__title-label {
+  flex: 0 1 auto;
+  width: auto;
+}
+
+.onboarding-page .onboarding-review-card--legal .onboarding-review-card__title .onboarding-review-block__title-label {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary, #3a0b47);
+  background: rgba(237, 233, 254, 0.97);
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  box-shadow: 0 1px 2px rgba(58, 11, 71, 0.06);
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-kv__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  gap: 0.35rem 0.85rem;
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-kv__row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem 0;
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-kv__label {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #4c1d95;
+  background: rgba(237, 233, 254, 0.95);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-kv__label-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-kv__colon {
+  margin-inline: 0.15rem 0.35rem;
+  padding: 0 0.1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(124, 58, 237, 0.45);
+  user-select: none;
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-package__feature {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0.28rem 0.65rem;
+  font-weight: 600;
+  color: #4c1d95;
+  background: rgba(237, 233, 254, 0.95);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+}
+
+.onboarding-page .onboarding-review-summary .onboarding-review-package__colon {
+  margin-inline: 0.15rem 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(124, 58, 237, 0.45);
+  user-select: none;
 }

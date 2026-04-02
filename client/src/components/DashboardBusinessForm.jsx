@@ -4,6 +4,7 @@ import { apiGet, apiPatch } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "./DashboardPanelHead.jsx";
 import { DEFAULT_HOURS_ROWS, parseHoursJson, parseGalleryJson } from "../lib/businessProfile.js";
+import { ensureHttpsUrl } from "../lib/siteUrl.js";
 
 const STORAGE_SLUG = "iraniu_dashboard_business_slug";
 
@@ -154,8 +155,8 @@ export default function DashboardBusinessForm({
         phone,
         listing_contact_email: listingContactEmail.trim() || null,
         address,
-        google_review_url: googleReviewUrl,
-        reservation_link: reservationLink,
+        google_review_url: googleReviewUrl.trim() ? ensureHttpsUrl(googleReviewUrl.trim()) : "",
+        reservation_link: reservationLink.trim() ? ensureHttpsUrl(reservationLink.trim()) : "",
         call_tracking_enabled: callTrackingEnabled ? 1 : 0,
         call_tracking_number: callTrackingNumber,
         call_forward_number: callForwardNumber,
@@ -369,6 +370,7 @@ export default function DashboardBusinessForm({
               type="url"
               value={googleReviewUrl}
               onChange={(e) => setGoogleReviewUrl(e.target.value)}
+              onBlur={() => setGoogleReviewUrl((prev) => (String(prev).trim() ? ensureHttpsUrl(String(prev).trim()) : ""))}
               placeholder="https://g.page/.../review"
               dir="ltr"
             />
@@ -380,6 +382,7 @@ export default function DashboardBusinessForm({
               type="url"
               value={reservationLink}
               onChange={(e) => setReservationLink(e.target.value)}
+              onBlur={() => setReservationLink((prev) => (String(prev).trim() ? ensureHttpsUrl(String(prev).trim()) : ""))}
               placeholder="https://example.com/book"
               dir="ltr"
             />

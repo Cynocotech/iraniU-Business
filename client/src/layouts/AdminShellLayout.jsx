@@ -7,6 +7,9 @@ import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 import { adminShellNavIcons } from "../components/AdminShellNavIcons.jsx";
 
+/** OpenAPI / Swagger — default matches production panel docs */
+const API_DOCS_URL = (import.meta.env.VITE_API_DOCS_URL || "").trim() || "https://panel.iraniu.uk/docs/api/";
+
 const adminNav = [
   { to: "/admin", label: "داشبورد", end: true, icon: "dashboard" },
   { to: "/admin-notes", label: "یادداشت و کارها", icon: "notes" },
@@ -106,13 +109,32 @@ export default function AdminShellLayout() {
               </li>
             ))}
           </ul>
-          <div className="app-shell__sidebar-foot">
+          <div className="app-shell__sidebar-foot app-shell__sidebar-foot--stack">
             <Link to="/">
               <span className="app-shell__nav-icon" aria-hidden="true">
                 {adminShellNavIcons.homePublic}
               </span>
               <span>بازگشت به سایت عمومی</span>
             </Link>
+            <a
+              href={API_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="مستندات API Swagger — باز می‌شود در تب جدید"
+            >
+              <span className="app-shell__nav-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span>مستندات API</span>
+            </a>
           </div>
         </aside>
 

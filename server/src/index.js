@@ -13,6 +13,7 @@ import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
 import { sendListingApprovedEmail, sendListingRejectedEmail } from "./listingDecisionEmail.js";
+import { notifyAdminsNewPendingListing } from "./pendingListingNotify.js";
 import multer from "multer";
 import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
@@ -372,7 +373,7 @@ const DEFAULT_BIOLINK_JSON = JSON.stringify({
   socialLinks: [],
 });
 
-app.post("/api/businesses", (req, res) => {
+app.post("/api/businesses", async (req, res) => {
   ensureRestaurantSafraDemo();
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const slug = String(b.slug || "")
@@ -501,6 +502,13 @@ app.post("/api/businesses", (req, res) => {
   });
 
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  if (listing_approval === "pending") {
+    try {
+      await notifyAdminsNewPendingListing(row);
+    } catch (e) {
+      console.error("[email] pending listing notify", e);
+    }
+  }
   res.status(201).json(row);
 });
 

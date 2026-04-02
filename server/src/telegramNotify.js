@@ -168,6 +168,44 @@ export async function sendTelegramTestMessage() {
 }
 
 /**
+ * Notify admin Telegram chat when a public user submits a listing (pending review).
+ * Uses the same bot + TELEGRAM_CHAT_ID as super-admin login alerts. Text-only (no photo).
+ */
+export async function notifyTelegramNewPendingListing(row) {
+  const token = getEffectiveTelegramConfig().botToken;
+  const chatIdRaw = getEffectiveTelegramConfig().chatId;
+  if (!token || !chatIdRaw) {
+    return { skipped: true, reason: "telegram_not_configured" };
+  }
+  const chat_id = parseChatId(chatIdRaw);
+  if (chat_id == null) {
+    return { skipped: true, reason: "invalid_chat_id" };
+  }
+  const base = String(
+    getEffectiveTelegramConfig().publicSiteUrl || process.env.PUBLIC_SITE_URL || process.env.SITE_BASE_URL || ""
+  ).replace(/\/$/, "");
+  const adminUrl = base ? `${base}/admin` : "";
+  const name = String(row?.name_fa || "").trim() || "—";
+  const slug = String(row?.slug || "").trim();
+  const city = String(row?.city || "").trim() || "—";
+  const text = [
+    "📋 New listing pending review",
+    "",
+    `Name: ${name}`,
+    `Slug: ${slug}`,
+    `City: ${city}`,
+    "",
+    `UTC: ${new Date().toISOString()}`,
+    "",
+    "Open the admin panel to approve or reject this listing.",
+  ].join("\n");
+  const replyMarkup = adminUrl
+    ? { inline_keyboard: [[{ text: "Open admin panel", url: adminUrl }]] }
+    : undefined;
+  return sendTelegramMessage(token, chat_id, text, replyMarkup);
+}
+
+/**
  * پردازش به‌روزرسانی تلگرام (دکمهٔ Kick out). باید webhook با همان TELEGRAM_CHAT_ID تنظیم شود.
  */
 export async function processTelegramWebhook(body) {

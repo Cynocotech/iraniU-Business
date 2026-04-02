@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import AdminSecurityPage from "./AdminSecurityPage.jsx";
 import AdminSuperAdminsPage from "./AdminSuperAdminsPage.jsx";
 import AdminSystemLogsPage from "./AdminSystemLogsPage.jsx";
+import AdminEmailSettingsSection from "./AdminEmailSettingsSection.jsx";
 
 export default function AdminSettingsPage() {
   const location = useLocation();
@@ -29,7 +30,9 @@ export default function AdminSettingsPage() {
         <div className="admin-settings-head__titles">
           <h2 className="admin-settings-head__title">تنظیمات</h2>
           <p className="admin-settings-head__subtitle">
-            {mustEnroll2fa ? "ابتدا ورود دو مرحله‌ای را تکمیل کنید." : "امنیت، نقش‌ها و گزارش سیستم"}
+            {mustEnroll2fa
+              ? "ابتدا ورود دو مرحله‌ای را تکمیل کنید."
+              : "امنیت، ایمیل، نقش‌ها و گزارش سیستم"}
           </p>
         </div>
       </header>
@@ -40,6 +43,9 @@ export default function AdminSettingsPage() {
         </section>
         {mustEnroll2fa ? null : (
           <>
+            <section id="email" className="admin-settings-section">
+              <AdminEmailSettingsSection embedded />
+            </section>
             <section id="super-admins" className="admin-settings-section">
               <AdminSuperAdminsPage embedded />
             </section>

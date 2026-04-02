@@ -32,6 +32,13 @@ import {
   setTwilioModuleEnabled,
   isTwilioModuleEnabled,
 } from "./twilioModuleSettings.js";
+import {
+  getSmtpSettingsForAdmin,
+  applySmtpSettingsPatch,
+  sendMailViaSettings,
+} from "./smtpSettings.js";
+import { wrapBrandedEmail, escapeHtml } from "./emailBranding.js";
+import { sendBroadcastToBusinesses } from "./emailBroadcast.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -463,6 +470,81 @@ export function registerAuthRoutes(app) {
       message: `Twilio module ${enabled ? "enabled" : "disabled"}`,
     });
     res.json(next);
+  });
+
+  app.get("/api/admin/smtp-settings", requireSuperAdmin, (_req, res) => {
+    res.json(getSmtpSettingsForAdmin());
+  });
+
+  app.patch("/api/admin/smtp-settings", requireSuperAdmin, (req, res) => {
+    try {
+      const next = applySmtpSettingsPatch(req.body || {});
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "admin_smtp_settings_updated",
+        targetType: "settings",
+        targetId: "smtp",
+        message: "Super admin updated SMTP / email branding settings",
+      });
+      res.json(next);
+    } catch (e) {
+      console.error("smtp-settings patch", e);
+      res.status(500).json({ error: "server_error" });
+    }
+  });
+
+  app.post("/api/admin/smtp-test", requireSuperAdmin, async (req, res) => {
+    const to = String((req.body && req.body.to) || "").trim().toLowerCase();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ error: "invalid_to", hint: "ایمیل گیرنده را وارد کنید" });
+    }
+    const html = wrapBrandedEmail({
+      headerIcon: "✉️",
+      title: "SMTP connection test",
+      subtitle: "Iraniu — system email",
+      bodyHtml:
+        "<p style=\"margin:0 0 12px;\">If you are reading this, mail delivery via Zoho / SMTP is working.</p><p style=\"margin:0;color:#6b5f75;font-size:0.88rem;\">Server time: " +
+        escapeHtml(new Date().toISOString()) +
+        "</p>",
+    });
+    const r = await sendMailViaSettings({
+      to,
+      subject: "SMTP test — Iraniu",
+      html,
+      text: "SMTP test completed successfully.",
+    });
+    if (r.skipped) {
+      return res.status(400).json({
+        error: r.reason || "smtp_not_configured",
+        hint:
+          r.reason === "smtp_not_configured"
+            ? "میزبان، نام کاربری و رمز SMTP را ذخیره کنید یا SMTP_PASS در .env"
+            : "ایمیل فرستنده یا گیرنده نامعتبر است",
+      });
+    }
+    res.json({ ok: true });
+  });
+
+  app.post("/api/admin/email/broadcast", requireSuperAdmin, async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const subject = String(b.subject || "").trim();
+    const body_html = String(b.body_html || "");
+    const claimed_only =
+      b.claimed_only === true || b.claimed_only === 1 || String(b.claimed_only || "").toLowerCase() === "true";
+    if (!subject) return res.status(400).json({ error: "missing_subject" });
+    if (!body_html.trim()) return res.status(400).json({ error: "missing_body_html" });
+    const out = await sendBroadcastToBusinesses({ subject, body_html, claimed_only });
+    if (out.error) {
+      return res.status(400).json({ error: out.error });
+    }
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_email_broadcast",
+      targetType: "email",
+      targetId: "broadcast",
+      message: `Broadcast sent=${out.sent_count} failed=${out.failed_count} claimed_only=${claimed_only}`,
+    });
+    res.json(out);
   });
 
   /** تلگرام: دکمهٔ Kick out — باید webhook با setWebhook ثبت شود */

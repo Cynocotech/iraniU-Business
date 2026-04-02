@@ -1,0 +1,29 @@
+// ../client/vite.config.js
+import path from "path";
+import { fileURLToPath } from "url";
+import { defineConfig } from "file:///Volumes/SSD%20500GB/Iraniu-Directory/client/node_modules/vite/dist/node/index.js";
+import react from "file:///Volumes/SSD%20500GB/Iraniu-Directory/client/node_modules/@vitejs/plugin-react/dist/index.js";
+var __vite_injected_original_import_meta_url = "file:///Volumes/SSD%20500GB/Iraniu-Directory/client/vite.config.js";
+var __dirname = path.dirname(fileURLToPath(__vite_injected_original_import_meta_url));
+var vite_config_default = defineConfig({
+  plugins: [react()],
+  /** اگر فقط Vite را جدا اجرا کنید (npm run dev --prefix client)، API را پروکسی کنید. حالت پیشنهادی: یک پورت با npm run dev از ریشه. */
+  server: {
+    fs: {
+      allow: [path.resolve(__dirname, "..")]
+    },
+    port: 5173,
+    proxy: {
+      "/api": { target: "http://127.0.0.1:3001", changeOrigin: true, credentials: true },
+      "/go": { target: "http://127.0.0.1:3001", changeOrigin: true, credentials: true }
+    }
+  },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets"
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsiLi4vY2xpZW50L3ZpdGUuY29uZmlnLmpzIl0sCiAgInNvdXJjZXNDb250ZW50IjogWyJjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfZGlybmFtZSA9IFwiL1ZvbHVtZXMvU1NEIDUwMEdCL0lyYW5pdS1EaXJlY3RvcnkvY2xpZW50XCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCIvVm9sdW1lcy9TU0QgNTAwR0IvSXJhbml1LURpcmVjdG9yeS9jbGllbnQvdml0ZS5jb25maWcuanNcIjtjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfaW1wb3J0X21ldGFfdXJsID0gXCJmaWxlOi8vL1ZvbHVtZXMvU1NEJTIwNTAwR0IvSXJhbml1LURpcmVjdG9yeS9jbGllbnQvdml0ZS5jb25maWcuanNcIjtpbXBvcnQgcGF0aCBmcm9tIFwicGF0aFwiO1xuaW1wb3J0IHsgZmlsZVVSTFRvUGF0aCB9IGZyb20gXCJ1cmxcIjtcbmltcG9ydCB7IGRlZmluZUNvbmZpZyB9IGZyb20gXCJ2aXRlXCI7XG5pbXBvcnQgcmVhY3QgZnJvbSBcIkB2aXRlanMvcGx1Z2luLXJlYWN0XCI7XG5cbmNvbnN0IF9fZGlybmFtZSA9IHBhdGguZGlybmFtZShmaWxlVVJMVG9QYXRoKGltcG9ydC5tZXRhLnVybCkpO1xuXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoe1xuICBwbHVnaW5zOiBbcmVhY3QoKV0sXG4gIC8qKiBcdTA2MjdcdTA2QUZcdTA2MzEgXHUwNjQxXHUwNjQyXHUwNjM3IFZpdGUgXHUwNjMxXHUwNjI3IFx1MDYyQ1x1MDYyRlx1MDYyNyBcdTA2MjdcdTA2MkNcdTA2MzFcdTA2MjcgXHUwNkE5XHUwNjQ2XHUwNkNDXHUwNjJGIChucG0gcnVuIGRldiAtLXByZWZpeCBjbGllbnQpXHUwNjBDIEFQSSBcdTA2MzFcdTA2MjcgXHUwNjdFXHUwNjMxXHUwNjQ4XHUwNkE5XHUwNjMzXHUwNkNDIFx1MDZBOVx1MDY0Nlx1MDZDQ1x1MDYyRi4gXHUwNjJEXHUwNjI3XHUwNjQ0XHUwNjJBIFx1MDY3RVx1MDZDQ1x1MDYzNFx1MDY0Nlx1MDY0N1x1MDYyN1x1MDYyRlx1MDZDQzogXHUwNkNDXHUwNkE5IFx1MDY3RVx1MDY0OFx1MDYzMVx1MDYyQSBcdTA2MjhcdTA2MjcgbnBtIHJ1biBkZXYgXHUwNjI3XHUwNjMyIFx1MDYzMVx1MDZDQ1x1MDYzNFx1MDY0Ny4gKi9cbiAgc2VydmVyOiB7XG4gICAgZnM6IHtcbiAgICAgIGFsbG93OiBbcGF0aC5yZXNvbHZlKF9fZGlybmFtZSwgXCIuLlwiKV0sXG4gICAgfSxcbiAgICBwb3J0OiA1MTczLFxuICAgIHByb3h5OiB7XG4gICAgICBcIi9hcGlcIjogeyB0YXJnZXQ6IFwiaHR0cDovLzEyNy4wLjAuMTozMDAxXCIsIGNoYW5nZU9yaWdpbjogdHJ1ZSwgY3JlZGVudGlhbHM6IHRydWUgfSxcbiAgICAgIFwiL2dvXCI6IHsgdGFyZ2V0OiBcImh0dHA6Ly8xMjcuMC4wLjE6MzAwMVwiLCBjaGFuZ2VPcmlnaW46IHRydWUsIGNyZWRlbnRpYWxzOiB0cnVlIH0sXG4gICAgfSxcbiAgfSxcbiAgYnVpbGQ6IHtcbiAgICBvdXREaXI6IFwiZGlzdFwiLFxuICAgIGFzc2V0c0RpcjogXCJhc3NldHNcIixcbiAgfSxcbn0pO1xuIl0sCiAgIm1hcHBpbmdzIjogIjtBQUFrVCxPQUFPLFVBQVU7QUFDblUsU0FBUyxxQkFBcUI7QUFDOUIsU0FBUyxvQkFBb0I7QUFDN0IsT0FBTyxXQUFXO0FBSDBLLElBQU0sMkNBQTJDO0FBSzdPLElBQU0sWUFBWSxLQUFLLFFBQVEsY0FBYyx3Q0FBZSxDQUFDO0FBRTdELElBQU8sc0JBQVEsYUFBYTtBQUFBLEVBQzFCLFNBQVMsQ0FBQyxNQUFNLENBQUM7QUFBQTtBQUFBLEVBRWpCLFFBQVE7QUFBQSxJQUNOLElBQUk7QUFBQSxNQUNGLE9BQU8sQ0FBQyxLQUFLLFFBQVEsV0FBVyxJQUFJLENBQUM7QUFBQSxJQUN2QztBQUFBLElBQ0EsTUFBTTtBQUFBLElBQ04sT0FBTztBQUFBLE1BQ0wsUUFBUSxFQUFFLFFBQVEseUJBQXlCLGNBQWMsTUFBTSxhQUFhLEtBQUs7QUFBQSxNQUNqRixPQUFPLEVBQUUsUUFBUSx5QkFBeUIsY0FBYyxNQUFNLGFBQWEsS0FBSztBQUFBLElBQ2xGO0FBQUEsRUFDRjtBQUFBLEVBQ0EsT0FBTztBQUFBLElBQ0wsUUFBUTtBQUFBLElBQ1IsV0FBVztBQUFBLEVBQ2I7QUFDRixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=
