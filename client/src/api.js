@@ -29,7 +29,26 @@ export async function apiPost(path, body) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    throw new Error(data.hint || data.error || String(r.status));
+    const err = new Error(data.hint || data.error || String(r.status));
+    if (data.error) err.code = data.error;
+    throw err;
+  }
+  return data;
+}
+
+/** POST با هدر Bearer (پس از ورود) */
+export async function apiPostWithAuth(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body ?? {}),
+    ...fetchOpts,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.hint || data.error || String(r.status));
+    err.code = data.error;
+    throw err;
   }
   return data;
 }

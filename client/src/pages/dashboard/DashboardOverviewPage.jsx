@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useDashboard } from "../../context/DashboardContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
 
@@ -19,9 +20,24 @@ function formatRatingDisplay(rating) {
 
 export default function DashboardOverviewPage() {
   const { dashSlug, biz, heroQr, phoneClickCount } = useDashboard();
+  const { me } = useAuth();
+  const show2faPrompt = !me?.totp_enabled;
 
   return (
     <DashboardMain>
+      {show2faPrompt ? (
+        <section
+          className="dashboard-panel"
+          role="status"
+          style={{ marginBottom: "var(--space-md)", borderColor: "rgba(245, 158, 11, 0.45)", background: "rgba(254, 252, 232, 0.9)" }}
+        >
+          <p style={{ margin: 0, fontWeight: 700 }}>امنیت حساب: ورود دو مرحله‌ای را فعال کنید</p>
+          <p className="field-hint" style={{ margin: "0.35rem 0 0" }}>
+            برای امنیت بیشتر، در ورود بعدی کد Google Authenticator را هم فعال کنید. این مرحله در onboarding اجباری نیست.
+          </p>
+        </section>
+      ) : null}
+
       <div className="app-shell__widgets">
         <div className="app-shell__hero-card">
           <svg className="app-shell__hero-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -98,8 +114,21 @@ export default function DashboardOverviewPage() {
       <section className="dashboard-panel" id="panel-overview" aria-labelledby="overview-heading">
         <DashboardPanelHead headingId="overview-heading" title="نمای کلی" icon={dashboardIcons.overview} />
         <p className="field-hint" style={{ margin: 0 }}>
-          نامک فعال: <strong lang="en">{dashSlug}</strong> — از منوی کنار به هر بخش بروید؛ مثلاً{" "}
-          <Link to="/dashboard/edit">ویرایش آگهی</Link> یا <Link to="/dashboard/careers">فرصت‌های شغلی</Link>.
+          {biz?.name_fa ? (
+            <>
+              آگهی فعال: <strong>{biz.name_fa}</strong>
+              {" — "}
+              نامک: <strong lang="en">{dashSlug}</strong>
+              {" — "}
+            </>
+          ) : (
+            <>
+              نامک فعال: <strong lang="en">{dashSlug}</strong>
+              {" — "}
+            </>
+          )}
+          از منوی کنار به هر بخش بروید؛ مثلاً <Link to="/dashboard/edit">ویرایش آگهی</Link> یا{" "}
+          <Link to="/dashboard/careers">فرصت‌های شغلی</Link>.
         </p>
       </section>
     </DashboardMain>

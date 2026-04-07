@@ -23,6 +23,12 @@ export const adminShellNavIcons = {
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   ),
+  exchanges: (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 9h8M8 15h8M12 6v12" />
+    </svg>
+  ),
   edit: (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />

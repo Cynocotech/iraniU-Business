@@ -79,6 +79,9 @@ export default function ListingsPage() {
         <h1 id="listings-title">لیست کسب‌وکارها</h1>
         <p className="listings-page__intro-lead">جستجو و فیلتر؛ نتایج به‌صورت کارت زیر نمایش داده می‌شوند.</p>
         <div className="listings-page__intro-actions">
+          <Link className="btn btn--ghost" to="/exchanges">
+            صرافی‌ها
+          </Link>
           <Link className="btn btn--accent" to="/">
             بازگشت به خانه
           </Link>

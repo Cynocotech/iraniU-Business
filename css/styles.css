@@ -138,7 +138,7 @@ html.iraniu-desktop-blocked body {
 }
 
 .iraniu-desktop-gate__inner {
-  max-width: 22rem;
+  max-width: 26rem;
   padding: 1.75rem 1.5rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -159,6 +159,14 @@ html.iraniu-desktop-blocked body {
   font-size: 0.95rem;
   line-height: 1.65;
   color: var(--color-muted);
+}
+
+.iraniu-desktop-gate__text--en {
+  margin-top: 0.65rem;
+}
+
+.iraniu-desktop-gate__text + .iraniu-desktop-gate__text:not(.iraniu-desktop-gate__text--en) {
+  margin-top: 0.85rem;
 }
 
 main {
@@ -242,6 +250,16 @@ textarea:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
+}
+
+body.business-page.business-page--exchange-detail .site-header__inner {
+  justify-content: center;
+}
+
+body.business-page.business-page--exchange-detail .site-header__inner .nav,
+body.business-page.business-page--exchange-detail .site-header__inner .nav-toggle,
+body.business-page.business-page--exchange-detail .site-header__inner .site-nav-cb {
+  display: none !important;
 }
 
 .logo {
@@ -1299,6 +1317,1520 @@ body.page-map main#main {
   flex-wrap: wrap;
   gap: var(--space-sm);
   align-items: center;
+}
+
+.listings-page--exchanges .listings-page__intro--exchanges {
+  border-color: rgba(58, 11, 71, 0.2);
+  background: linear-gradient(135deg, rgba(250, 245, 252, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+/* —— /exchanges listing: چیدمان شبیه اپ موبایل + ماشین‌حساب در هیرو —— */
+.exchanges-app__public-alert {
+  margin: 0 0 var(--space-md);
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(255, 248, 235, 0.98), rgba(255, 233, 204, 0.92));
+  border: 1px solid rgba(230, 126, 34, 0.5);
+  color: #5c3d0c;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  box-shadow: 0 2px 12px rgba(230, 126, 34, 0.1);
+}
+
+.exchanges-app__public-alert strong {
+  color: #b45309;
+}
+
+.exchanges-app__float-nav {
+  position: sticky;
+  top: 0.7rem;
+  z-index: 35;
+  margin: 0 0 var(--space-md);
+  padding: 0.45rem;
+  border-radius: 16px;
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 10px 30px rgba(31, 41, 55, 0.14);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+.exchanges-app__float-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.2rem;
+  padding: 0.38rem 0.72rem;
+  border-radius: 11px;
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #1f2937;
+  border: 1px solid rgba(30, 41, 59, 0.08);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.72));
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.exchanges-app__float-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.16);
+}
+
+.exchanges-best-page__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.exchanges-best-page__card {
+  border-radius: 14px;
+  border: 1px solid rgba(30, 41, 59, 0.1);
+  background: #fff;
+  padding: 0.8rem 0.85rem;
+}
+
+.exchanges-best-page__currency {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.exchanges-best-page__currency small {
+  margin-inline-start: auto;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.exchanges-best-page__line {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.4rem;
+}
+
+/* ویجت «بهترین نرخ» — حلقهٔ قرمز در حال چرخش + درخشش */
+.exchanges-app__best-widget-shell {
+  position: relative;
+  margin-top: var(--space-md);
+  width: 100%;
+  border-radius: 20px;
+  padding: 2px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(229, 57, 53, 0.45),
+    0 0 18px 4px rgba(229, 57, 53, 0.35);
+  animation: exchanges-best-red-glow 2.2s ease-in-out infinite;
+}
+
+.exchanges-app__best-widget-shell::before {
+  content: "";
+  position: absolute;
+  inset: -45%;
+  z-index: 0;
+  background: conic-gradient(
+    from 0deg,
+    #e53935,
+    #ffcdd2,
+    #ff5252,
+    #b71c1c,
+    #ff8a80,
+    #e53935
+  );
+  animation: exchanges-best-orbit-spin 3.2s linear infinite;
+}
+
+.exchanges-app__best-widget-body {
+  position: relative;
+  z-index: 1;
+  border-radius: 18px;
+  padding: 0.85rem;
+  min-height: 13.5rem;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(168deg, #fff 0%, #fff8f8 100%);
+  border: 1px solid rgba(229, 57, 53, 0.12);
+}
+
+.exchanges-app__best-widget-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c62828;
+}
+
+.exchanges-app__best-widget-meta {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.exchanges-app__best-widget-ccy {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.exchanges-app__best-widget-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.exchanges-app__best-widget-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+
+.exchanges-app__best-widget-logo {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.14);
+  background: #fff;
+}
+
+.exchanges-app__best-widget-logo--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #334155;
+  background: linear-gradient(170deg, #eef2ff, #dbeafe);
+}
+
+.exchanges-app__best-widget-rate {
+  margin: 0 0 0.65rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #b71c1c;
+}
+
+.exchanges-app__best-widget-link {
+  width: 100%;
+  margin-top: auto;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 0.88rem;
+}
+
+.exchanges-app__calc-fab {
+  position: fixed;
+  inset-inline-end: max(1rem, env(safe-area-inset-right, 0px));
+  left: auto;
+  transform: none;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  border: none;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-family: var(--font), inherit;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(150deg, #4c1d95, #7c3aed);
+  box-shadow: 0 12px 30px rgba(76, 29, 149, 0.35);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .exchanges-app__calc-fab {
+    left: 50% !important;
+    right: auto !important;
+    inset-inline-start: 50% !important;
+    inset-inline-end: auto !important;
+    transform: translateX(-50%) !important;
+    margin-inline: 0 !important;
+  }
+}
+
+.exchanges-app__sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(2, 6, 23, 0.46);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.exchanges-app__sheet {
+  width: min(640px, 100%);
+  max-height: min(82vh, 720px);
+  overflow-y: auto;
+  border-radius: 20px;
+  padding: 0.9rem 0.9rem 1rem;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.3);
+}
+
+.exchanges-app__sheet--wide {
+  width: min(1100px, calc(100vw - 1.5rem));
+  max-height: min(88vh, 900px);
+}
+
+@media (max-width: 900px) {
+  .exchanges-app__sheet--wide {
+    width: min(100%, calc(100vw - 1rem));
+    border-radius: 16px;
+  }
+
+  .exchanges-app__sheet-overlay--wide-calc {
+    align-items: flex-end;
+    padding: 0.35rem;
+  }
+}
+
+.exchanges-app__sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.exchanges-app__sheet-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exchange-fab-row {
+  position: fixed;
+  inset-inline: max(0.75rem, env(safe-area-inset-left, 0px)) max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  z-index: 72;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.exchange-fab-row--single {
+  grid-template-columns: 1fr;
+}
+
+.exchange-contact-fab {
+  border: 0;
+  border-radius: 999px;
+  height: 3.1rem;
+  padding: 0 1.1rem;
+  width: 100%;
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.98rem;
+  box-shadow: 0 12px 30px rgba(14, 116, 144, 0.34);
+  cursor: pointer;
+}
+
+.exchange-contact-fab--calc {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+.exchange-contact-sheet__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 73;
+  background: rgba(2, 6, 23, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: exchange-contact-sheet-fade 180ms ease;
+}
+
+.exchange-contact-sheet {
+  width: min(760px, 100%);
+  border-radius: 1.15rem 1.15rem 0 0;
+  background: #fff;
+  box-shadow: 0 -10px 28px rgba(15, 23, 42, 0.24);
+  padding: 0.65rem 0.85rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  animation: exchange-contact-sheet-rise 220ms ease-out;
+}
+
+.exchange-contact-sheet__handle {
+  width: 56px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.8);
+  margin: 0.15rem auto 0.75rem;
+}
+
+.exchange-contact-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.exchange-contact-sheet__head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exchange-contact-sheet__call {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  color: #0c4a6e;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.exchange-contact-sheet__currency {
+  margin-bottom: 0.7rem;
+}
+
+@keyframes exchange-contact-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes exchange-contact-sheet-rise {
+  from {
+    transform: translateY(20px);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.exchanges-app__currency-mini--sheet {
+  margin-bottom: 0.7rem;
+}
+
+.exchanges-app__sheet--wide .exchange-calc__result--hero {
+  font-size: 1.12rem;
+  padding: 0.9rem 1rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+@media (min-width: 700px) {
+  .listings-page--exchanges .exchanges-app__calc-fab {
+    min-width: min(420px, calc(100vw - 2rem));
+    padding-inline: 1.2rem;
+  }
+}
+
+@keyframes exchanges-best-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes exchanges-best-red-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(229, 57, 53, 0.5),
+      0 0 16px 3px rgba(229, 57, 53, 0.32);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(211, 47, 47, 0.65),
+      0 0 28px 10px rgba(229, 57, 53, 0.38);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exchanges-app__best-widget-shell {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.55), 0 0 14px rgba(229, 57, 53, 0.25);
+  }
+
+  .exchanges-app__best-widget-shell::before {
+    animation: none;
+    inset: 0;
+    background: linear-gradient(135deg, #e53935, #ff8a80);
+  }
+}
+
+.exchange-private-alert {
+  margin: 0 0 var(--space-md);
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, rgba(255, 243, 224, 0.98), rgba(255, 230, 200, 0.94));
+  border: 1px solid rgba(230, 126, 34, 0.48);
+  color: #5c3d0c;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  box-shadow: 0 2px 10px rgba(230, 126, 34, 0.1);
+}
+
+.exchange-private-alert strong {
+  color: #b45309;
+}
+
+.exchange-private-alert__highlight {
+  display: inline-block;
+  margin: 0 0.12rem;
+  padding: 0.06rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(245, 124, 0, 0.18);
+  border: 1px solid rgba(230, 126, 34, 0.35);
+  color: #9a3412;
+  font-weight: 600;
+}
+
+body.business-page .profile-panel > .exchange-private-alert--hero {
+  position: relative;
+  margin: 0 0 var(--space-sm);
+  font-size: clamp(0.82rem, 2.6vw, 0.92rem);
+  line-height: 1.5;
+  padding: 0.65rem 0.8rem;
+}
+
+@media (min-width: 768px) {
+  body.business-page .profile-panel > .exchange-private-alert--hero {
+    margin-bottom: var(--space-md);
+    padding: 0.85rem 1rem;
+  }
+}
+
+.exchange-world-clock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 var(--space-sm);
+}
+
+.exchange-world-clock__item {
+  border: 1px solid rgba(14, 116, 144, 0.22);
+  background: linear-gradient(170deg, #f0f9ff, #ffffff);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.exchange-world-clock__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #0e7490;
+}
+
+.exchange-world-clock__ico {
+  font-size: 0.95rem;
+  opacity: 0.92;
+  color: #0891b2;
+}
+
+.exchange-world-clock__item--iran .exchange-world-clock__ico {
+  color: #c2410c;
+}
+
+.exchange-world-clock__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.98rem;
+  color: #0f172a;
+}
+
+.exchange-world-clock__time-ico {
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+@media (max-width: 560px) {
+  .exchange-world-clock {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-name-with-verified {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.profile-name-with-verified__text {
+  min-width: 0;
+}
+
+.exchange-company-verified {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.listing-card__title a {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.listing-card__verified-tick {
+  flex-shrink: 0;
+}
+
+.dashboard-exchange-verified select {
+  border-radius: 12px;
+  max-width: 100%;
+}
+
+.exchanges-app {
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+}
+
+.exchanges-app__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.exchanges-app__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(58, 11, 71, 0.65);
+}
+
+.exchanges-app__title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.45rem, 5vw, 1.9rem);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--color-text);
+}
+
+.exchanges-app__lead {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+  max-width: 22rem;
+}
+
+.exchanges-app__lead a {
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+/* کارت جستجو و فیلتر — صفحهٔ /exchanges */
+.exchanges-app__filter-card {
+  position: relative;
+  border-radius: 22px;
+  padding: 1.15rem 1.15rem 1.2rem;
+  background:
+    radial-gradient(ellipse 110% 90% at 100% 0%, rgba(126, 34, 206, 0.11), transparent 52%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.99), rgba(248, 244, 255, 0.93));
+  border: 1px solid rgba(58, 11, 71, 0.11);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 14px 44px rgba(58, 11, 71, 0.09),
+    0 4px 12px rgba(58, 11, 71, 0.04);
+}
+
+.exchanges-app__filter-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.exchanges-app__filter-card-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 16px;
+  color: #5b21b6;
+  background: linear-gradient(155deg, rgba(126, 34, 206, 0.14), rgba(255, 255, 255, 0.92));
+  border: 1px solid rgba(126, 34, 206, 0.2);
+  box-shadow: 0 2px 10px rgba(88, 28, 135, 0.08);
+}
+
+.exchanges-app__filter-card-headlines {
+  min-width: 0;
+  flex: 1;
+}
+
+.exchanges-app__filter-card-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(91, 33, 182, 0.75);
+}
+
+.exchanges-app__filter-card-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.exchanges-app__filter-card-title--compact {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.exchanges-app__filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.95rem;
+}
+
+.exchanges-app__filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(58, 11, 71, 0.1);
+  box-shadow: 0 1px 2px rgba(58, 11, 71, 0.04);
+}
+
+.exchanges-app__filter-chip-key {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.exchanges-app__filter-chip-val {
+  font-weight: 600;
+  color: var(--color-text);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exchanges-app__filter-clear {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  padding: 0.38rem 0.55rem;
+  margin-inline-start: auto;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.exchanges-app__filter-clear:hover {
+  background: rgba(126, 34, 206, 0.08);
+  text-decoration: none;
+}
+
+.exchanges-app__search {
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.exchanges-app__search--in-card {
+  margin: 0;
+}
+
+.exchanges-app__search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.exchanges-app__field label {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.exchanges-app__input {
+  width: 100%;
+  border-radius: 14px !important;
+  border: 1px solid rgba(58, 11, 71, 0.14) !important;
+  padding: 0.65rem 0.85rem !important;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.95);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.exchanges-app__filter-card .exchanges-app__input:focus {
+  outline: none;
+  border-color: rgba(126, 34, 206, 0.42) !important;
+  box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.12);
+}
+
+.exchanges-app__submit {
+  width: 100%;
+  border-radius: 14px;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  font-weight: 500;
+}
+
+.exchanges-app__calc-wrap {
+  border-radius: 20px;
+  padding: var(--space-md);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(237, 231, 246, 0.5));
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  box-shadow: 0 10px 36px rgba(58, 11, 71, 0.1);
+}
+
+.exchanges-app__currency-mini {
+  border-radius: 16px;
+  padding: 0.7rem 0.8rem 0.45rem;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.94), rgba(243, 244, 246, 0.92));
+  border: 1px solid rgba(58, 11, 71, 0.12);
+}
+
+.exchanges-app__currency-mini-label {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.exchanges-app__calc-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: var(--space-sm);
+}
+
+.exchanges-app__calc-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+}
+
+/* انتخاب ارز با پرچم — نوار افقی اسکرول‌شونده */
+.exchanges-app__currency-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  padding: 0.35rem 0 0.5rem;
+  margin: 0 -0.15rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(58, 11, 71, 0.25) transparent;
+}
+
+.exchanges-app__currency-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.exchanges-app__currency-strip::-webkit-scrollbar-thumb {
+  background: rgba(58, 11, 71, 0.22);
+  border-radius: 999px;
+}
+
+.exchanges-app__currency-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-width: 4.75rem;
+  max-width: 6.5rem;
+  padding: 0.55rem 0.5rem 0.6rem;
+  border-radius: 16px;
+  border: 1.5px solid rgba(58, 11, 71, 0.14);
+  background: linear-gradient(180deg, #fff 0%, rgba(250, 248, 255, 0.96) 100%);
+  box-shadow: 0 2px 10px rgba(58, 11, 71, 0.06);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+}
+
+.exchanges-app__currency-chip:hover {
+  border-color: rgba(126, 34, 206, 0.35);
+  box-shadow: 0 4px 16px rgba(58, 11, 71, 0.1);
+  transform: translateY(-1px);
+}
+
+.exchanges-app__currency-chip:focus-visible {
+  outline: 2px solid rgba(126, 34, 206, 0.55);
+  outline-offset: 2px;
+}
+
+.exchanges-app__currency-chip--selected {
+  border-color: rgba(126, 34, 206, 0.55);
+  background: linear-gradient(165deg, rgba(126, 34, 206, 0.12), rgba(255, 255, 255, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(126, 34, 206, 0.2),
+    0 6px 20px rgba(88, 28, 135, 0.12);
+}
+
+.exchanges-app__currency-chip-flag {
+  font-size: 1.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+}
+
+.exchanges-app__currency-chip-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.exchanges-app__currency-chip-code {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.03em;
+}
+
+.exchanges-app__currency-chip--selected .exchanges-app__currency-chip-code {
+  color: #4c1d95;
+}
+
+.exchanges-app__currency-chip-name {
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--color-muted);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
+}
+
+.exchanges-app__body {
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  .exchanges-app__body {
+    max-width: none;
+  }
+
+  .exchanges-app__search-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .exchanges-app__field {
+    flex: 2 1 180px;
+  }
+
+  .exchanges-app__submit {
+    width: auto;
+    flex: 0 0 auto;
+    min-width: 7rem;
+  }
+}
+
+.exchanges-app__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exchanges-app__card {
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(26, 31, 36, 0.08);
+  border: 1px solid rgba(26, 31, 36, 0.06);
+  background: #fff;
+}
+
+.exchanges-app__card .listing-card {
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
+.exchanges-app__card .listing-card__media {
+  border-radius: 0;
+}
+
+.listing-card--exchange {
+  border: 2px solid rgba(8, 145, 178, 0.6);
+  border-radius: 18px;
+  padding: 0.85rem;
+  background: linear-gradient(170deg, #f8feff, #ffffff);
+}
+
+.listing-card__exchange-head {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+.listing-card__exchange-logo-wrap {
+  text-decoration: none;
+}
+
+.listing-card__exchange-logo {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid rgba(8, 145, 178, 0.2);
+  background: #fff;
+}
+
+.listing-card__exchange-logo--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0891b2;
+  background: linear-gradient(170deg, #ecfeff, #e0f2fe);
+}
+
+.listing-card__exchange-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.listing-card__exchange-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.listing-card__exchange-title a {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  text-decoration: none;
+}
+
+.listing-card__exchange-loc {
+  margin: 0.3rem 0 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.listing-card__exchange-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.72rem 0 0.55rem;
+}
+
+.listing-card__exchange-chip {
+  border-radius: 10px;
+  padding: 0.3rem 0.65rem;
+  background: #e6f7fb;
+  color: #0e7490;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.listing-card__exchange-pair {
+  margin: 0 0 0.45rem;
+  color: #334155;
+  font-size: 1rem;
+}
+
+.listing-card__exchange-rates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.listing-card__exchange-rate {
+  border-radius: 14px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.listing-card__exchange-rate strong {
+  font-size: 0.9rem;
+}
+
+.listing-card__exchange-rate span {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.listing-card__exchange-rate--buy {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #047857;
+}
+
+.listing-card__exchange-rate--sell {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #b91c1c;
+}
+
+.listing-card__exchange-pay {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.listing-card__exchange-pay-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.listing-card__exchange-pay-icons .exchange-pay-badge {
+  min-height: 1.8rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.listing-card__exchange-pay-icons .exchange-pay-badge__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.exchanges-app__preloader {
+  border-radius: 16px;
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  background: linear-gradient(170deg, #f0f9ff, #ffffff);
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  gap: 0.45rem;
+  color: #0e7490;
+}
+
+.app-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  text-align: center;
+  background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.14), transparent 45%), #ffffff;
+  color: #0e7490;
+}
+
+.app-preloader p {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(1rem, 2.8vw, 1.2rem);
+}
+
+.app-preloader__logo {
+  position: relative;
+  width: min(240px, 70vw);
+  aspect-ratio: 200 / 52;
+}
+
+.app-preloader__logo-base,
+.app-preloader__logo-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.app-preloader__logo-base {
+  filter: grayscale(1);
+  opacity: 0.28;
+}
+
+.app-preloader__logo-fill {
+  clip-path: inset(0 100% 0 0);
+  animation: app-preloader-logo-fill 2s linear infinite;
+}
+
+.app-preloader__line {
+  width: min(240px, 72vw);
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(14, 116, 144, 0.15);
+}
+
+.app-preloader__line-fill {
+  display: block;
+  width: 45%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22d3ee, #0ea5e9);
+  animation: app-preloader-line 1.1s ease-in-out infinite;
+}
+
+@keyframes app-preloader-line {
+  0% {
+    transform: translateX(-110%);
+  }
+  50% {
+    transform: translateX(120%);
+  }
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+@keyframes app-preloader-logo-fill {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.exchanges-app__preloader p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.exchanges-app__preloader-dots {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.exchanges-app__preloader-dots span {
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 999px;
+  background: #06b6d4;
+  animation: exchanges-preload-dot 0.9s ease-in-out infinite;
+}
+
+.exchanges-app__preloader-dots span:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.exchanges-app__preloader-dots span:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+@keyframes exchanges-preload-dot {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.exchanges-app__toolbar {
+  margin-top: 0;
+}
+
+.exchanges-app__pagination {
+  margin-top: var(--space-md);
+  justify-content: center;
+}
+
+.exchanges-app__empty {
+  text-align: center;
+  padding: var(--space-lg);
+}
+
+/* ویرایشگر نرخ در داشبورد: فهرست جهانی + رمز ارز */
+.exchange-rates-editor {
+  margin-top: var(--space-sm);
+}
+
+.exchange-rates-editor__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.exchange-rates-editor__filter-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  margin-bottom: 0.35rem;
+  color: var(--color-muted);
+}
+
+.exchange-rates-editor__kind-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.exchange-rates-editor__kind-toggle .btn.is-active {
+  background: rgba(58, 11, 71, 0.12);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.exchange-rates-editor__search {
+  width: 100%;
+  max-width: 28rem;
+  border-radius: 12px !important;
+}
+
+.exchange-rates-editor__suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.exchange-rates-editor__suggestion {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  text-align: start;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.exchange-rates-editor__suggestion:hover:not(:disabled) {
+  background: rgba(58, 11, 71, 0.06);
+}
+
+.exchange-rates-editor__suggestion:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.exchange-rates-editor__sug-code {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.exchange-rates-editor__sug-name {
+  font-size: 0.88rem;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exchange-rates-editor__sug-kind {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.4rem;
+  border-radius: 6px;
+}
+
+.exchange-rates-editor__sug-kind--fiat {
+  background: rgba(0, 105, 92, 0.12);
+  color: #00695c;
+}
+
+.exchange-rates-editor__sug-kind--crypto {
+  background: rgba(88, 28, 135, 0.12);
+  color: #5b21b6;
+}
+
+.exchange-rates-editor__custom {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border-radius: 12px;
+  border: 1px dashed rgba(58, 11, 71, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.exchange-rates-editor__custom-hint {
+  margin-top: 0;
+}
+
+.exchange-rates-editor__custom-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-end;
+}
+
+.exchange-rates-editor__custom-row .field {
+  flex: 1 1 140px;
+}
+
+.exchange-rates-editor__custom-add {
+  flex: 0 0 auto;
+}
+
+.exchange-rates-editor__empty {
+  padding: var(--space-md);
+  border-radius: 12px;
+  background: rgba(58, 11, 71, 0.04);
+}
+
+.exchange-rates-editor__table-wrap {
+  overflow-x: auto;
+}
+
+.exchange-rates-editor__table {
+  min-width: 720px;
+}
+
+.exchange-rates-editor__th-narrow {
+  width: 2.5rem;
+}
+
+.exchange-rates-editor__remove {
+  padding: 0.15rem 0.45rem !important;
+  min-height: auto !important;
+  line-height: 1;
+  font-size: 1.25rem;
+}
+
+.exchange-rates-editor__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.exchange-rates-editor__check input {
+  width: auto;
+}
+
+.exchange-rates-editor__rate-input {
+  min-width: 5rem;
+  max-width: 8rem;
+}
+
+/* هیرو صرافی در صفحهٔ آگهی: کارت نرخ + ماشین‌حساب */
+.exchange-panel__hero--with-calc {
+  margin-bottom: var(--space-lg);
+}
+
+.exchange-hero-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .exchange-hero-stack {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+}
+
+.exchange-panel__table-block {
+  margin-top: var(--space-sm);
+}
+
+.exchange-calc--hero {
+  border-radius: 18px;
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  background:
+    linear-gradient(155deg, rgba(58, 11, 71, 0.06), rgba(255, 255, 255, 0.97));
+  padding: var(--space-md);
+  box-shadow: 0 8px 28px rgba(58, 11, 71, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.exchange-calc__hint {
+  margin: 0 0 var(--space-sm);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.exchange-calc__fields--compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+@media (max-width: 520px) {
+  .exchange-calc__fields--compact {
+    grid-template-columns: 1fr;
+  }
+}
+
+.exchange-calc__amount-input {
+  border-radius: 12px !important;
+  font-weight: 500;
+}
+
+.exchange-calc__result--hero {
+  margin-top: auto;
+  font-size: 1.05rem;
+  font-weight: 500;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px dashed rgba(58, 11, 71, 0.2);
 }
 
 .listings-toolbar {
@@ -2988,6 +4520,37 @@ body.app-shell-body .admin-topbar {
   color: var(--color-muted);
 }
 
+.app-shell__nav-heading {
+  margin: 1.1rem 0 0.35rem;
+  padding: 0 0.85rem;
+  list-style: none;
+  pointer-events: none;
+}
+
+.app-shell__nav-heading:first-child {
+  margin-top: 0;
+}
+
+.app-shell__nav-heading-text {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(26, 31, 36, 0.45);
+}
+
+.app-shell__sidebar--exchange {
+  border-inline-end: 1px solid rgba(0, 105, 92, 0.12);
+  background: linear-gradient(180deg, rgba(0, 105, 92, 0.04) 0%, transparent 42%);
+}
+
+body.app-shell-body--exchange-hub .app-shell__nav a[aria-current="page"] {
+  background: rgba(0, 105, 92, 0.14);
+  color: #004d40;
+  border-inline-start-color: #00897b;
+}
+
 .app-shell__nav {
   list-style: none;
   margin: 0;
@@ -3747,6 +5310,487 @@ a.app-shell__metric-link:hover {
   border: 1px solid var(--color-promoted-border);
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+/* Money exchange landing section (public business page) */
+.exchange-panel .profile-section-heading {
+  font-weight: 500;
+}
+
+.exchange-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  background:
+    radial-gradient(circle at 84% -20%, rgba(126, 34, 206, 0.12), transparent 48%),
+    radial-gradient(circle at -5% 102%, rgba(251, 191, 36, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(252, 248, 255, 0.96));
+}
+
+.exchange-panel__hero {
+  margin-bottom: var(--space-md);
+}
+
+.exchange-panel__lead {
+  margin-top: 0.35rem;
+}
+
+/* کارت نمونه: نرخ ویژه امروز / خرید و فروش به تومان / پرداخت با */
+.exchange-featured {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  border-radius: 18px;
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98), rgba(248, 245, 255, 0.92));
+  box-shadow: 0 8px 32px rgba(58, 11, 71, 0.08);
+}
+
+.exchange-featured__currency {
+  margin-bottom: 0.75rem;
+  max-width: 22rem;
+}
+
+.exchange-featured__select {
+  width: 100%;
+  font-weight: 500;
+}
+
+.exchange-featured__subtitle {
+  margin: 0 0 var(--space-md);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.55;
+}
+
+.exchange-featured__currency-name {
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.exchange-featured__rates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.exchange-featured__rate-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(58, 11, 71, 0.1);
+}
+
+.exchange-featured__rate-label {
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.exchange-featured__rate-label--buy,
+.exchange-featured__rate-value--buy,
+.exchange-rate-col--buy {
+  color: #1b8f3a;
+  font-weight: 500;
+}
+
+.exchange-featured__rate-label--sell,
+.exchange-featured__rate-value--sell,
+.exchange-rate-col--sell {
+  color: #c62828;
+  font-weight: 500;
+}
+
+.exchange-featured__rate-value {
+  font-weight: 500;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  color: #4a148c;
+}
+
+.exchange-featured__pay {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px dashed rgba(58, 11, 71, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exchange-featured__pay-title {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.exchange-featured__pay-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.exchange-pay-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #1a237e;
+  background: linear-gradient(180deg, #fff, #e8eaf6);
+  border: 1px solid rgba(26, 35, 126, 0.25);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.exchange-pay-badge__icon {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+.exchange-pay-badge--muted .exchange-pay-badge__icon {
+  color: #455a64;
+}
+
+.exchange-pay-badge__icon--dash {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.exchange-pay-badge--muted {
+  color: #37474f;
+  background: linear-gradient(180deg, #fafafa, #eceff1);
+  border-color: rgba(55, 71, 79, 0.2);
+}
+
+.exchange-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: var(--space-md);
+}
+
+.exchange-tile {
+  border-radius: 12px;
+  border: 1px solid rgba(58, 11, 71, 0.12);
+  background: linear-gradient(180deg, #fff, #faf6ff);
+  padding: 0.55rem 0.65rem;
+}
+
+.exchange-tile__head {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.exchange-tile__flag {
+  font-size: 1.05rem;
+}
+
+.exchange-tile__code {
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.exchange-tile__name {
+  margin: 0.18rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.exchange-tile__rates {
+  margin: 0.45rem 0 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.exchange-tile__rates > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.exchange-tile__rates dt {
+  color: var(--color-muted);
+}
+
+.exchange-tile__rates dd {
+  margin: 0;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.exchange-panel__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.exchange-table-wrap {
+  margin: 0;
+}
+
+.exchange-rates-table tbody td {
+  font-variant-numeric: tabular-nums;
+}
+
+.exchange-panel .exchange-rates-table__name {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.exchange-calc {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  background: linear-gradient(160deg, rgba(58, 11, 71, 0.05), rgba(255, 255, 255, 0.95));
+  padding: 0.9rem;
+}
+
+.exchange-calc__title {
+  margin: 0 0 var(--space-sm);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.exchange-calc .field label {
+  font-size: 0.82rem;
+}
+
+.exchange-calc__result {
+  margin: 0.75rem 0 0;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--color-primary);
+  background: #fff;
+  border: 1px dashed rgba(58, 11, 71, 0.2);
+}
+
+@media (max-width: 900px) {
+  .exchange-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* —— Admin: دپارتمان صرافی (جدا از دایرکتوری) —— */
+.admin-exchange-hub {
+  margin-bottom: var(--space-lg);
+}
+
+.admin-exchange-dept {
+  border-radius: 20px;
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border: 1px solid rgba(79, 70, 229, 0.22);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(99, 102, 241, 0.2), transparent 42%),
+    linear-gradient(145deg, rgba(79, 70, 229, 0.09), rgba(255, 255, 255, 0.97));
+  box-shadow: 0 8px 32px rgba(49, 46, 129, 0.1);
+}
+
+.admin-exchange-dept__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(67, 56, 202, 0.9);
+}
+
+.admin-exchange-dept__title {
+  margin: 0.4rem 0 0;
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: #312e81;
+}
+
+.admin-exchange-dept__lead {
+  margin: 0.55rem 0 0;
+  max-width: 40rem;
+  line-height: 1.65;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.admin-exchange-dept__actions {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-exchange-hub__toggle {
+  border: 1px solid rgba(26, 31, 36, 0.2);
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
+.admin-exchange-hub__toggle--on {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(5, 150, 105, 0.35);
+  color: #047857;
+}
+
+.admin-exchange-hub__toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-exchange-hub__masthead {
+  border-radius: 20px;
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  border: 1px solid rgba(0, 105, 92, 0.18);
+  background:
+    radial-gradient(circle at 92% -30%, rgba(0, 137, 123, 0.18), transparent 45%),
+    linear-gradient(135deg, rgba(0, 105, 92, 0.07), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 6px 28px rgba(0, 77, 64, 0.08);
+}
+
+.admin-exchange-hub__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 77, 64, 0.75);
+}
+
+.admin-exchange-hub__title {
+  margin: 0.35rem 0 0;
+  font-size: 1.45rem;
+  font-weight: 500;
+  color: #004d40;
+}
+
+.admin-exchange-hub__lead {
+  margin: 0.5rem 0 0;
+  max-width: 46rem;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
+.admin-exchange-hub__lead a {
+  font-weight: 500;
+  color: #00695c;
+}
+
+.admin-exchange-hub__actions {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-exchange-hub__panel {
+  margin-top: 0;
+}
+
+.admin-exchange-hub__panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid rgba(26, 31, 36, 0.08);
+}
+
+.admin-exchange-hub__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.admin-exchange-hub__stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(0, 105, 92, 0.08);
+  border: 1px solid rgba(0, 105, 92, 0.12);
+}
+
+.admin-exchange-hub__stat strong {
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: #004d40;
+  line-height: 1.2;
+}
+
+.admin-exchange-hub__stat small {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.admin-exchange-hub__search {
+  margin-bottom: var(--space-md);
+}
+
+.admin-exchange-hub__table-wrap {
+  margin-top: 0;
+}
+
+.admin-exchange-hub__rates-cell {
+  font-size: 0.82rem;
+  max-width: 14rem;
+  word-break: break-word;
+}
+
+.admin-exchange-hub__status-pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(26, 31, 36, 0.06);
+}
+
+.admin-exchange-hub__badge {
+  display: inline-block;
+  margin-inline-start: 0.35rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #004d40;
+  background: rgba(0, 105, 92, 0.12);
+  vertical-align: middle;
+}
+
+.admin-exchange-hub__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
 }
 
 @media (max-width: 900px) {
@@ -4709,6 +6753,10 @@ a.app-shell__metric-link:hover {
   .listing-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-sm);
+  }
+
+  .listings-page--exchanges .exchanges-app__list.listing-cards {
+    grid-template-columns: 1fr;
   }
 
   .listing-card__body {
@@ -7348,4 +9396,198 @@ body.biolink-public-body #root {
   font-weight: 600;
   color: rgba(124, 58, 237, 0.45);
   user-select: none;
+}
+
+/* راه‌اندازی صرافی — بلوک هدر، مرحله‌ها، نوار رمز، QR */
+.exchange-onboarding__hero {
+  border-radius: 1rem;
+  padding: 1.25rem 1rem 1.35rem;
+  margin-bottom: 1.25rem;
+  background: linear-gradient(160deg, rgba(91, 33, 182, 0.09) 0%, rgba(255, 255, 255, 0.95) 45%, rgba(248, 250, 252, 0.98) 100%);
+  border: 1px solid rgba(91, 33, 182, 0.14);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 8px 28px rgba(30, 27, 75, 0.08);
+}
+
+.exchange-onboarding__logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+}
+
+.exchange-onboarding__logo {
+  width: 108px;
+  height: auto;
+  display: block;
+}
+
+.exchange-onboarding__title {
+  margin: 0.35rem 0 0.2rem;
+  font-size: clamp(1.15rem, 4vw, 1.4rem);
+  font-weight: 800;
+  text-align: center;
+  color: #1e1b4b;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.exchange-onboarding__subtitle {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: rgba(30, 27, 75, 0.55);
+}
+
+.exchange-onboarding__stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 380px) {
+  .exchange-onboarding__stepper {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+}
+
+.exchange-onboarding__step-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.4rem;
+  border-radius: 0.75rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.exchange-onboarding__step-card--pending {
+  opacity: 0.9;
+}
+
+.exchange-onboarding__step-card--pending .exchange-onboarding__step-num {
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.45);
+}
+
+.exchange-onboarding__step-card--active {
+  border-color: rgba(91, 33, 182, 0.45);
+  background: rgba(91, 33, 182, 0.08);
+  box-shadow: 0 2px 14px rgba(91, 33, 182, 0.12);
+}
+
+.exchange-onboarding__step-card--active .exchange-onboarding__step-num {
+  background: #5b21b6;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(91, 33, 182, 0.2);
+}
+
+.exchange-onboarding__step-card--active .exchange-onboarding__step-label {
+  color: #1e1b4b;
+  font-weight: 700;
+}
+
+.exchange-onboarding__step-card--done {
+  border-color: rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.06);
+}
+
+.exchange-onboarding__step-card--done .exchange-onboarding__step-num {
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.exchange-onboarding__step-card--done .exchange-onboarding__step-label {
+  color: rgba(22, 101, 52, 0.95);
+  font-weight: 600;
+}
+
+.exchange-onboarding__step-num {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.exchange-onboarding__step-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(30, 27, 75, 0.72);
+  word-break: break-word;
+}
+
+@media (min-width: 381px) {
+  .exchange-onboarding__step-label {
+    font-size: 0.78rem;
+  }
+}
+
+.exchange-onboarding__strength {
+  margin-top: 0.35rem;
+}
+
+.exchange-onboarding__strength-bar {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.exchange-onboarding__strength-bar span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.exchange-onboarding__strength-bar span.is-on {
+  background: linear-gradient(90deg, #f59e0b, #16a34a);
+}
+
+.exchange-onboarding__checklist {
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.1rem;
+  font-size: 0.82rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.exchange-onboarding__checklist li.is-ok {
+  color: #15803d;
+}
+
+.exchange-onboarding__secret {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.375rem;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.exchange-onboarding__qr-wrap {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.exchange-onboarding__qr {
+  display: inline-block;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
 }

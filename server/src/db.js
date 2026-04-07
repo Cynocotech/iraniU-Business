@@ -6,16 +6,69 @@ import { applyPendingSqliteImportIfAny } from "./sqliteDbPending.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
-const dbPath = process.env.SQLITE_PATH || path.join(dataDir, "iraniu.db");
+
+/** Escape a path for use inside single-quoted SQLite string literals. */
+function escapeSqlitePath(p) {
+  return String(p).replace(/'/g, "''");
+}
+
+const legacyDbPath = process.env.SQLITE_PATH || path.join(dataDir, "iraniu.db");
+const directoryPath = process.env.SQLITE_DIRECTORY_PATH || path.join(dataDir, "iraniu-directory.db");
+const identityPath = process.env.SQLITE_IDENTITY_PATH || path.join(dataDir, "iraniu-identity.db");
+
+/** Public directory / listings DB (businesses, claims, etc.). */
+export const dbPath = directoryPath;
+/** Separate identity DB file (managers, super_admins, login throttle). Attached as schema `identity`. */
+export const identityDbPath = identityPath;
+
+/**
+ * One-time: if only the legacy single file exists, copy it to the directory path so we can split auth out.
+ */
+function migrateLegacyFileToDirectoryIfNeeded() {
+  if (!fs.existsSync(legacyDbPath)) return;
+  if (fs.existsSync(directoryPath)) return;
+  fs.copyFileSync(legacyDbPath, directoryPath);
+  console.log(`[db] Copied legacy ${legacyDbPath} → ${directoryPath}`);
+}
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-applyPendingSqliteImportIfAny(dbPath);
+migrateLegacyFileToDirectoryIfNeeded();
+applyPendingSqliteImportIfAny(directoryPath);
 
-const db = new Database(dbPath);
+const db = new Database(directoryPath);
 db.pragma("journal_mode = WAL");
+db.exec(`ATTACH DATABASE '${escapeSqlitePath(identityPath)}' AS identity`);
+
+/**
+ * Move auth tables from the main file into `identity` (one-time per legacy DB).
+ */
+function migrateAuthTablesFromMainToIdentity() {
+  const authTables = ["managers", "super_admins", "login_ip_throttle"];
+  for (const t of authTables) {
+    const mainRow = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(t);
+    if (!mainRow) continue;
+    const idRow = db
+      .prepare(`SELECT name FROM identity.sqlite_master WHERE type='table' AND name=?`)
+      .get(t);
+    if (!idRow) {
+      db.exec(`CREATE TABLE identity.${t} AS SELECT * FROM main.${t}`);
+    } else {
+      const mc = db.prepare(`SELECT COUNT(*) AS c FROM main.${t}`).get().c;
+      const ic = db.prepare(`SELECT COUNT(*) AS c FROM identity.${t}`).get().c;
+      if (mc > 0 && ic === 0) {
+        db.exec(`INSERT INTO identity.${t} SELECT * FROM main.${t}`);
+      } else if (mc > 0 && ic > 0) {
+        console.warn(`[db] migrate auth: both main and identity have ${t}; keeping identity, dropping main`);
+      }
+    }
+    db.exec(`DROP TABLE main.${t}`);
+  }
+}
+
+migrateAuthTablesFromMainToIdentity();
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS businesses (
@@ -91,6 +144,11 @@ function migrateBusinessesColumns() {
     ["listing_contact_email", "TEXT"],
     ["listing_rejection_reason", "TEXT"],
     ["google_place_id", "TEXT"],
+    ["exchange_rates_json", "TEXT"],
+    ["payment_methods_json", "TEXT"],
+    ["exchange_company_verified", "INTEGER NOT NULL DEFAULT 0"],
+    ["exchange_features_json", "TEXT"],
+    ["exchange_today_rate_enabled", "INTEGER NOT NULL DEFAULT 1"],
   ];
   for (const [col, typ] of add) {
     if (!names.has(col)) {
@@ -103,13 +161,6 @@ migrateBusinessesColumns();
 
 function ensureAdminTables() {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS managers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      phone TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
     CREATE TABLE IF NOT EXISTS claim_requests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       business_slug TEXT NOT NULL,
@@ -224,7 +275,16 @@ function seedBusinessCategories() {
 seedBusinessCategories();
 
 function migrateAuthTables() {
-  const mInfo = db.prepare("PRAGMA table_info(managers)").all();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS identity.managers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  const mInfo = db.prepare("PRAGMA identity.table_info(managers)").all();
   const mNames = new Set(mInfo.map((c) => c.name));
   const mAdd = [
     ["login_username", "TEXT"],
@@ -240,18 +300,18 @@ function migrateAuthTables() {
   ];
   for (const [col, typ] of mAdd) {
     if (!mNames.has(col)) {
-      db.exec(`ALTER TABLE managers ADD COLUMN ${col} ${typ}`);
+      db.exec(`ALTER TABLE identity.managers ADD COLUMN ${col} ${typ}`);
     }
   }
   try {
     db.exec(
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_login_username ON managers(login_username) WHERE login_username IS NOT NULL AND length(trim(login_username)) > 0`
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_login_username ON identity.managers(login_username) WHERE login_username IS NOT NULL AND length(trim(login_username)) > 0`
     );
   } catch (e) {
     console.warn("[db] idx_managers_login_username:", e?.message || e);
   }
   db.exec(`
-    CREATE TABLE IF NOT EXISTS super_admins (
+    CREATE TABLE IF NOT EXISTS identity.super_admins (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -261,19 +321,19 @@ function migrateAuthTables() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
-  const saInfo = db.prepare("PRAGMA table_info(super_admins)").all();
+  const saInfo = db.prepare("PRAGMA identity.table_info(super_admins)").all();
   const saNames = new Set(saInfo.map((c) => c.name));
   if (!saNames.has("token_version")) {
-    db.exec(`ALTER TABLE super_admins ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+    db.exec(`ALTER TABLE identity.super_admins ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
   }
   if (!saNames.has("avatar_url")) {
-    db.exec(`ALTER TABLE super_admins ADD COLUMN avatar_url TEXT`);
+    db.exec(`ALTER TABLE identity.super_admins ADD COLUMN avatar_url TEXT`);
   }
   if (!saNames.has("totp_setup_required")) {
-    db.exec(`ALTER TABLE super_admins ADD COLUMN totp_setup_required INTEGER NOT NULL DEFAULT 0`);
+    db.exec(`ALTER TABLE identity.super_admins ADD COLUMN totp_setup_required INTEGER NOT NULL DEFAULT 0`);
   }
   db.exec(`
-    CREATE TABLE IF NOT EXISTS login_ip_throttle (
+    CREATE TABLE IF NOT EXISTS identity.login_ip_throttle (
       ip TEXT PRIMARY KEY,
       fail_count INTEGER NOT NULL DEFAULT 0,
       window_start_ms INTEGER NOT NULL,
@@ -602,4 +662,4 @@ function migrateLbHashSlugsToIuIdSlugs() {
 
 migrateLbHashSlugsToIuIdSlugs();
 
-export { db, dbPath, ensureRestaurantSafraDemo };
+export { db, ensureRestaurantSafraDemo };

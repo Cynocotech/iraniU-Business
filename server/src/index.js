@@ -6,7 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { db, dbPath, ensureRestaurantSafraDemo } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
-import { parseAuthHeader, stripManagerRow, hashPassword } from "./authUtil.js";
+import { parseAuthHeader, stripManagerRow, hashPassword, validatePasswordComplexity } from "./authUtil.js";
 import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
@@ -51,6 +51,11 @@ const PATCHABLE_BUSINESS = new Set([
   "call_tracking_number",
   "call_forward_number",
   "listing_contact_email",
+  "exchange_rates_json",
+  "payment_methods_json",
+  "exchange_company_verified",
+  "exchange_features_json",
+  "exchange_today_rate_enabled",
 ]);
 
 /** گزارش‌های آگهی — کلیدها باید با کلاینت هم‌خوان باشند */
@@ -910,7 +915,10 @@ app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, (req, res) =
 function attachLinkedBusinesses(managerRow) {
   const linked_businesses = db
     .prepare(
-      `SELECT id, slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
+      `SELECT id, slug, name_fa, category, status, claimed, package, city
+       FROM businesses
+       WHERE manager_id = ?
+       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
     )
     .all(managerRow.id);
   return {
@@ -922,14 +930,14 @@ function attachLinkedBusinesses(managerRow) {
 }
 
 app.get("/api/managers", requireSuperAdmin, (_req, res) => {
-  const rows = db.prepare(`SELECT * FROM managers ORDER BY created_at DESC`).all();
+  const rows = db.prepare(`SELECT * FROM identity.managers ORDER BY created_at DESC`).all();
   res.json(rows.map((m) => attachLinkedBusinesses(m)));
 });
 
 app.get("/api/managers/:id", requireSuperAdmin, (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const m = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(id);
+  const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(id);
   if (!m) return res.status(404).json({ error: "not_found" });
   res.json(attachLinkedBusinesses(m));
 });
@@ -948,8 +956,9 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
   if (!login_username_raw) {
     return res.status(400).json({ error: "missing_username", hint: "نام کاربری الزامی است" });
   }
-  if (password.length < 8) {
-    return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر برای رمز مدیر" });
+  const pwCheck = validatePasswordComplexity(password);
+  if (!pwCheck.ok) {
+    return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
   }
   const login_username = login_username_raw;
   if (!MANAGER_LOGIN_USERNAME_RE.test(login_username)) {
@@ -958,17 +967,17 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
       hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
     });
   }
-  if (db.prepare(`SELECT id FROM managers WHERE login_username = ?`).get(login_username)) {
+  if (db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)) {
     return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
   }
   try {
     const ph = hashPassword(password);
     const info = db
       .prepare(
-        `INSERT INTO managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO identity.managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
       )
       .run(email, name, phone, ph, login_username);
-    const row = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(info.lastInsertRowid);
+    const row = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(info.lastInsertRowid);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "manager_created",
@@ -1005,7 +1014,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
   } else {
     const id = parseInt(String(mid), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_manager_id" });
-    const m = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(id);
+    const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
     if (!m) return res.status(400).json({ error: "invalid_manager_id" });
     db.prepare(`UPDATE businesses SET manager_id = ? WHERE slug = ?`).run(id, slug);
     writeSystemLog({
@@ -1213,11 +1222,11 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
     SELECT sl.*,
       COALESCE(sa.name, mg.name) AS actor_name
     FROM system_logs sl
-    LEFT JOIN super_admins sa
+    LEFT JOIN identity.super_admins sa
       ON sl.actor_type = 'superadmin'
       AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
       AND sa.id = CAST(sl.actor_id AS INTEGER)
-    LEFT JOIN managers mg
+    LEFT JOIN identity.managers mg
       ON sl.actor_type = 'manager'
       AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
       AND mg.id = CAST(sl.actor_id AS INTEGER)
@@ -1273,6 +1282,16 @@ function updateBusinessBySlug(req, res) {
       updates[key] = v;
       continue;
     }
+    if (key === "exchange_company_verified") {
+      const v = val === true || val === 1 || val === "1" ? 1 : 0;
+      updates[key] = v;
+      continue;
+    }
+    if (key === "exchange_today_rate_enabled") {
+      const v = val === true || val === 1 || val === "1" ? 1 : 0;
+      updates[key] = v;
+      continue;
+    }
     if (key === "package") {
       updates[key] = String(val);
       continue;
@@ -1283,7 +1302,7 @@ function updateBusinessBySlug(req, res) {
       } else {
         const mid = parseInt(String(val), 10);
         if (!Number.isFinite(mid)) continue;
-        const m = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(mid);
+        const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(mid);
         if (!m) return res.status(400).json({ error: "invalid_manager_id" });
         updates[key] = mid;
       }
@@ -1307,7 +1326,14 @@ function updateBusinessBySlug(req, res) {
       updates[key] = e;
       continue;
     }
-    if (key === "hours_json" || key === "gallery_json" || key === "biolink_json") {
+    if (
+      key === "hours_json" ||
+      key === "gallery_json" ||
+      key === "biolink_json" ||
+      key === "exchange_rates_json" ||
+      key === "payment_methods_json" ||
+      key === "exchange_features_json"
+    ) {
       if (typeof val !== "string") {
         try {
           val = JSON.stringify(val);
@@ -1328,6 +1354,7 @@ function updateBusinessBySlug(req, res) {
     delete updates.manager_id;
     delete updates.claimed;
     delete updates.package;
+    delete updates.exchange_company_verified;
     if (!isTwilioModuleEnabled()) {
       delete updates.call_tracking_enabled;
       delete updates.call_tracking_number;
@@ -1465,7 +1492,7 @@ app.post("/api/twilio/voice/incoming", (req, res) => {
       `SELECT b.slug, b.call_forward_number, b.phone, b.call_tracking_enabled, b.call_tracking_number,
               m.twilio_phone_number
        FROM businesses b
-       LEFT JOIN managers m ON m.id = b.manager_id
+       LEFT JOIN identity.managers m ON m.id = b.manager_id
        WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
        LIMIT 1`
     )
@@ -1493,7 +1520,7 @@ app.post("/api/twilio/voice/status", (req, res) => {
         .prepare(
           `SELECT b.slug
            FROM businesses b
-           LEFT JOIN managers m ON m.id = b.manager_id
+           LEFT JOIN identity.managers m ON m.id = b.manager_id
            WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
            LIMIT 1`
         )
@@ -1553,7 +1580,7 @@ app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
   const m = db
     .prepare(
       `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
-       FROM managers WHERE id = ?`
+       FROM identity.managers WHERE id = ?`
     )
     .get(req.auth.sub);
   if (!m) return res.status(404).json({ error: "not_found" });
@@ -1584,7 +1611,7 @@ app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
   const keys = Object.keys(updates);
   if (!keys.length) return res.status(400).json({ error: "no_fields" });
   const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-  db.prepare(`UPDATE managers SET ${setClause} WHERE id = @id`).run({ ...updates, id: req.auth.sub });
+  db.prepare(`UPDATE identity.managers SET ${setClause} WHERE id = @id`).run({ ...updates, id: req.auth.sub });
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "manager_twilio_settings_updated",
@@ -1596,7 +1623,7 @@ app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
   const m = db
     .prepare(
       `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
-       FROM managers WHERE id = ?`
+       FROM identity.managers WHERE id = ?`
     )
     .get(req.auth.sub);
   res.json({

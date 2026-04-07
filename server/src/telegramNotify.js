@@ -246,7 +246,7 @@ export async function processTelegramWebhook(body) {
     return { handled: true };
   }
 
-  const info = db.prepare(`UPDATE super_admins SET token_version = token_version + 1 WHERE id = ?`).run(adminId);
+  const info = db.prepare(`UPDATE identity.super_admins SET token_version = token_version + 1 WHERE id = ?`).run(adminId);
   if (info.changes === 0) {
     await telegramApi("answerCallbackQuery", {
       callback_query_id: cq.id,

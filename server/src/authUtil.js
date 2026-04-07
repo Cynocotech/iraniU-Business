@@ -5,6 +5,34 @@ import { db } from "./db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "iraniu-dev-jwt-secret-change-me";
 
+/** قوانین رمز قوی برای مدیران — حداقل ۱۲ کاراکتر + حروف بزرگ/کوچک + رقم + نماد */
+export function validatePasswordComplexity(plain) {
+  const p = String(plain || "");
+  if (p.length < 12) {
+    return { ok: false, code: "password_too_short", hint: "رمز باید حداقل ۱۲ کاراکتر باشد." };
+  }
+  if (p.length > 200) {
+    return { ok: false, code: "password_too_long", hint: "رمز خیلی طولانی است." };
+  }
+  if (!/[a-z]/.test(p)) {
+    return { ok: false, code: "password_no_lower", hint: "حداقل یک حرف کوچک انگلیسی (a-z) لازم است." };
+  }
+  if (!/[A-Z]/.test(p)) {
+    return { ok: false, code: "password_no_upper", hint: "حداقل یک حرف بزرگ انگلیسی (A-Z) لازم است." };
+  }
+  if (!/[0-9]/.test(p)) {
+    return { ok: false, code: "password_no_digit", hint: "حداقل یک رقم لازم است." };
+  }
+  if (!/[^a-zA-Z0-9_]/.test(p)) {
+    return {
+      ok: false,
+      code: "password_no_special",
+      hint: "حداقل یک نماد یا علامت (غیر از حرف، رقم و _) لازم است؛ مثلاً ! @ # $ %",
+    };
+  }
+  return { ok: true };
+}
+
 export function hashPassword(plain) {
   return bcrypt.hashSync(String(plain), 12);
 }

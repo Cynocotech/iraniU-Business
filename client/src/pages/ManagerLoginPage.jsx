@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import AuthLoginLayout from "../components/AuthLoginLayout.jsx";
 import Seo from "../components/Seo.jsx";
+import { pickPreferredManagerSlug } from "../lib/managerDashboardSlug.js";
 
 function totpErrMessage(code, fallback) {
   if (code === "invalid_totp") return "کد شش‌رقمی نادرست است. دوباره تلاش کنید.";
@@ -41,8 +42,9 @@ export default function ManagerLoginPage() {
         });
         if (r.ok) {
           const m = await r.json();
-          const first = m.user?.linked_businesses?.[0]?.slug;
-          if (first) localStorage.setItem("iraniu_dashboard_business_slug", first);
+          const linked = m.user?.linked_businesses;
+          const slug = pickPreferredManagerSlug(linked) || linked?.[0]?.slug;
+          if (slug) localStorage.setItem("iraniu_dashboard_business_slug", slug);
         }
       }
     } catch (_) {}
@@ -84,6 +86,10 @@ export default function ManagerLoginPage() {
   const footer = (
     <p className="auth-login__links">
       <Link to="/manager-signup">ثبت‌نام مدیر</Link>
+      <span className="auth-login__links-sep" aria-hidden="true">
+        ·
+      </span>
+      <Link to="/onboarding/exchange">راه‌اندازی صرافی</Link>
       <span className="auth-login__links-sep" aria-hidden="true">
         ·
       </span>

@@ -76,7 +76,7 @@ export function applyPendingSqliteImportIfAny(dbPath) {
       /* ignore */
     }
     fs.renameSync(pending, dbPath);
-    console.log("[db] Applied pending SQLite upload → iraniu.db");
+    console.log("[db] Applied pending SQLite upload → directory database");
     return { applied: true };
   } catch (e) {
     console.error("[db] Failed to apply pending SQLite import:", e);

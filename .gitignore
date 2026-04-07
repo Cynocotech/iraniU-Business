@@ -15,4 +15,7 @@ server/data/iraniu.db.uploaded
 London_Bussines_List.sql
 /*.sql
 
+# Local backups / archives (too large for GitHub)
+bk.zip
+
 server/.env

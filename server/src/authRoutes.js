@@ -6,6 +6,7 @@ import multer from "multer";
 import {
   hashPassword,
   verifyPassword,
+  validatePasswordComplexity,
   signManagerToken,
   signSuperAdminToken,
   parseAuthHeader,
@@ -48,6 +49,24 @@ if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 /** نام کاربری ورود به پنل مدیر — فقط حروف کوچک انگلیسی، اعداد و زیرخط */
 const MANAGER_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
 
+function makeExchangeOnboardingSlug(loginUsername) {
+  const baseRaw = String(loginUsername || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const base = baseRaw || "exchange";
+  let slug = `${base}-exchange`;
+  let i = 2;
+  while (db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(slug)) {
+    slug = `${base}-exchange-${i}`;
+    i += 1;
+  }
+  return slug;
+}
+
 const avatarUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, avatarDir),
@@ -71,7 +90,10 @@ const avatarUpload = multer({
 function attachLinkedBusinesses(managerRow) {
   const linked_businesses = db
     .prepare(
-      `SELECT id, slug, name_fa, status, claimed, package, city FROM businesses WHERE manager_id = ? ORDER BY name_fa`
+      `SELECT id, slug, name_fa, category, status, claimed, package, city
+       FROM businesses
+       WHERE manager_id = ?
+       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
     )
     .all(managerRow.id);
   return {
@@ -91,7 +113,7 @@ function attachLinkedBusinesses(managerRow) {
 
 export function ensureSuperAdminFromEnv() {
   try {
-    const n = db.prepare(`SELECT COUNT(*) AS c FROM super_admins`).get().c;
+    const n = db.prepare(`SELECT COUNT(*) AS c FROM identity.super_admins`).get().c;
     if (n > 0) return;
     const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
     const password = process.env.SUPER_ADMIN_PASSWORD;
@@ -102,7 +124,7 @@ export function ensureSuperAdminFromEnv() {
       return;
     }
     const hash = hashPassword(password);
-    db.prepare(`INSERT INTO super_admins (email, password_hash, name) VALUES (?, ?, ?)`).run(
+    db.prepare(`INSERT INTO identity.super_admins (email, password_hash, name) VALUES (?, ?, ?)`).run(
       email,
       hash,
       "Super Admin"
@@ -125,6 +147,10 @@ export function registerAuthRoutes(app) {
     const login_username = String(b.login_username || b.username || "")
       .trim()
       .toLowerCase();
+    const exchange_onboarding =
+      b.exchange_onboarding === true ||
+      b.exchange_onboarding === 1 ||
+      String(b.exchange_onboarding || "").toLowerCase() === "true";
     const password = String(b.password || "").trim();
     if (!email || !name || !login_username || !password || !phone) {
       return res.status(400).json({
@@ -141,20 +167,49 @@ export function registerAuthRoutes(app) {
         hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
       });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر برای رمز" });
+    const pwCheck = validatePasswordComplexity(password);
+    if (!pwCheck.ok) {
+      return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
     }
-    if (db.prepare(`SELECT id FROM managers WHERE email = ?`).get(email)) {
+    if (db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)) {
       return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً ثبت شده" });
     }
-    if (db.prepare(`SELECT id FROM managers WHERE login_username = ?`).get(login_username)) {
+    if (db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)) {
       return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
     }
     const ph = hashPassword(password);
     try {
       const info = db
-        .prepare(`INSERT INTO managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
+        .prepare(`INSERT INTO identity.managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
         .run(email, name, phone, ph, login_username);
+      if (exchange_onboarding) {
+        const slug = makeExchangeOnboardingSlug(login_username);
+        const managerId = Number(info.lastInsertRowid);
+        db.prepare(
+          `INSERT INTO businesses
+            (slug, name_fa, category, phone, city, status, manager_id, package, listing_approval, listing_title, cta, price_range)
+           VALUES (?, ?, ?, ?, ?, 'active', ?, 'basic', 'pending', ?, ?, ?)`
+        ).run(
+          slug,
+          name,
+          "صرافی",
+          phone || null,
+          "",
+          managerId,
+          `${name} | صرافی`,
+          "تماس با ما",
+          "—"
+        );
+        writeSystemLog({
+          level: "info",
+          actorType: "system",
+          action: "exchange_onboarding_business_created",
+          targetType: "business",
+          targetId: slug,
+          message: `Exchange onboarding listing created for manager #${managerId}`,
+          meta: { manager_id: managerId, category: "صرافی" },
+        });
+      }
       writeSystemLog({
         level: "info",
         actorType: "system",
@@ -185,7 +240,7 @@ export function registerAuthRoutes(app) {
     if (!assertLoginNotBlocked(req, res)) return;
 
     const m = db
-      .prepare(`SELECT * FROM managers WHERE email = ? OR login_username = ?`)
+      .prepare(`SELECT * FROM identity.managers WHERE email = ? OR login_username = ?`)
       .get(identifier, identifier);
     if (!m || !m.password_hash) {
       recordLoginFailure(req);
@@ -226,7 +281,7 @@ export function registerAuthRoutes(app) {
     }
     if (!assertLoginNotBlocked(req, res)) return;
 
-    const a = db.prepare(`SELECT * FROM super_admins WHERE email = ?`).get(email);
+    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE email = ?`).get(email);
     if (!a) {
       recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
@@ -265,7 +320,7 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p) return res.status(401).json({ error: "unauthorized" });
     if (p.typ === "mgr") {
-      const m = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(p.sub);
+      const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
       if (!m) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "manager",
@@ -274,7 +329,7 @@ export function registerAuthRoutes(app) {
       });
     }
     if (p.typ === "adm") {
-      const a = db.prepare(`SELECT * FROM super_admins WHERE id = ?`).get(p.sub);
+      const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
       if (!a) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "superadmin",
@@ -308,9 +363,9 @@ export function registerAuthRoutes(app) {
       if (!req.file) return res.status(400).json({ error: "missing_file" });
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
       if (p.typ === "mgr") {
-        db.prepare(`UPDATE managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
+        db.prepare(`UPDATE identity.managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
       } else {
-        db.prepare(`UPDATE super_admins SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
+        db.prepare(`UPDATE identity.super_admins SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
       }
       writeSystemLog({
         ...actorFromAuth(p),
@@ -328,7 +383,7 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
     const sec = totpGenerateSecret();
-    db.prepare(`UPDATE managers SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
+    db.prepare(`UPDATE identity.managers SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
     res.json({
       secret: sec.base32,
       otpauth_url: sec.otpauth_url,
@@ -339,12 +394,12 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
     const token = String((req.body && req.body.token) || "").trim();
-    const m = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(p.sub);
+    const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
     if (!m?.totp_secret) return res.status(400).json({ error: "setup_first" });
     if (!totpVerify(m.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE managers SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE identity.managers SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_enabled",
@@ -359,11 +414,11 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
     const password = String((req.body && req.body.password) || "");
-    const m = db.prepare(`SELECT * FROM managers WHERE id = ?`).get(p.sub);
+    const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
     if (!m || !verifyPassword(password, m.password_hash)) {
       return res.status(401).json({ error: "invalid_password" });
     }
-    db.prepare(`UPDATE managers SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE identity.managers SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_disabled",
@@ -377,10 +432,10 @@ export function registerAuthRoutes(app) {
   app.post("/api/auth/admin/2fa/setup", (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
-    const row = db.prepare(`SELECT email FROM super_admins WHERE id = ?`).get(p.sub);
+    const row = db.prepare(`SELECT email FROM identity.super_admins WHERE id = ?`).get(p.sub);
     const label = row?.email ? `Iraniu Admin (${row.email})` : "Iraniu Admin";
     const sec = totpGenerateSecret(label);
-    db.prepare(`UPDATE super_admins SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
+    db.prepare(`UPDATE identity.super_admins SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
     res.json({
       secret: sec.base32,
       otpauth_url: sec.otpauth_url,
@@ -391,12 +446,12 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
     const token = String((req.body && req.body.token) || "").trim();
-    const a = db.prepare(`SELECT * FROM super_admins WHERE id = ?`).get(p.sub);
+    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
     if (!a?.totp_secret) return res.status(400).json({ error: "setup_first" });
     if (!totpVerify(a.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE super_admins SET totp_enabled = 1, totp_setup_required = 0 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE identity.super_admins SET totp_enabled = 1, totp_setup_required = 0 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "admin_2fa_enabled",
@@ -411,11 +466,11 @@ export function registerAuthRoutes(app) {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
     const password = String((req.body && req.body.password) || "");
-    const a = db.prepare(`SELECT * FROM super_admins WHERE id = ?`).get(p.sub);
+    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
     if (!a || !verifyPassword(password, a.password_hash)) {
       return res.status(401).json({ error: "invalid_password" });
     }
-    db.prepare(`UPDATE super_admins SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE identity.super_admins SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "admin_2fa_disabled",
@@ -592,10 +647,10 @@ export function registerAuthRoutes(app) {
     if (password.length < 8) {
       return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
     }
-    const m = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(id);
+    const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
     if (!m) return res.status(404).json({ error: "not_found" });
     const hash = hashPassword(password);
-    db.prepare(`UPDATE managers SET password_hash = ? WHERE id = ?`).run(hash, id);
+    db.prepare(`UPDATE identity.managers SET password_hash = ? WHERE id = ?`).run(hash, id);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "manager_password_reset",
@@ -611,7 +666,7 @@ export function registerAuthRoutes(app) {
     const rows = db
       .prepare(
         `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url
-         FROM super_admins ORDER BY id ASC`
+         FROM identity.super_admins ORDER BY id ASC`
       )
       .all();
     res.json(rows);
@@ -635,19 +690,19 @@ export function registerAuthRoutes(app) {
     if (password.length < 8) {
       return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
     }
-    if (db.prepare(`SELECT id FROM super_admins WHERE email = ?`).get(email)) {
+    if (db.prepare(`SELECT id FROM identity.super_admins WHERE email = ?`).get(email)) {
       return res.status(409).json({ error: "email_taken" });
     }
     const hash = hashPassword(password);
     const ins = db
       .prepare(
-        `INSERT INTO super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
+        `INSERT INTO identity.super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
          VALUES (?, ?, ?, ?, 0)`
       )
       .run(email, hash, name, totpSetupRequired);
     const row = db
       .prepare(
-        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url FROM super_admins WHERE id = ?`
+        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url FROM identity.super_admins WHERE id = ?`
       )
       .get(ins.lastInsertRowid);
     writeSystemLog({
@@ -667,11 +722,11 @@ export function registerAuthRoutes(app) {
     if (id === Number(req.auth.sub)) {
       return res.status(400).json({ error: "cannot_delete_self", hint: "نمی‌توانید حساب خود را حذف کنید" });
     }
-    const total = db.prepare(`SELECT COUNT(*) AS c FROM super_admins`).get().c;
+    const total = db.prepare(`SELECT COUNT(*) AS c FROM identity.super_admins`).get().c;
     if (total <= 1) {
       return res.status(400).json({ error: "last_admin", hint: "حداقل یک سوپرادمین باید بماند" });
     }
-    const info = db.prepare(`DELETE FROM super_admins WHERE id = ?`).run(id);
+    const info = db.prepare(`DELETE FROM identity.super_admins WHERE id = ?`).run(id);
     if (info.changes === 0) return res.status(404).json({ error: "not_found" });
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -689,7 +744,7 @@ export function registerAuthRoutes(app) {
     const m = db
       .prepare(
         `SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number
-         FROM managers WHERE id = ?`
+         FROM identity.managers WHERE id = ?`
       )
       .get(id);
     if (!m) return res.status(404).json({ error: "not_found" });
@@ -714,7 +769,7 @@ export function registerAuthRoutes(app) {
     }
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-    const exists = db.prepare(`SELECT id FROM managers WHERE id = ?`).get(id);
+    const exists = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
     if (!exists) return res.status(404).json({ error: "not_found" });
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const updates = {};
@@ -724,7 +779,7 @@ export function registerAuthRoutes(app) {
     const keys = Object.keys(updates);
     if (!keys.length) return res.status(400).json({ error: "no_fields" });
     const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-    db.prepare(`UPDATE managers SET ${setClause} WHERE id = @id`).run({ ...updates, id });
+    db.prepare(`UPDATE identity.managers SET ${setClause} WHERE id = @id`).run({ ...updates, id });
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_manager_twilio_updated",
@@ -734,7 +789,7 @@ export function registerAuthRoutes(app) {
       meta: { fields: keys.filter((k) => k !== "twilio_auth_token") },
     });
     const m = db
-      .prepare(`SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number FROM managers WHERE id = ?`)
+      .prepare(`SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number FROM identity.managers WHERE id = ?`)
       .get(id);
     res.json({
       id: m.id,

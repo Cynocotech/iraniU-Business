@@ -5,6 +5,20 @@ import { useAuth } from "../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "./DashboardPanelHead.jsx";
 import { DEFAULT_HOURS_ROWS, parseHoursJson, parseGalleryJson } from "../lib/businessProfile.js";
 import { ensureHttpsUrl } from "../lib/siteUrl.js";
+import {
+  EXCHANGE_DEFAULT_PAYMENT_METHOD_IDS,
+  EXCHANGE_DEFAULT_FEATURE_IDS,
+  EXCHANGE_FEATURES,
+  EXCHANGE_PAYMENT_METHODS,
+  EXCHANGE_DEFAULT_RATES,
+  isExchangeCategory,
+  parseExchangeFeaturesJson,
+  parseExchangePaymentMethodsJson,
+  parseExchangeRatesJson,
+  sanitizeExchangeRatesRows,
+} from "../lib/exchangeRates.js";
+import ExchangeRatesEditor from "./ExchangeRatesEditor.jsx";
+import ExchangePaymentMethodIcon from "./ExchangePaymentMethodIcon.jsx";
 
 const STORAGE_SLUG = "iraniu_dashboard_business_slug";
 
@@ -45,6 +59,11 @@ export default function DashboardBusinessForm({
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [hoursRows, setHoursRows] = useState(() => [...DEFAULT_HOURS_ROWS]);
   const [galleryUrls, setGalleryUrls] = useState(["", "", "", ""]);
+  const [exchangeRatesRows, setExchangeRatesRows] = useState(() => [...EXCHANGE_DEFAULT_RATES]);
+  const [paymentMethods, setPaymentMethods] = useState(() => [...EXCHANGE_DEFAULT_PAYMENT_METHOD_IDS]);
+  const [exchangeFeatures, setExchangeFeatures] = useState(() => [...EXCHANGE_DEFAULT_FEATURE_IDS]);
+  const [exchangeTodayRateEnabled, setExchangeTodayRateEnabled] = useState(true);
+  const [exchangeCompanyVerified, setExchangeCompanyVerified] = useState(false);
   const [categories, setCategories] = useState([]);
   const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
 
@@ -86,6 +105,11 @@ export default function DashboardBusinessForm({
       setCoverImageUrl(b.cover_image_url || "");
       setHoursRows(parseHoursJson(b.hours_json));
       setGalleryUrls(parseGalleryJson(b.gallery_json));
+      setExchangeRatesRows(parseExchangeRatesJson(b.exchange_rates_json));
+      setPaymentMethods(parseExchangePaymentMethodsJson(b.payment_methods_json));
+      setExchangeFeatures(parseExchangeFeaturesJson(b.exchange_features_json));
+      setExchangeTodayRateEnabled(Number(b.exchange_today_rate_enabled) !== 0);
+      setExchangeCompanyVerified(Number(b.exchange_company_verified) === 1);
       onLoaded?.(b);
     },
     [onLoaded]
@@ -139,6 +163,9 @@ export default function DashboardBusinessForm({
         hoursRows.map((r) => ({ day: r.day, hours: r.hours }))
       );
       const gallery_json = JSON.stringify(galleryUrls.map((u) => u.trim()));
+      const exchange_rates_json = JSON.stringify(sanitizeExchangeRatesRows(exchangeRatesRows));
+      const payment_methods_json = JSON.stringify(paymentMethods);
+      const exchange_features_json = JSON.stringify(exchangeFeatures);
       const ratingPayload =
         ratingStr.trim() === "" ? null : parseFloat(ratingStr.replace(",", "."));
       const updated = await apiPatch(`/api/businesses/${encodeURIComponent(slugInput.trim())}`, {
@@ -165,6 +192,11 @@ export default function DashboardBusinessForm({
         cover_image_url: coverImageUrl,
         hours_json,
         gallery_json,
+        exchange_rates_json,
+        payment_methods_json,
+        exchange_features_json,
+        exchange_today_rate_enabled: exchangeTodayRateEnabled ? 1 : 0,
+        ...(isSuperAdmin ? { exchange_company_verified: exchangeCompanyVerified ? 1 : 0 } : {}),
       });
       applyBusiness(updated);
       setSaveMsg("ذخیره شد.");
@@ -193,6 +225,21 @@ export default function DashboardBusinessForm({
   };
 
   const previewHref = `/business?slug=${encodeURIComponent(slugInput.trim())}`;
+  const showExchangeFields = isExchangeCategory(category);
+  const togglePaymentMethod = (methodId, enabled) => {
+    setPaymentMethods((prev) => {
+      const exists = prev.includes(methodId);
+      if (enabled) return exists ? prev : [...prev, methodId];
+      return prev.filter((id) => id !== methodId);
+    });
+  };
+  const toggleExchangeFeature = (featureId, enabled) => {
+    setExchangeFeatures((prev) => {
+      const exists = prev.includes(featureId);
+      if (enabled) return exists ? prev : [...prev, featureId];
+      return prev.filter((id) => id !== featureId);
+    });
+  };
 
   return (
     <section className="dashboard-panel" id="edit-ad" aria-labelledby="edit-heading">
@@ -491,6 +538,81 @@ export default function DashboardBusinessForm({
             </div>
           ))}
         </div>
+
+        {showExchangeFields && (
+          <>
+            <h3 style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>
+              نرخ ارز و رمز ارز (ویژهٔ صرافی)
+            </h3>
+            <p className="field-hint">
+              ارزها را از جستجو اضافه کنید؛ برای هر ارز می‌توانید خرید یا فروش را غیرفعال کنید. فیات و رمز ارز در سیستم
+              پشتیبانی می‌شود. نرخ‌ها در صفحهٔ عمومی و ماشین‌حساب نمایش داده می‌شوند.
+            </p>
+            <ExchangeRatesEditor rows={exchangeRatesRows} setRows={setExchangeRatesRows} />
+            <div className="field field--block" style={{ marginTop: "0.85rem" }}>
+              <label>روش‌های پرداخت قابل نمایش در صفحهٔ عمومی</label>
+              <div style={{ display: "grid", gap: "0.45rem", marginTop: "0.45rem" }}>
+                {EXCHANGE_PAYMENT_METHODS.map((m) => (
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <input
+                      type="checkbox"
+                      checked={paymentMethods.includes(m.id)}
+                      onChange={(e) => togglePaymentMethod(m.id, e.target.checked)}
+                    />
+                    <ExchangePaymentMethodIcon methodId={m.id} className="exchange-pay-badge__icon--dash" />
+                    <span>{m.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="field-hint">
+                هر گزینه‌ای که فعال باشد، در بخش «پرداخت با» در صفحهٔ عمومی نمایش داده می‌شود.
+              </p>
+            </div>
+            <div className="field field--block" style={{ marginTop: "0.85rem" }}>
+              <label>ویژگی‌های صرافی برای نمایش روی کارت لیست</label>
+              <div style={{ display: "grid", gap: "0.45rem", marginTop: "0.45rem" }}>
+                {EXCHANGE_FEATURES.map((f) => (
+                  <label key={f.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <input
+                      type="checkbox"
+                      checked={exchangeFeatures.includes(f.id)}
+                      onChange={(e) => toggleExchangeFeature(f.id, e.target.checked)}
+                    />
+                    <span>{f.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="field-hint">هر گزینه‌ای که فعال باشد، به‌صورت چیپ روی کارت صرافی در صفحهٔ exchanges دیده می‌شود.</p>
+            </div>
+            <div className="field field--block" style={{ marginTop: "0.85rem" }}>
+              <label htmlFor="dash-exchange-today-rate-enabled">نمایش «نرخ ویژه امروز» در صفحه جزئیات صرافی</label>
+              <select
+                id="dash-exchange-today-rate-enabled"
+                value={exchangeTodayRateEnabled ? "1" : "0"}
+                onChange={(e) => setExchangeTodayRateEnabled(e.target.value === "1")}
+              >
+                <option value="1">فعال</option>
+                <option value="0">غیرفعال</option>
+              </select>
+            </div>
+            {isSuperAdmin ? (
+              <div className="field field--block dashboard-exchange-verified" style={{ marginTop: "0.85rem" }}>
+                <label htmlFor="dash-exchange-company-verified">وضعیت صرافی (فقط سوپرادمین)</label>
+                <select
+                  id="dash-exchange-company-verified"
+                  value={exchangeCompanyVerified ? "1" : "0"}
+                  onChange={(e) => setExchangeCompanyVerified(e.target.value === "1")}
+                >
+                  <option value="0">خصوصی / غیر شرکتی — هشدار نارنجی در صفحهٔ عمومی</option>
+                  <option value="1">کسب‌وکار ثبت‌شده — تیک آبی در سایت</option>
+                </select>
+                <p className="field-hint">
+                  مدیر عادی آگهی نمی‌تواند این گزینه را تغییر دهد؛ فقط از این پنل با حساب سوپرادمین ذخیره می‌شود.
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
 
         <div className="dashboard-actions" style={{ marginTop: "1rem" }}>
           <button type="submit" className="btn btn--primary" disabled={saving}>

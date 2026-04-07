@@ -1,12 +1,12 @@
 /**
  * GET جستجوی لیست — بدون React Router Form (نیاز به data router ندارد).
  */
-export function getListingsLocationFromForm(form) {
+export function getListingsLocationFromForm(form, pathname = "/listings") {
   const fd = new FormData(form);
   const sp = new URLSearchParams();
   for (const [key, value] of fd.entries()) {
     sp.append(key, String(value));
   }
   const qs = sp.toString();
-  return { pathname: "/listings", search: qs ? `?${qs}` : "" };
+  return { pathname, search: qs ? `?${qs}` : "" };
 }

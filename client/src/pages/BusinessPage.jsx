@@ -1,4 +1,4 @@
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { Link, useSearchParams, useLocation, useOutletContext } from "react-router-dom";
 import BusinessReportModal from "../components/BusinessReportModal.jsx";
 import Seo from "../components/Seo.jsx";
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +13,20 @@ import {
   pickHeroImageUrlFromBusiness,
 } from "../lib/businessProfile.js";
 import { useMediaQuery } from "../lib/useMediaQuery.js";
+import {
+  EXCHANGE_PAYMENT_METHODS,
+  exchangeCurrencyNameFaShort,
+  formatExchangeRateToman,
+  getEffectiveRateRaw,
+  isExchangeBusiness,
+  isExchangeCompanyVerified,
+  isExchangeCategory,
+  parseExchangePaymentMethodsJson,
+  parseExchangeRatesJson,
+} from "../lib/exchangeRates.js";
+import ExchangeInlineCalc from "../components/ExchangeInlineCalc.jsx";
+import ExchangeCompanyVerifiedBadge from "../components/ExchangeCompanyVerifiedBadge.jsx";
+import ExchangePaymentMethodIcon from "../components/ExchangePaymentMethodIcon.jsx";
 
 const FALLBACK_LONDON_COVER =
   "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1600&q=80&auto=format&fit=crop";
@@ -20,6 +34,33 @@ const FALLBACK_LONDON_COVER =
 function trackBusinessPhoneClick(slug) {
   if (!slug) return;
   apiPost("/api/phone-click", { slug }).catch(() => {});
+}
+
+function resolveBusinessTimeZone(row) {
+  const raw = `${row?.city || ""} ${row?.address || ""}`.toLowerCase();
+  const map = [
+    { keys: ["london", "manchester", "birmingham", "uk", "england"], tz: "Europe/London", label: "وقت محلی (انگلستان)" },
+    { keys: ["tehran", "iran", "تهران", "ایران"], tz: "Asia/Tehran", label: "وقت محلی" },
+    { keys: ["dubai", "uae", "emirates"], tz: "Asia/Dubai", label: "وقت محلی (امارات)" },
+    { keys: ["istanbul", "turkey"], tz: "Europe/Istanbul", label: "وقت محلی (ترکیه)" },
+    { keys: ["toronto", "canada"], tz: "America/Toronto", label: "وقت محلی (کانادا)" },
+  ];
+  const hit = map.find((m) => m.keys.some((k) => raw.includes(k)));
+  return hit || { tz: "Europe/London", label: "وقت محلی" };
+}
+
+function formatClockForZone(nowMs, timeZone) {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date(nowMs));
+  } catch {
+    return "—";
+  }
 }
 
 /** یکدست‌سازی توضیحات: حذف خط خالی پشت‌سرهم، تبدیل \\n ذخیره‌شده به خط جدید */
@@ -100,6 +141,7 @@ function ProfileSprites() {
 }
 
 export default function BusinessPage() {
+  const { setHeaderLogoHref } = useOutletContext() ?? {};
   const [params, setSearchParams] = useSearchParams();
   const location = useLocation();
   const slug = params.get("slug") || "clinic-pars";
@@ -110,10 +152,24 @@ export default function BusinessPage() {
   );
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [exchangeContactSheetOpen, setExchangeContactSheetOpen] = useState(false);
+  const [exchangeCalcSheetOpen, setExchangeCalcSheetOpen] = useState(false);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
+  const [exchangeMode, setExchangeMode] = useState("buy");
+  const [exchangeAmount, setExchangeAmount] = useState("1");
+  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState("USD");
 
   useEffect(() => {
     setAboutExpanded(false);
-  }, [slug]);
+    setExchangeContactSheetOpen(false);
+    setExchangeCalcSheetOpen(false);
+    setHeaderLogoHref?.("/");
+  }, [slug, setHeaderLogoHref]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setClockNowMs(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     setB(null);
@@ -147,7 +203,12 @@ export default function BusinessPage() {
   useEffect(() => {
     document.body.classList.add("business-page");
     return () => {
-      document.body.classList.remove("business-page", "business-page--unclaimed", "business-page--claimed");
+      document.body.classList.remove(
+        "business-page",
+        "business-page--unclaimed",
+        "business-page--claimed",
+        "business-page--exchange-detail"
+      );
     };
   }, []);
 
@@ -156,10 +217,20 @@ export default function BusinessPage() {
     const claimed = !!b.claimed;
     document.body.classList.toggle("business-page--claimed", claimed);
     document.body.classList.toggle("business-page--unclaimed", !claimed);
+    document.body.classList.toggle("business-page--exchange-detail", isExchangeBusiness(b));
     return () => {
-      document.body.classList.remove("business-page--claimed", "business-page--unclaimed");
+      document.body.classList.remove("business-page--claimed", "business-page--unclaimed", "business-page--exchange-detail");
     };
   }, [b]);
+
+  useEffect(() => {
+    if (!setHeaderLogoHref) return;
+    if (loadState !== "ok" || !b) {
+      return;
+    }
+    setHeaderLogoHref(isExchangeBusiness(b) ? "/exchanges" : "/");
+    return () => setHeaderLogoHref("/");
+  }, [loadState, b, setHeaderLogoHref]);
 
   const businessSeoDescription = useMemo(() => {
     if (!b) return SEO_DEFAULT_DESCRIPTION;
@@ -175,6 +246,7 @@ export default function BusinessPage() {
   const trackedEnabled = twilioModuleOn && !!b?.call_tracking_enabled;
   const trackedNumber = String(b?.call_tracking_number || "").trim();
   const phoneForCall = trackedEnabled && trackedNumber ? trackedNumber : String(b?.phone || "").trim();
+  const showExchangeContactFab = isExchangeBusiness(b) && !!phoneForCall;
 
   const coverView = useMemo(() => {
     if (!b) return { url: FALLBACK_LONDON_COVER, fallback: true };
@@ -222,6 +294,20 @@ export default function BusinessPage() {
 
   const hoursRows = parseHoursJson(b?.hours_json);
   const gallerySlots = parseGalleryJson(b?.gallery_json);
+  const exchangeRatesRows = parseExchangeRatesJson(b?.exchange_rates_json);
+  const exchangePaymentMethods = parseExchangePaymentMethodsJson(b?.payment_methods_json);
+  const showExchangeSection = isExchangeCategory(b?.category) || exchangeRatesRows.some((r) => r.buy || r.sell);
+  const exchangeTodayRateEnabled = Number(b?.exchange_today_rate_enabled) !== 0;
+  const selectedRate =
+    exchangeRatesRows.find((r) => r.code === selectedCurrencyCode) || exchangeRatesRows[0] || null;
+  const showExchangeCalcFab = isExchangeBusiness(b) && !!selectedRate;
+  const selectedRateRaw = getEffectiveRateRaw(selectedRate, exchangeMode);
+  const selectedRateNum = Number.parseFloat(String(selectedRateRaw || "").replace(",", "."));
+  const exchangeAmountNum = Number.parseFloat(String(exchangeAmount || "").replace(",", "."));
+  const exchangeResult =
+    Number.isFinite(selectedRateNum) && Number.isFinite(exchangeAmountNum)
+      ? selectedRateNum * exchangeAmountNum
+      : null;
   const showPromo = !!(b?.promo_title?.trim() || b?.promo_description?.trim());
   const careersBody = b?.careers_text && String(b.careers_text).trim();
   const careersSubtitle = b?.careers_title && String(b.careers_title).trim();
@@ -230,10 +316,33 @@ export default function BusinessPage() {
   const aboutLead = useMemo(() => summarizeAboutText(b?.description), [b?.description]);
   const descriptionNormalized = useMemo(() => normalizeAboutDescription(b?.description), [b?.description]);
   const desktopLayout = useMediaQuery("(min-width: 1024px)");
+  const exchangeBusinessTime = useMemo(() => resolveBusinessTimeZone(b), [b?.city, b?.address]);
+  const exchangeLocalTimeText = useMemo(
+    () => formatClockForZone(clockNowMs, exchangeBusinessTime.tz),
+    [clockNowMs, exchangeBusinessTime.tz]
+  );
+  const iranTimeText = useMemo(() => formatClockForZone(clockNowMs, "Asia/Tehran"), [clockNowMs]);
   const categoryOnly =
     b?.category && String(b.category).trim() ? String(b.category).trim() : "";
   /** Desktop bar: category, else subtitle / location line (same as mobile second line). */
   const desktopBarSubtitle = categoryOnly || secondLine || "";
+
+  useEffect(() => {
+    if (!exchangeRatesRows.length) return;
+    if (exchangeRatesRows.some((r) => r.code === selectedCurrencyCode)) return;
+    setSelectedCurrencyCode(exchangeRatesRows[0].code);
+  }, [exchangeRatesRows, selectedCurrencyCode]);
+
+  useEffect(() => {
+    if (!selectedRate) return;
+    const buyOk = selectedRate.buy_active !== false;
+    const sellOk = selectedRate.sell_active !== false;
+    setExchangeMode((m) => {
+      if (m === "buy" && !buyOk && sellOk) return "sell";
+      if (m === "sell" && !sellOk && buyOk) return "buy";
+      return m;
+    });
+  }, [selectedRate?.code, selectedRate?.buy_active, selectedRate?.sell_active]);
 
   if (loadState === "loading") {
     return (
@@ -305,7 +414,7 @@ export default function BusinessPage() {
           </button>
         </div>
       )}
-      {!b.claimed && (
+      {!b.claimed && !isExchangeBusiness(b) && (
         <div className="claim-banner" role="region" aria-label="ادعای مالکیت">
           <p className="claim-banner__text">
             <strong>این کسب‌وکار هنوز به حساب هیچ مدیری وصل نشده است.</strong>
@@ -329,6 +438,37 @@ export default function BusinessPage() {
       )}
 
       <div className="profile-panel">
+        {isExchangeBusiness(b) && !isExchangeCompanyVerified(b) ? (
+          <div className="exchange-private-alert exchange-private-alert--hero" role="alert">
+            <strong>توجه:</strong> این صرافی در ایرانیو به‌عنوان کسب‌وکار ثبت‌شده (شرکت) تأیید نشده است؛ ممکن است فعالیت
+            شخصی یا غیررسمی باشد. پیش از هر معامله، هویت و اعتبار طرف مقابل را بررسی کنید و در صورت تردید مستقیماً تماس
+            بگیرید.
+          </div>
+        ) : null}
+        {isExchangeBusiness(b) ? (
+          <div className="exchange-world-clock" role="status" aria-live="polite">
+            <div className="exchange-world-clock__item">
+              <span className="exchange-world-clock__label">
+                <i className="fa-solid fa-location-dot exchange-world-clock__ico" aria-hidden="true" />
+                {exchangeBusinessTime.label}
+              </span>
+              <strong className="exchange-world-clock__time" dir="ltr">
+                <i className="fa-regular fa-clock exchange-world-clock__time-ico" aria-hidden="true" />
+                {exchangeLocalTimeText}
+              </strong>
+            </div>
+            <div className="exchange-world-clock__item exchange-world-clock__item--iran">
+              <span className="exchange-world-clock__label">
+                <i className="fa-solid fa-earth-asia exchange-world-clock__ico" aria-hidden="true" />
+                وقت ایران
+              </span>
+              <strong className="exchange-world-clock__time" dir="ltr">
+                <i className="fa-regular fa-clock exchange-world-clock__time-ico" aria-hidden="true" />
+                {iranTimeText}
+              </strong>
+            </div>
+          </div>
+        ) : null}
         <div className="profile-hero" id="biz-profile-cover">
           <div
             className={`profile-cover ${coverView.fallback ? "profile-cover--fallback" : ""}`}
@@ -345,7 +485,10 @@ export default function BusinessPage() {
                 {logoMark}
               </div>
               <div className="profile-title-block">
-                <h1 id="biz-name">{b.name_fa}</h1>
+                <h1 id="biz-name" className="profile-name-with-verified">
+                  <span className="profile-name-with-verified__text">{b.name_fa}</span>
+                  {isExchangeBusiness(b) && isExchangeCompanyVerified(b) ? <ExchangeCompanyVerifiedBadge /> : null}
+                </h1>
                 {leadTitle && (
                   <p className="profile-listing-lead" id="biz-listing-title">
                     {leadTitle}
@@ -385,8 +528,9 @@ export default function BusinessPage() {
                 {logoMark}
               </div>
               <div className="profile-hero-desktop-bar__text">
-                <h1 id="biz-name" className="profile-hero-desktop-bar__title">
-                  {b.name_fa}
+                <h1 id="biz-name" className="profile-hero-desktop-bar__title profile-name-with-verified">
+                  <span className="profile-name-with-verified__text">{b.name_fa}</span>
+                  {isExchangeBusiness(b) && isExchangeCompanyVerified(b) ? <ExchangeCompanyVerifiedBadge /> : null}
                 </h1>
                 {desktopBarSubtitle && (
                   <p className="profile-hero-desktop-bar__category" id="biz-subtitle">
@@ -438,6 +582,138 @@ export default function BusinessPage() {
                   {b.promo_description.trim()}
                 </p>
               )}
+            </section>
+          )}
+
+          {showExchangeSection && (
+            <section className="profile-panel profile-body exchange-panel" id="biz-exchange-section" aria-label="نرخ ارز صرافی">
+              {exchangeTodayRateEnabled ? (
+                <div className="exchange-panel__hero exchange-panel__hero--with-calc">
+                  <h2 id="exchange-title" className="profile-section-heading">
+                    نرخ ویژه امروز
+                  </h2>
+                  <p className="field-hint exchange-panel__lead">
+                    نرخ‌ها توسط صرافی ثبت می‌شوند. برای معاملهٔ قطعی، قبل از مراجعه با صرافی تماس بگیرید.
+                  </p>
+
+                  {selectedRate ? (
+                    <div className="exchange-hero-stack">
+                      <div className="exchange-featured">
+                        <div className="exchange-featured__currency field field--block">
+                          <label htmlFor="exchange-currency">ارز</label>
+                          <select
+                            id="exchange-currency"
+                            className="exchange-featured__select"
+                            value={selectedRate.code}
+                            onChange={(e) => setSelectedCurrencyCode(e.target.value)}
+                            dir="ltr"
+                          >
+                            {exchangeRatesRows.map((row) => (
+                              <option key={row.code} value={row.code}>
+                                {row.flag || "🏳️"} {row.code}
+                                {row.name ? ` — ${row.name}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <p className="exchange-featured__subtitle">
+                          نرخ لحظه‌ای{" "}
+                          <span dir="ltr" className="exchange-featured__currency-name">
+                            {exchangeCurrencyNameFaShort(selectedRate.code, selectedRate.name)}
+                          </span>{" "}
+                          به تومان
+                        </p>
+                        <ul className="exchange-featured__rates" aria-label="نرخ خرید و فروش">
+                          {selectedRate.buy_active !== false ? (
+                            <li className="exchange-featured__rate-line exchange-featured__rate-line--buy">
+                              <span className="exchange-featured__rate-label exchange-featured__rate-label--buy">خرید</span>
+                              <span className="exchange-featured__rate-value exchange-featured__rate-value--buy" dir="ltr">
+                                {formatExchangeRateToman(selectedRate.buy)}
+                              </span>
+                            </li>
+                          ) : null}
+                          {selectedRate.sell_active !== false ? (
+                            <li className="exchange-featured__rate-line exchange-featured__rate-line--sell">
+                              <span className="exchange-featured__rate-label exchange-featured__rate-label--sell">فروش</span>
+                              <span className="exchange-featured__rate-value exchange-featured__rate-value--sell" dir="ltr">
+                                {formatExchangeRateToman(selectedRate.sell)}
+                              </span>
+                            </li>
+                          ) : null}
+                        </ul>
+                      </div>
+
+                      <ExchangeInlineCalc
+                        idPrefix="biz-ex"
+                        exchangeMode={exchangeMode}
+                        onExchangeModeChange={setExchangeMode}
+                        exchangeAmount={exchangeAmount}
+                        onExchangeAmountChange={setExchangeAmount}
+                        exchangeResult={exchangeResult}
+                        exchangeAmountNum={exchangeAmountNum}
+                        selectedRateNum={selectedRateNum}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="exchange-panel__table-block">
+                <div className="table-wrap exchange-table-wrap">
+                  <table className="data-table exchange-rates-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">پرچم</th>
+                        <th scope="col">ارز</th>
+                        <th scope="col" className="exchange-rate-col--buy">
+                          خرید
+                        </th>
+                        <th scope="col" className="exchange-rate-col--sell">
+                          فروش
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exchangeRatesRows.map((row) => (
+                        <tr key={row.code}>
+                          <td style={{ fontSize: "1.15rem" }} dir="ltr">
+                            {row.flag || "🏳️"}
+                          </td>
+                          <td dir="ltr">
+                            {row.code}
+                            {row.name ? <span className="exchange-rates-table__name"> — {row.name}</span> : null}
+                          </td>
+                          <td dir="ltr" className="exchange-rate-col--buy">
+                            {row.buy_active === false ? "—" : formatExchangeRateToman(row.buy)}
+                          </td>
+                          <td dir="ltr" className="exchange-rate-col--sell">
+                            {row.sell_active === false ? "—" : formatExchangeRateToman(row.sell)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="exchange-featured__pay" style={{ marginTop: "0.75rem" }}>
+                <span className="exchange-featured__pay-title">پرداخت با</span>
+                <div className="exchange-featured__pay-badges" aria-label="روش‌های پرداخت">
+                  {exchangePaymentMethods.length ? (
+                    exchangePaymentMethods.map((methodId) => {
+                      const method = EXCHANGE_PAYMENT_METHODS.find((m) => m.id === methodId);
+                      if (!method) return null;
+                      return (
+                        <span key={method.id} className={`exchange-pay-badge ${method.badgeClassName || ""}`.trim()}>
+                          <ExchangePaymentMethodIcon methodId={method.id} />
+                          {method.label}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="exchange-pay-badge exchange-pay-badge--muted">ثبت نشده</span>
+                  )}
+                </div>
+              </div>
             </section>
           )}
 
@@ -532,34 +808,36 @@ export default function BusinessPage() {
             </div>
           </section>
 
-          <section className="profile-panel profile-body" id="biz-gallery-section" aria-labelledby="gallery-title">
-            <h2 id="gallery-title" className="profile-section-heading">
-              <span className="profile-section-heading__icon" aria-hidden="true">
-                <svg className="profile-section-heading__svg" aria-hidden="true">
-                  <use href="#section-gallery" />
-                </svg>
-              </span>
-              گالری
-            </h2>
-            <div className="gallery" id="biz-gallery" role="list">
-              {gallerySlots.map((url, i) => (
-                <div
-                  key={i}
-                  className="gallery__item"
-                  role="listitem"
-                  style={
-                    url
-                      ? {
-                          backgroundImage: `url(${resolveBusinessImageUrl(String(url).trim())})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          </section>
+          {!isExchangeBusiness(b) ? (
+            <section className="profile-panel profile-body" id="biz-gallery-section" aria-labelledby="gallery-title">
+              <h2 id="gallery-title" className="profile-section-heading">
+                <span className="profile-section-heading__icon" aria-hidden="true">
+                  <svg className="profile-section-heading__svg" aria-hidden="true">
+                    <use href="#section-gallery" />
+                  </svg>
+                </span>
+                گالری
+              </h2>
+              <div className="gallery" id="biz-gallery" role="list">
+                {gallerySlots.map((url, i) => (
+                  <div
+                    key={i}
+                    className="gallery__item"
+                    role="listitem"
+                    style={
+                      url
+                        ? {
+                            backgroundImage: `url(${resolveBusinessImageUrl(String(url).trim())})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {reservationLink && (
             <section className="profile-panel profile-body" aria-labelledby="booking-title">
@@ -576,49 +854,53 @@ export default function BusinessPage() {
           )}
         </div>
 
-        <aside aria-label="تماس و تبلیغات">
+        <aside aria-label={isExchangeBusiness(b) ? "اقدامات" : "تماس و تبلیغات"}>
           <section className="profile-panel profile-body">
-            <h2 className="contact-panel__title">
-              <span className="contact-list__icon-wrap" aria-hidden="true">
-                <svg className="contact-list__svg" aria-hidden="true">
-                  <use href="#contact-phone" />
-                </svg>
-              </span>
-              تماس
-            </h2>
-            <ul className="contact-list" id="biz-contact">
-              {phoneForCall ? (
-                <li className="contact-list__item">
+            {!isExchangeBusiness(b) ? (
+              <>
+                <h2 className="contact-panel__title">
                   <span className="contact-list__icon-wrap" aria-hidden="true">
                     <svg className="contact-list__svg" aria-hidden="true">
                       <use href="#contact-phone" />
                     </svg>
                   </span>
-                  <div className="contact-list__main">
-                    <a
-                      href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
-                      className="phone-ltr"
-                      dir="ltr"
-                      onClick={() => trackBusinessPhoneClick(b.slug)}
-                    >
-                      {phoneForCall}
-                    </a>
-                  </div>
-                </li>
-              ) : (
-                <li className="contact-list__item">
-                  <span className="contact-list__icon-wrap" aria-hidden="true">
-                    <svg className="contact-list__svg" aria-hidden="true">
-                      <use href="#contact-phone" />
-                    </svg>
-                  </span>
-                  <div className="contact-list__main">
-                    <span className="field-hint">شماره ثبت نشده</span>
-                  </div>
-                </li>
-              )}
-            </ul>
-            <p style={{ marginTop: "0.75rem" }}>
+                  تماس
+                </h2>
+                <ul className="contact-list" id="biz-contact">
+                  {phoneForCall ? (
+                    <li className="contact-list__item">
+                      <span className="contact-list__icon-wrap" aria-hidden="true">
+                        <svg className="contact-list__svg" aria-hidden="true">
+                          <use href="#contact-phone" />
+                        </svg>
+                      </span>
+                      <div className="contact-list__main">
+                        <a
+                          href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
+                          className="phone-ltr"
+                          dir="ltr"
+                          onClick={() => trackBusinessPhoneClick(b.slug)}
+                        >
+                          {phoneForCall}
+                        </a>
+                      </div>
+                    </li>
+                  ) : (
+                    <li className="contact-list__item">
+                      <span className="contact-list__icon-wrap" aria-hidden="true">
+                        <svg className="contact-list__svg" aria-hidden="true">
+                          <use href="#contact-phone" />
+                        </svg>
+                      </span>
+                      <div className="contact-list__main">
+                        <span className="field-hint">شماره ثبت نشده</span>
+                      </div>
+                    </li>
+                  )}
+                </ul>
+              </>
+            ) : null}
+            <p style={{ marginTop: isExchangeBusiness(b) ? 0 : "0.75rem" }}>
               <button
                 type="button"
                 className="btn btn--ghost btn--block"
@@ -628,15 +910,132 @@ export default function BusinessPage() {
               </button>
             </p>
           </section>
-          <div className="ad-slot ad-slot--sidebar" role="complementary" aria-label="جای تبلیغ">
-            تبلیغ کنار پروفایل — ۳۰۰×۲۵۰ یا ستون ثابت
-          </div>
+          {!isExchangeBusiness(b) ? (
+            <div className="ad-slot ad-slot--sidebar" role="complementary" aria-label="جای تبلیغ">
+              تبلیغ کنار پروفایل — ۳۰۰×۲۵۰ یا ستون ثابت
+            </div>
+          ) : null}
         </aside>
       </div>
 
-      <p style={{ marginTop: "1.5rem" }}>
-        <Link to="/listings">بازگشت به لیست</Link>
-      </p>
+      {!isExchangeBusiness(b) ? (
+        <p style={{ marginTop: "1.5rem" }}>
+          <Link to="/listings">بازگشت به لیست</Link>
+        </p>
+      ) : null}
+
+      {showExchangeContactFab || showExchangeCalcFab ? (
+        <>
+          <div className={`exchange-fab-row${showExchangeContactFab && showExchangeCalcFab ? "" : " exchange-fab-row--single"}`}>
+            {showExchangeCalcFab ? (
+              <button
+                type="button"
+                className="exchange-contact-fab exchange-contact-fab--calc"
+                onClick={() => setExchangeCalcSheetOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={exchangeCalcSheetOpen}
+              >
+                ماشین حساب لحظه ای
+              </button>
+            ) : null}
+            {showExchangeContactFab ? (
+              <button
+                type="button"
+                className="exchange-contact-fab"
+                onClick={() => setExchangeContactSheetOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={exchangeContactSheetOpen}
+              >
+                تماس با صرافی
+              </button>
+            ) : null}
+          </div>
+          {exchangeContactSheetOpen ? (
+            <div
+              className="exchange-contact-sheet__overlay"
+              role="presentation"
+              onClick={() => setExchangeContactSheetOpen(false)}
+            >
+              <section
+                className="exchange-contact-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="اطلاعات تماس صرافی"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="exchange-contact-sheet__handle" aria-hidden="true" />
+                <div className="exchange-contact-sheet__head">
+                  <h3>اطلاعات تماس</h3>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => setExchangeContactSheetOpen(false)}
+                  >
+                    بستن
+                  </button>
+                </div>
+                <a
+                  href={`tel:${String(phoneForCall).replace(/\s/g, "")}`}
+                  className="exchange-contact-sheet__call"
+                  dir="ltr"
+                  onClick={() => trackBusinessPhoneClick(b.slug)}
+                >
+                  {phoneForCall}
+                </a>
+              </section>
+            </div>
+          ) : null}
+          {exchangeCalcSheetOpen ? (
+            <div
+              className="exchange-contact-sheet__overlay"
+              role="presentation"
+              onClick={() => setExchangeCalcSheetOpen(false)}
+            >
+              <section
+                className="exchange-contact-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="ماشین حساب لحظه ای"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="exchange-contact-sheet__handle" aria-hidden="true" />
+                <div className="exchange-contact-sheet__head">
+                  <h3>ماشین حساب لحظه ای</h3>
+                  <button type="button" className="btn btn--ghost" onClick={() => setExchangeCalcSheetOpen(false)}>
+                    بستن
+                  </button>
+                </div>
+                <div className="field field--block exchange-contact-sheet__currency">
+                  <label htmlFor="exchange-currency-sheet">ارز برای محاسبه</label>
+                  <select
+                    id="exchange-currency-sheet"
+                    value={selectedCurrencyCode}
+                    onChange={(e) => setSelectedCurrencyCode(e.target.value)}
+                    dir="ltr"
+                  >
+                    {exchangeRatesRows.map((row) => (
+                      <option key={row.code} value={row.code}>
+                        {row.flag || "🏳️"} {row.code}
+                        {row.name ? ` — ${row.name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <ExchangeInlineCalc
+                  idPrefix="biz-ex-sheet"
+                  exchangeMode={exchangeMode}
+                  onExchangeModeChange={setExchangeMode}
+                  exchangeAmount={exchangeAmount}
+                  onExchangeAmountChange={setExchangeAmount}
+                  exchangeResult={exchangeResult}
+                  exchangeAmountNum={exchangeAmountNum}
+                  selectedRateNum={selectedRateNum}
+                />
+              </section>
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       <BusinessReportModal
         open={reportOpen}

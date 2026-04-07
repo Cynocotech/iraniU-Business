@@ -1,23 +1,15 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-/** مسیرهایی که روی دسکتاپ هم بدون «فقط موبایل» نمایش داده می‌شوند (صفحات عمومی، پنل، ادمین، لینک‌تک). */
+/** مسیرهایی که روی دسکتاپ مجازند (پنل، ادمین، ورود، لینک‌تک). بقیهٔ سایت فقط موبایل/تبلت. */
 function allowDesktopPathname(pathname) {
   const normalized = pathname !== "/" ? pathname.replace(/\/+$/, "") : "/";
   if (normalized.startsWith("/dashboard")) return true;
   if (normalized.startsWith("/admin")) return true;
   if (normalized.startsWith("/l/")) return true;
   if (normalized.startsWith("/login")) return true;
-  const publicExact = new Set([
-    "/",
-    "/listings",
-    "/claim",
-    "/onboarding",
-    "/manager-signup",
-    "/business",
-    "/business-claimed",
-  ]);
-  return publicExact.has(normalized);
+  if (normalized.startsWith("/onboarding/exchange")) return true;
+  return false;
 }
 
 export default function DesktopGate() {
@@ -46,7 +38,10 @@ export default function DesktopGate() {
         gate.setAttribute("lang", "fa");
         gate.innerHTML =
           '<div class="iraniu-desktop-gate__inner" role="alert" aria-live="assertive">' +
-          '<p class="iraniu-desktop-gate__title">فقط موبایل و تبلت</p>' +
+          '<p class="iraniu-desktop-gate__title" dir="ltr" lang="en">Open this on mobile</p>' +
+          '<p class="iraniu-desktop-gate__text iraniu-desktop-gate__text--en" dir="ltr" lang="en">' +
+          "This site is for phones and tablets only. Please open this address on your mobile device." +
+          "</p>" +
           '<p class="iraniu-desktop-gate__text">این نسخه فقط برای موبایل و تبلت است. لطفاً با گوشی یا تبلت همان آدرس را باز کنید.</p>' +
           "</div>";
         document.body.insertBefore(gate, document.body.firstChild);

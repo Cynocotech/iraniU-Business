@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiGet } from "../api.js";
+import { useAuth } from "./AuthContext.jsx";
+import { pickPreferredManagerSlug } from "../lib/managerDashboardSlug.js";
 
 export const STORAGE_SLUG = "iraniu_dashboard_business_slug";
 
@@ -16,6 +18,7 @@ function readImpersonation() {
 const DashboardContext = createContext(null);
 
 export function DashboardProvider({ children }) {
+  const { me, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [heroQr, setHeroQr] = useState("—");
@@ -57,6 +60,35 @@ export function DashboardProvider({ children }) {
     };
   }, [dashSlug]);
 
+  /** هم‌تراز با آگهی‌های واقعی مدیر؛ از نامک قدیمی localStorage جلوگیری می‌کند */
+  useEffect(() => {
+    if (authLoading) return;
+    if (impersonation) return;
+    if (me?.role !== "manager") return;
+    const linked = me?.user?.linked_businesses;
+    if (!Array.isArray(linked) || linked.length === 0) return;
+    const preferred = pickPreferredManagerSlug(linked);
+    if (!preferred) return;
+
+    let forceExchange = false;
+    try {
+      if (sessionStorage.getItem("iraniu_exchange_onboarding") === "1") {
+        sessionStorage.removeItem("iraniu_exchange_onboarding");
+        forceExchange = true;
+      }
+    } catch (_) {}
+
+    const inList = linked.some((b) => b.slug === dashSlug);
+    if (forceExchange || !inList) {
+      if (dashSlug !== preferred) {
+        try {
+          localStorage.setItem(STORAGE_SLUG, preferred);
+        } catch (_) {}
+        setDashSlug(preferred);
+      }
+    }
+  }, [authLoading, me, impersonation, dashSlug]);
+
   const asManagerParam = searchParams.get("asManager");
 
   useEffect(() => {
@@ -92,7 +124,7 @@ export function DashboardProvider({ children }) {
           noBusiness,
         });
         if (list.length > 0) {
-          const slug = list[0].slug;
+          const slug = pickPreferredManagerSlug(list) || list[0].slug;
           try {
             localStorage.setItem(STORAGE_SLUG, slug);
           } catch (_) {}

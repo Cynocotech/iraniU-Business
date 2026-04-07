@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 import { apiGet, apiPost, apiPatchUrl } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
+function isExchangeLinkedBusiness(b) {
+  const s = `${String(b?.name_fa || "")} ${String(b?.slug || "")}`.toLowerCase();
+  return s.includes("صراف") || s.includes("exchange");
+}
+
 export default function AdminManagersPage() {
   const [rows, setRows] = useState([]);
   const [email, setEmail] = useState("");
@@ -12,8 +17,6 @@ export default function AdminManagersPage() {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState(null);
   const [rowPw, setRowPw] = useState({});
-  const [rowTwilio, setRowTwilio] = useState({});
-  const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
 
   const load = () => {
     apiGet("/api/managers").then(setRows).catch(() => setRows([]));
@@ -23,13 +26,6 @@ export default function AdminManagersPage() {
     load();
   }, []);
 
-  useEffect(() => {
-    apiGet("/api/admin/twilio-module")
-      .then((d) => {
-        if (d && typeof d.enabled === "boolean") setTwilioModuleEnabled(d.enabled);
-      })
-      .catch(() => {});
-  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -71,36 +67,10 @@ export default function AdminManagersPage() {
     }
   };
 
-  const saveRowTwilio = async (id) => {
-    if (!twilioModuleEnabled) {
-      setMsg("ماژول Twilio غیرفعال است؛ ابتدا از امنیت و ۲FA آن را فعال کنید.");
-      return;
-    }
-    const row = rowTwilio[id] || {};
-    setMsg(null);
-    try {
-      const payload = {
-        twilio_account_sid: row.twilio_account_sid || "",
-        twilio_phone_number: row.twilio_phone_number || "",
-      };
-      if ((row.twilio_auth_token || "").trim()) payload.twilio_auth_token = row.twilio_auth_token.trim();
-      const data = await apiPatchUrl(`/api/admin/managers/${id}/twilio-settings`, payload);
-      setRowTwilio((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          twilio_account_sid: data.twilio_account_sid || "",
-          twilio_phone_number: data.twilio_phone_number || "",
-          twilio_auth_token: "",
-          twilio_auth_token_set: !!data.twilio_auth_token_set,
-          twilio_auth_token_masked: data.twilio_auth_token_masked || "",
-        },
-      }));
-      setMsg(`تنظیمات Twilio مدیر ${id} ذخیره شد.`);
-    } catch (err) {
-      setMsg(err.message || String(err));
-    }
-  };
+  const nonExchangeRows = rows.filter((r) => {
+    const linked = Array.isArray(r?.linked_businesses) ? r.linked_businesses : [];
+    return !linked.some(isExchangeLinkedBusiness);
+  });
 
   return (
     <>
@@ -111,16 +81,11 @@ export default function AdminManagersPage() {
       </p>
       <section className="dashboard-panel">
         <h2>حساب‌های مدیر</h2>
-        {!twilioModuleEnabled ? (
-          <p className="field-hint" style={{ color: "#5d4037" }}>
-            ماژول Twilio غیرفعال است — ستون Twilio فقط خواندنی است. برای ذخیره از{" "}
-            <Link to="/admin-settings#security">تنظیمات</Link> بخش «ماژول Twilio» را فعال کنید.
-          </p>
-        ) : null}
         <p className="field-hint">
           برای هر مدیر ایمیل، تلفن، نام کاربری (۳–۳۲ کاراکتر، a-z، ۰-۹، _) و رمز (حداقل ۸ کاراکتر) تعریف کنید. مدیر از صفحهٔ{" "}
           <Link to="/login">ورود مدیر</Link> با ایمیل یا نام کاربری وارد می‌شود. ثبت‌نام عمومی:{" "}
-          <Link to="/manager-signup">ثبت‌نام مدیر</Link>.
+          <Link to="/manager-signup">ثبت‌نام مدیر</Link>. مدیران صرافی در{" "}
+          <Link to="/admin/exchanges/managers">دپارتمان صرافی</Link> نمایش داده می‌شوند.
         </p>
         <form onSubmit={submit} style={{ marginBottom: "1.5rem" }}>
           <div className="form-grid">
@@ -188,14 +153,13 @@ export default function AdminManagersPage() {
                 <th>نام کاربری</th>
                 <th>رمز / ۲FA</th>
                 <th>تلفن</th>
-                <th>Twilio</th>
                 <th>تاریخ ثبت</th>
                 <th>آگهی‌های وابسته</th>
                 <th>پنل</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {nonExchangeRows.map((r) => (
                 <tr key={r.id}>
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>
@@ -219,73 +183,6 @@ export default function AdminManagersPage() {
                     </div>
                   </td>
                   <td dir="ltr">{r.phone || "—"}</td>
-                  <td style={{ minWidth: "14rem", fontSize: "0.85rem" }}>
-                    <div className="field" style={{ marginBottom: "0.35rem" }}>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        placeholder="Account SID"
-                        disabled={!twilioModuleEnabled}
-                        value={rowTwilio[r.id]?.twilio_account_sid ?? r.twilio_account_sid ?? ""}
-                        onChange={(e) =>
-                          setRowTwilio((prev) => ({
-                            ...prev,
-                            [r.id]: {
-                              ...prev[r.id],
-                              twilio_account_sid: e.target.value,
-                              twilio_phone_number: prev[r.id]?.twilio_phone_number ?? r.twilio_phone_number ?? "",
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="field" style={{ marginBottom: "0.35rem" }}>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        placeholder="Twilio Number"
-                        disabled={!twilioModuleEnabled}
-                        value={rowTwilio[r.id]?.twilio_phone_number ?? r.twilio_phone_number ?? ""}
-                        onChange={(e) =>
-                          setRowTwilio((prev) => ({
-                            ...prev,
-                            [r.id]: {
-                              ...prev[r.id],
-                              twilio_phone_number: e.target.value,
-                              twilio_account_sid: prev[r.id]?.twilio_account_sid ?? r.twilio_account_sid ?? "",
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <input
-                        type="password"
-                        dir="ltr"
-                        disabled={!twilioModuleEnabled}
-                        placeholder={
-                          rowTwilio[r.id]?.twilio_auth_token_set || r.twilio_auth_token_set
-                            ? `Token: ${rowTwilio[r.id]?.twilio_auth_token_masked || r.twilio_auth_token_masked || "••••"}`
-                            : "Twilio Auth Token"
-                        }
-                        value={rowTwilio[r.id]?.twilio_auth_token || ""}
-                        onChange={(e) =>
-                          setRowTwilio((prev) => ({
-                            ...prev,
-                            [r.id]: { ...prev[r.id], twilio_auth_token: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      disabled={!twilioModuleEnabled}
-                      onClick={() => saveRowTwilio(r.id)}
-                    >
-                      ذخیره Twilio
-                    </button>
-                  </td>
                   <td dir="ltr" style={{ whiteSpace: "nowrap", fontSize: "0.85rem" }}>
                     {r.created_at}
                   </td>

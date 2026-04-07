@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { apiPost } from "../api.js";
+import { validatePasswordComplexity } from "../lib/passwordPolicy.js";
 
 export default function ManagerSignupPage() {
   const [email, setEmail] = useState("");
@@ -22,8 +23,9 @@ export default function ManagerSignupPage() {
       setSending(false);
       return;
     }
-    if (password.length < 8) {
-      setMsg({ ok: false, text: "رمز باید حداقل ۸ کاراکتر باشد." });
+    const pw = validatePasswordComplexity(password);
+    if (!pw.ok) {
+      setMsg({ ok: false, text: pw.hint });
       setSending(false);
       return;
     }
@@ -46,13 +48,14 @@ export default function ManagerSignupPage() {
       setPassword("");
       setPassword2("");
     } catch (err) {
+      const code = err?.code;
       const t = String(err.message || "");
       let text = t;
-      if (t.includes("email_taken")) text = "این ایمیل قبلاً ثبت شده.";
-      else if (t.includes("username_taken")) text = "این نام کاربری گرفته شده؛ نام دیگری انتخاب کنید.";
-      else if (t.includes("invalid_username")) text = "نام کاربری باید ۳ تا ۳۲ کاراکتر و فقط شامل a-z، ۰-۹ و _ باشد.";
-      else if (t.includes("invalid_email")) text = "ایمیل نامعتبر است.";
-      else if (t.includes("password_too_short")) text = "رمز باید حداقل ۸ کاراکتر باشد.";
+      if (code === "email_taken" || t.includes("email_taken")) text = "این ایمیل قبلاً ثبت شده.";
+      else if (code === "username_taken" || t.includes("username_taken")) text = "این نام کاربری گرفته شده؛ نام دیگری انتخاب کنید.";
+      else if (code === "invalid_username" || t.includes("invalid_username")) text = "نام کاربری باید ۳ تا ۳۲ کاراکتر و فقط شامل a-z، ۰-۹ و _ باشد.";
+      else if (code === "invalid_email" || t.includes("invalid_email")) text = "ایمیل نامعتبر است.";
+      else if (String(code || "").startsWith("password_")) text = err.message;
       setMsg({ ok: false, text });
     } finally {
       setSending(false);
@@ -86,14 +89,14 @@ export default function ManagerSignupPage() {
             <span className="field-hint">فقط حروف انگلیسی کوچک، اعداد و _ — ۳ تا ۳۲ کاراکتر.</span>
           </div>
           <div className="field field--block">
-            <label htmlFor="ms-pass">رمز عبور (حداقل ۸ کاراکتر)</label>
+            <label htmlFor="ms-pass">رمز عبور (حداقل ۱۲ کاراکتر؛ حروف بزرگ/کوچک، رقم، نماد)</label>
             <input
               id="ms-pass"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={12}
               dir="ltr"
               autoComplete="new-password"
             />
@@ -106,7 +109,7 @@ export default function ManagerSignupPage() {
               value={password2}
               onChange={(e) => setPassword2(e.target.value)}
               required
-              minLength={8}
+              minLength={12}
               dir="ltr"
               autoComplete="new-password"
             />

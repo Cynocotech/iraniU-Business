@@ -32,7 +32,7 @@ function ipKey(req) {
 export function assertLoginNotBlocked(req, res) {
   const ip = ipKey(req);
   const now = Date.now();
-  const row = db.prepare(`SELECT fail_count, window_start_ms, blocked_until_ms FROM login_ip_throttle WHERE ip = ?`).get(ip);
+  const row = db.prepare(`SELECT fail_count, window_start_ms, blocked_until_ms FROM identity.login_ip_throttle WHERE ip = ?`).get(ip);
 
   if (row?.blocked_until_ms != null && now < row.blocked_until_ms) {
     const retryAfter = Math.ceil((row.blocked_until_ms - now) / 1000);
@@ -47,7 +47,7 @@ export function assertLoginNotBlocked(req, res) {
 
   if (row?.blocked_until_ms != null && now >= row.blocked_until_ms) {
     db.prepare(
-      `UPDATE login_ip_throttle SET blocked_until_ms = NULL, fail_count = 0, window_start_ms = ? WHERE ip = ?`
+      `UPDATE identity.login_ip_throttle SET blocked_until_ms = NULL, fail_count = 0, window_start_ms = ? WHERE ip = ?`
     ).run(now, ip);
   }
 
@@ -61,10 +61,10 @@ export function recordLoginFailure(req) {
   const max = maxFails();
   const block = blockMs();
 
-  const row = db.prepare(`SELECT * FROM login_ip_throttle WHERE ip = ?`).get(ip);
+  const row = db.prepare(`SELECT * FROM identity.login_ip_throttle WHERE ip = ?`).get(ip);
   if (!row) {
     db.prepare(
-      `INSERT INTO login_ip_throttle (ip, fail_count, window_start_ms, blocked_until_ms) VALUES (?, 1, ?, NULL)`
+      `INSERT INTO identity.login_ip_throttle (ip, fail_count, window_start_ms, blocked_until_ms) VALUES (?, 1, ?, NULL)`
     ).run(ip, now);
     return;
   }
@@ -74,7 +74,7 @@ export function recordLoginFailure(req) {
   }
 
   if (now - row.window_start_ms > w) {
-    db.prepare(`UPDATE login_ip_throttle SET fail_count = 1, window_start_ms = ?, blocked_until_ms = NULL WHERE ip = ?`).run(
+    db.prepare(`UPDATE identity.login_ip_throttle SET fail_count = 1, window_start_ms = ?, blocked_until_ms = NULL WHERE ip = ?`).run(
       now,
       ip
     );
@@ -84,14 +84,14 @@ export function recordLoginFailure(req) {
   const next = row.fail_count + 1;
   if (next >= max) {
     const until = now + block;
-    db.prepare(`UPDATE login_ip_throttle SET fail_count = ?, blocked_until_ms = ? WHERE ip = ?`).run(next, until, ip);
+    db.prepare(`UPDATE identity.login_ip_throttle SET fail_count = ?, blocked_until_ms = ? WHERE ip = ?`).run(next, until, ip);
     console.warn("[auth] brute-force block ip=%s until %s (failures=%s)", ip, new Date(until).toISOString(), next);
   } else {
-    db.prepare(`UPDATE login_ip_throttle SET fail_count = ? WHERE ip = ?`).run(next, ip);
+    db.prepare(`UPDATE identity.login_ip_throttle SET fail_count = ? WHERE ip = ?`).run(next, ip);
   }
 }
 
 export function recordLoginSuccess(req) {
   const ip = ipKey(req);
-  db.prepare(`DELETE FROM login_ip_throttle WHERE ip = ?`).run(ip);
+  db.prepare(`DELETE FROM identity.login_ip_throttle WHERE ip = ?`).run(ip);
 }

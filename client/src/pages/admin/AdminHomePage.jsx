@@ -154,9 +154,13 @@ export default function AdminHomePage() {
           <Link className="btn btn--ghost" to="/admin-edit">
             ویرایش آگهی
           </Link>
+          <Link className="btn btn--ghost" to="/admin/exchanges">
+            دپارتمان صرافی
+          </Link>
         </div>
         <p className="field-hint" style={{ marginBottom: 0 }}>
-          از «افزودن آگهی» می‌توانید آگهی جدید بسازید؛ از «ویرایش» همان آگهی را کامل کنید.
+          از «افزودن آگهی» می‌توانید آگهی جدید بسازید؛ از «ویرایش» همان آگهی را کامل کنید. «دپارتمان صرافی» بخش جدا از
+          دایرکتوری عمومی است.
         </p>
       </section>
     </>

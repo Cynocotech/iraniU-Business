@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { Outlet, Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { AdminPanelSearchProvider, useAdminPanelSearch } from "../context/AdminPanelSearchContext.jsx";
@@ -10,7 +10,8 @@ import { adminShellNavIcons } from "../components/AdminShellNavIcons.jsx";
 /** OpenAPI / Swagger — default matches production panel docs */
 const API_DOCS_URL = (import.meta.env.VITE_API_DOCS_URL || "").trim() || "https://panel.iraniu.uk/docs/api/";
 
-const adminNav = [
+/** دایرکتوری عمومی — جدا از بخش صرافی در منو */
+const adminNavDirectory = [
   { to: "/admin", label: "داشبورد", end: true, icon: "dashboard" },
   { to: "/admin-notes", label: "یادداشت و کارها", icon: "notes" },
   { to: "/admin-businesses", label: "همه آگهی‌ها", icon: "businesses" },
@@ -28,9 +29,18 @@ const adminNav = [
   { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
 ];
 
+const adminNavExchange = [{ to: "/admin/exchanges", label: "دپارتمان صرافی", icon: "exchanges" }];
+
+const adminNavSections = [
+  { id: "directory", title: "دایرکتوری", items: adminNavDirectory },
+  { id: "exchange", title: "خدمات ارزی", items: adminNavExchange },
+];
+
 function AdminShellSearchInput() {
   const { query, setQuery } = useAdminPanelSearch();
   const location = useLocation();
+  const onExchangeHub = location.pathname === "/admin/exchanges" || location.pathname.startsWith("/admin/exchanges/");
+  if (onExchangeHub) return null;
   const onBusinesses = location.pathname === "/admin-businesses";
   return (
     <div className="app-shell__search-wrap">
@@ -59,11 +69,19 @@ function AdminShellSearchInput() {
 export default function AdminShellLayout() {
   const { logout, me } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onExchangeHub =
+    location.pathname === "/admin/exchanges" || location.pathname.startsWith("/admin/exchanges/");
 
   useEffect(() => {
     document.body.classList.add("app-shell-body");
     return () => document.body.classList.remove("app-shell-body");
   }, []);
+
+  useEffect(() => {
+    if (onExchangeHub) document.body.classList.add("app-shell-body--exchange-hub");
+    return () => document.body.classList.remove("app-shell-body--exchange-hub");
+  }, [onExchangeHub]);
 
   const onLogout = () => {
     logout();
@@ -84,7 +102,10 @@ export default function AdminShellLayout() {
           htmlFor="admin-shell-sidebar-toggle"
           aria-hidden="true"
         ></label>
-        <aside className="app-shell__sidebar" aria-label="منوی ادمین">
+        <aside
+          className={`app-shell__sidebar${onExchangeHub ? " app-shell__sidebar--exchange" : ""}`}
+          aria-label="منوی ادمین"
+        >
           <Link className="app-shell__brand" to="/" title="ایرانیو — صفحهٔ اصلی">
             <img
               className="app-shell__brand-img"
@@ -98,15 +119,22 @@ export default function AdminShellLayout() {
           </Link>
           <p className="app-shell__nav-title">سوپرادمین</p>
           <ul className="app-shell__nav">
-            {adminNav.map((item) => (
-              <li key={item.to}>
-                <NavLink to={item.to} end={item.end === true}>
-                  <span className="app-shell__nav-icon" aria-hidden="true">
-                    {adminShellNavIcons[item.icon]}
-                  </span>
-                  <span>{item.label}</span>
-                </NavLink>
-              </li>
+            {adminNavSections.map((section) => (
+              <Fragment key={section.id}>
+                <li className="app-shell__nav-heading" aria-hidden="true">
+                  <span className="app-shell__nav-heading-text">{section.title}</span>
+                </li>
+                {section.items.map((item) => (
+                  <li key={item.to}>
+                    <NavLink to={item.to} end={item.end === true}>
+                      <span className="app-shell__nav-icon" aria-hidden="true">
+                        {adminShellNavIcons[item.icon]}
+                      </span>
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </Fragment>
             ))}
           </ul>
           <div className="app-shell__sidebar-foot app-shell__sidebar-foot--stack">
@@ -150,8 +178,12 @@ export default function AdminShellLayout() {
               </svg>
             </label>
             <div className="app-shell__header-text">
-              <h1>پنل سوپرادمین</h1>
-              <p>سلام! خوش آمدید — همان چیدمان داشبورد کسب‌وکار</p>
+              <h1>{onExchangeHub ? "دپارتمان صرافی (ادمین)" : "پنل سوپرادمین"}</h1>
+              <p>
+                {onExchangeHub
+                  ? "مدیریت جدا از فهرست عمومی دایرکتوری — فقط صرافی و نرخ‌ها"
+                  : "سلام! خوش آمدید — همان چیدمان داشبورد کسب‌وکار"}
+              </p>
             </div>
             <AdminShellSearchInput />
             <div className="app-shell__header-actions">

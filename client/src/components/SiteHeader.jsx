@@ -1,10 +1,14 @@
 import { Link, NavLink } from "react-router-dom";
 
-export default function SiteHeader() {
+export default function SiteHeader({ logoHref = "/" }) {
+  const logoTitle =
+    logoHref === "/exchanges" ? "بازگشت به لیست صرافی‌ها" : "ایرانیو — صفحهٔ اصلی";
+  const logoHiddenLabel = logoHref === "/exchanges" ? "بازگشت به لیست صرافی‌ها" : "ایرانیو — صفحهٔ اصلی";
+
   return (
     <header className="site-header">
       <div className="site-header__inner">
-        <Link className="logo" to="/" title="ایرانیو — صفحهٔ اصلی">
+        <Link className="logo" to={logoHref} title={logoTitle}>
           <img
             className="logo__img"
             src="/images/iraniu-logo-header.png"
@@ -13,7 +17,7 @@ export default function SiteHeader() {
             height={52}
             decoding="async"
           />
-          <span className="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
+          <span className="visually-hidden">{logoHiddenLabel}</span>
         </Link>
         <input type="checkbox" id="site-nav-toggle" className="site-nav-cb" />
         <label htmlFor="site-nav-toggle" className="nav-toggle" aria-label="باز و بسته کردن منو">
@@ -28,6 +32,9 @@ export default function SiteHeader() {
             </li>
             <li>
               <NavLink to="/listings">لیست کسب‌وکارها</NavLink>
+            </li>
+            <li>
+              <NavLink to="/exchanges">صرافی‌ها</NavLink>
             </li>
             <li>
               <NavLink to="/dashboard">پنل کسب‌وکار</NavLink>
