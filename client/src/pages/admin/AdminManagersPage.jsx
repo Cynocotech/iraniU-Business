@@ -30,13 +30,16 @@ export default function AdminManagersPage() {
   const submit = async (e) => {
     e.preventDefault();
     setMsg(null);
+    const emailNorm = String(email || "")
+      .trim()
+      .toLowerCase();
     try {
       await apiPost("/api/managers", {
-        email,
-        name,
-        phone,
+        email: emailNorm,
+        name: String(name || "").trim(),
+        phone: String(phone || "").trim(),
         password,
-        login_username: loginUsername.trim(),
+        login_username: loginUsername.trim().toLowerCase(),
       });
       setEmail("");
       setName("");

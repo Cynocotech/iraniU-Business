@@ -967,6 +967,9 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
       hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
     });
   }
+  if (db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)) {
+    return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً برای یک مدیر ثبت شده" });
+  }
   if (db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)) {
     return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
   }
