@@ -5,6 +5,7 @@ import { DEFAULT_HOURS_ROWS } from "../../lib/businessProfile.js";
 import { LISTING_TERMS_VERSION } from "../../lib/listingTerms.js";
 import { ListingTermsScrollBox, ListingTermsCheckbox } from "../../components/ListingTermsAgreement.jsx";
 import Seo from "../../components/Seo.jsx";
+import { normalizeBusinessSlugInput } from "../../lib/businessSlugInput.js";
 
 const EXCHANGE_CATEGORY = "صرافی";
 
@@ -18,6 +19,11 @@ export default function AdminAddExchangePage() {
   const [slug, setSlug] = useState("");
   const [nameFa, setNameFa] = useState("");
   const [description, setDescription] = useState("");
+  const [listingTitle, setListingTitle] = useState("");
+  const [listingContactEmail, setListingContactEmail] = useState("");
+  const [googleReviewUrl, setGoogleReviewUrl] = useState("https://www.google.com/maps");
+  const [cta, setCta] = useState("تماس با ما");
+  const [priceRange, setPriceRange] = useState("—");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -37,23 +43,38 @@ export default function AdminAddExchangePage() {
     setSaving(true);
     setMsg(null);
     try {
+      const slugNorm = normalizeBusinessSlugInput(slug);
+      if (!slugNorm) {
+        setMsg("نامک را فقط با حروف انگلیسی کوچک، عدد و خط تیره وارد کنید.");
+        setSaving(false);
+        return;
+      }
       const hours_json = JSON.stringify(
         DEFAULT_HOURS_ROWS.map((r) => ({ day: r.day, hours: r.hours }))
       );
       const gallery_json = JSON.stringify(["", "", "", ""]);
+      const nameTrim = nameFa.trim();
+      const titleTrim = listingTitle.trim() || nameTrim;
+      const descTrim = description.trim();
+      const emailTrim = listingContactEmail.trim().toLowerCase();
       const payload = {
-        slug: slug.trim().toLowerCase(),
-        name_fa: nameFa.trim(),
-        description,
+        slug: slugNorm,
+        name_fa: nameTrim,
+        description: descTrim,
         category: EXCHANGE_CATEGORY,
-        city,
-        phone,
-        address,
+        city: city.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
         status,
         hours_json,
         gallery_json,
         accept_listing_terms: true,
         listing_terms_version: LISTING_TERMS_VERSION,
+        listing_contact_email: emailTrim,
+        listing_title: titleTrim,
+        google_review_url: googleReviewUrl.trim(),
+        cta: cta.trim(),
+        price_range: priceRange.trim(),
       };
       await apiPost("/api/businesses", payload);
       navigate(`/admin-edit?slug=${encodeURIComponent(payload.slug)}`);
@@ -87,17 +108,41 @@ export default function AdminAddExchangePage() {
               <input
                 id="add-ex-slug"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => setSlug(normalizeBusinessSlugInput(e.target.value))}
                 lang="en"
                 dir="ltr"
                 required
                 placeholder="my-exchange"
                 autoComplete="off"
               />
+              <p className="field-hint" style={{ marginTop: "0.35rem" }}>
+                فقط a تا z، 0–۹ و خط تیره؛ هنگام تایپ نرمال می‌شود.
+              </p>
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-name">نام صرافی (فارسی)</label>
               <input id="add-ex-name" value={nameFa} onChange={(e) => setNameFa(e.target.value)} required />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="add-ex-listing-title">عنوان آگهی در لیست</label>
+              <input
+                id="add-ex-listing-title"
+                value={listingTitle}
+                onChange={(e) => setListingTitle(e.target.value)}
+                placeholder="اگر خالی بماند، همان نام صرافی استفاده می‌شود"
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="add-ex-contact-email">ایمیل تماس برای اطلاع‌رسانی</label>
+              <input
+                id="add-ex-contact-email"
+                type="email"
+                value={listingContactEmail}
+                onChange={(e) => setListingContactEmail(e.target.value)}
+                dir="ltr"
+                autoComplete="email"
+                required
+              />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-desc">توضیحات</label>
@@ -107,7 +152,27 @@ export default function AdminAddExchangePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 style={{ width: "100%" }}
+                required
               />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="add-ex-gmaps">لینک صفحهٔ Google (نظر / نقشه)</label>
+              <input
+                id="add-ex-gmaps"
+                type="url"
+                value={googleReviewUrl}
+                onChange={(e) => setGoogleReviewUrl(e.target.value)}
+                dir="ltr"
+                placeholder="https://www.google.com/maps/..."
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="add-ex-cta">دکمهٔ فراخوان (CTA)</label>
+              <input id="add-ex-cta" value={cta} onChange={(e) => setCta(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="add-ex-price">محدودهٔ قیمت (نمایشی)</label>
+              <input id="add-ex-price" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} dir="ltr" />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-cat">دسته</label>
@@ -118,15 +183,15 @@ export default function AdminAddExchangePage() {
             </div>
             <div className="field">
               <label htmlFor="add-ex-city">شهر</label>
-              <input id="add-ex-city" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" />
+              <input id="add-ex-city" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" required />
             </div>
             <div className="field">
               <label htmlFor="add-ex-phone">تلفن</label>
-              <input id="add-ex-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
+              <input id="add-ex-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-address">آدرس</label>
-              <textarea id="add-ex-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
+              <textarea id="add-ex-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} required />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-status">وضعیت</label>
