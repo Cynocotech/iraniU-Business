@@ -7,7 +7,6 @@ import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
 import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
-import { filterListingsByCategoryParams } from "../lib/categoryFilters.js";
 import {
   averageExchangeRatesFromBusinesses,
   formatExchangeRateToman,
@@ -17,8 +16,21 @@ import {
 } from "../lib/exchangeRates.js";
 
 function filterExchangeRows(rows, searchParams) {
-  const only = (Array.isArray(rows) ? rows : []).filter(isExchangeBusiness);
-  return filterListingsByCategoryParams(only, searchParams);
+  let out = (Array.isArray(rows) ? rows : []).filter(isExchangeBusiness);
+  const q = (searchParams.get("q") || "").trim().toLowerCase();
+  const city = (searchParams.get("city") || "").trim().toLowerCase();
+  // On /exchanges we intentionally ignore generic `cat` query param,
+  // because legacy links like ?cat=food can hide all exchanges.
+  if (city) {
+    out = out.filter((b) => String(b?.city || "").toLowerCase().includes(city));
+  }
+  if (q) {
+    out = out.filter((b) => {
+      const blob = `${b?.name_fa || ""} ${b?.category || ""} ${b?.listing_title || ""} ${b?.address || ""}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }
+  return out;
 }
 
 const EXCHANGE_CITY_LABELS = {
