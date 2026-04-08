@@ -443,6 +443,9 @@ export default function ExchangesListingsPage() {
                       <i className="fa-solid fa-arrow-up-right-dots exchanges-app__best-side-ico" aria-hidden="true" />
                       فروش
                     </span>
+                    <span className="exchanges-app__best-side-ccy" dir="ltr">
+                      {widgetCurrencyCode}
+                    </span>
                     <span className="exchanges-app__best-side-rate" dir="ltr">
                       {formatExchangeRateToman(bestSellPick.raw)}
                     </span>
@@ -452,6 +455,9 @@ export default function ExchangesListingsPage() {
                     <span className="exchanges-app__best-side-label">
                       <i className="fa-solid fa-arrow-up-right-dots exchanges-app__best-side-ico" aria-hidden="true" />
                       فروش
+                    </span>
+                    <span className="exchanges-app__best-side-ccy" dir="ltr">
+                      {widgetCurrencyCode}
                     </span>
                     <span className="exchanges-app__best-side-rate" dir="ltr">
                       —
@@ -468,6 +474,9 @@ export default function ExchangesListingsPage() {
                       <i className="fa-solid fa-arrow-down-wide-short exchanges-app__best-side-ico" aria-hidden="true" />
                       خرید
                     </span>
+                    <span className="exchanges-app__best-side-ccy" dir="ltr">
+                      {widgetCurrencyCode}
+                    </span>
                     <span className="exchanges-app__best-side-rate" dir="ltr">
                       {formatExchangeRateToman(bestBuyPick.raw)}
                     </span>
@@ -477,6 +486,9 @@ export default function ExchangesListingsPage() {
                     <span className="exchanges-app__best-side-label">
                       <i className="fa-solid fa-arrow-down-wide-short exchanges-app__best-side-ico" aria-hidden="true" />
                       خرید
+                    </span>
+                    <span className="exchanges-app__best-side-ccy" dir="ltr">
+                      {widgetCurrencyCode}
                     </span>
                     <span className="exchanges-app__best-side-rate" dir="ltr">
                       —
