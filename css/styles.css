@@ -8464,6 +8464,14 @@ body.page-home main#main > *:not(.hero) {
 
 /* خانه + لیست: موبایل باریک — فاصله، تایپ، یک ستونهٔ دسته‌ها */
 @media (max-width: 480px) {
+  .listing-cards,
+  .card-grid,
+  .page-home .page-home__listing-cards,
+  .page-home .card-grid--home,
+  .listings-page--exchanges .exchanges-app__list.listing-cards {
+    padding-inline: 10px;
+  }
+
   .page-home .hero.hero--home {
     padding-top: max(clamp(1.35rem, 5.5vw, 2.75rem), calc(var(--space-xs) + env(safe-area-inset-top, 0px)));
     padding-bottom: clamp(1.2rem, 4vw, 2rem);
