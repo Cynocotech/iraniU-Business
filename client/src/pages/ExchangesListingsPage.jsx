@@ -380,6 +380,14 @@ export default function ExchangesListingsPage() {
             className="exchanges-app__best-widget-shell"
             aria-label="بهترین نرخ در فهرست فعلی"
           >
+            <img
+              className="exchanges-app__best-widget-tag"
+              src="/images/exchange-best-tag.png"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+            />
             <div className="exchanges-app__best-widget-toolbar exchanges-app__best-widget-toolbar--compact">
               <label className="visually-hidden" htmlFor="ex-list-best-currency">
                 ارز برای مقایسه
@@ -410,40 +418,16 @@ export default function ExchangesListingsPage() {
                 <option value="sell">فروش</option>
               </select>
             </div>
-            <div className="exchanges-app__best-widget-body">
+            <Link
+              className="exchanges-app__best-widget-body exchanges-app__best-widget-body--compact"
+              to={`/business?slug=${encodeURIComponent(bestRatePick.business.slug)}`}
+              aria-label={`مشاهده جزئیات صرافی با بهترین نرخ: ${bestRatePick.business.name_fa || "صرافی"}`}
+            >
               <p className="exchanges-app__best-widget-kicker">بهترین نرخ در این فهرست</p>
-              <p className="exchanges-app__best-widget-meta">
-                {exchangeMode === "buy" ? "خرید" : "فروش"} ·{" "}
-                <span dir="ltr" className="exchanges-app__best-widget-ccy">
-                  {selectedCurrencyCode}
-                </span>
-              </p>
-              <div className="exchanges-app__best-widget-head">
-                {(bestRatePick.business.cover_image_url || "").trim() ? (
-                  <img
-                    className="exchanges-app__best-widget-logo"
-                    src={bestRatePick.business.cover_image_url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <span className="exchanges-app__best-widget-logo exchanges-app__best-widget-logo--fallback" aria-hidden>
-                    {String(bestRatePick.business.name_fa || "E").trim().charAt(0)}
-                  </span>
-                )}
-                <p className="exchanges-app__best-widget-name">{bestRatePick.business.name_fa}</p>
-              </div>
               <p className="exchanges-app__best-widget-rate" dir="ltr">
                 {formatExchangeRateToman(bestRatePick.raw)}
               </p>
-              <Link
-                className="btn btn--ghost exchanges-app__best-widget-link"
-                to={`/business?slug=${encodeURIComponent(bestRatePick.business.slug)}`}
-              >
-                مشاهدهٔ صرافی
-              </Link>
-            </div>
+            </Link>
           </aside>
         ) : null}
       </div>

@@ -1854,6 +1854,7 @@ body.page-map main#main {
   margin-inline: auto;
   width: 100%;
   max-width: 420px;
+  position: relative;
   border-radius: 14px;
   border: 2px solid #d32f2f;
   background: linear-gradient(180deg, #ffffff 0%, #fbf8ff 100%);
@@ -1866,9 +1867,25 @@ body.page-map main#main {
   overflow: hidden;
 }
 
+.exchanges-app__best-widget-tag {
+  position: absolute;
+  top: calc(0.12rem - 5px);
+  left: 0.45rem;
+  width: 48px;
+  height: auto;
+  z-index: 2;
+  pointer-events: none;
+}
+
 @media (max-width: 480px) {
   .exchanges-app__best-widget-shell {
     max-width: 100%;
+  }
+
+  .exchanges-app__best-widget-tag {
+    width: 42px;
+    top: calc(0.08rem - 5px);
+    left: 0.35rem;
   }
 }
 
@@ -1898,6 +1915,19 @@ body.page-map main#main {
   display: flex;
   flex-direction: column;
   background: transparent;
+}
+
+.exchanges-app__best-widget-body--compact {
+  min-height: 4.15rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.exchanges-app__best-widget-body--compact:hover {
+  background: rgba(58, 11, 71, 0.04);
 }
 
 .exchanges-app__best-widget-kicker {
@@ -1961,6 +1991,20 @@ body.page-map main#main {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--color-primary);
+}
+
+.exchanges-app__best-widget-body--compact .exchanges-app__best-widget-rate {
+  margin: 0;
+  font-size: 1.15rem;
+  text-align: center;
+  background: linear-gradient(180deg, #e8f8ee 0%, #d8f3e2 100%);
+  border: 1px solid #5ec57e;
+  color: #0f6a33;
+  border-radius: 10px;
+  padding: 0.3rem 0.55rem;
+  width: 100%;
+  max-width: 240px;
+  box-shadow: 0 4px 14px rgba(15, 106, 51, 0.2);
 }
 
 .exchanges-app__best-widget-link {
