@@ -89,6 +89,13 @@ function summarizeAboutText(raw, maxLen = 280) {
   return { summary: `${cut.trim()}…`, hasMore: true };
 }
 
+function extractUkPostcode(raw) {
+  const m = String(raw || "")
+    .toUpperCase()
+    .match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/);
+  return m ? m[0].replace(/\s+/g, " ").trim() : "";
+}
+
 /** Inline SVG defs (IDs match css / legacy business.html) */
 function ProfileSprites() {
   return (
@@ -299,6 +306,11 @@ export default function BusinessPage() {
   const exchangePaymentMethods = parseExchangePaymentMethodsJson(b?.payment_methods_json);
   const showExchangeSection = isExchangeCategory(b?.category) || exchangeRatesRows.some((r) => r.buy || r.sell);
   const exchangeTodayRateEnabled = Number(b?.exchange_today_rate_enabled) !== 0;
+  const exchangePostcode = extractUkPostcode(b?.address);
+  const exchangeMapQuery = exchangePostcode || [b?.address, b?.city].filter(Boolean).join(", ").trim();
+  const exchangeMapEmbedUrl = exchangeMapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(exchangeMapQuery)}&output=embed`
+    : "";
   const selectedRate =
     exchangeRatesRows.find((r) => r.code === selectedCurrencyCode) || exchangeRatesRows[0] || null;
   const showExchangeCalcFab = isExchangeBusiness(b) && !!selectedRate;
@@ -715,6 +727,28 @@ export default function BusinessPage() {
                   )}
                 </div>
               </div>
+              {exchangeMapEmbedUrl ? (
+                <div className="exchange-panel__map-wrap" aria-label="موقعیت صرافی روی نقشه">
+                  <p className="exchange-panel__map-title">
+                    موقعیت روی نقشه
+                    {exchangePostcode ? (
+                      <span className="exchange-panel__map-postcode" dir="ltr">
+                        {exchangePostcode}
+                      </span>
+                    ) : null}
+                  </p>
+                  <div className="exchange-panel__map-frame-wrap">
+                    <iframe
+                      title={`Google Map ${b?.name_fa || "Exchange"}`}
+                      src={exchangeMapEmbedUrl}
+                      className="exchange-panel__map-frame"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
+              ) : null}
             </section>
           )}
 

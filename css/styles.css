@@ -1917,6 +1917,87 @@ body.page-map main#main {
   background: transparent;
 }
 
+.exchanges-app__best-widget-body--dual {
+  min-height: 5.4rem;
+  justify-content: center;
+}
+
+.exchanges-app__best-widget-title-logo-link {
+  align-self: center;
+  display: inline-flex;
+  margin-bottom: 0.2rem;
+}
+
+.exchanges-app__best-widget-title-logo {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  box-shadow: 0 3px 10px rgba(17, 24, 39, 0.18);
+  background: #fff;
+}
+
+.exchanges-app__best-widget-title-logo--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.exchanges-app__best-widget-dual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  direction: ltr;
+}
+
+.exchanges-app__best-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 10px;
+  border: 1px solid rgba(58, 11, 71, 0.16);
+  padding: 0.36rem 0.4rem;
+  min-height: 3.2rem;
+}
+
+.exchanges-app__best-side--sell {
+  background: linear-gradient(180deg, #e8f8ee 0%, #d8f3e2 100%);
+  border-color: #5ec57e;
+}
+
+.exchanges-app__best-side--buy {
+  background: linear-gradient(180deg, #feecec 0%, #ffdede 100%);
+  border-color: #ef9a9a;
+}
+
+.exchanges-app__best-side-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.exchanges-app__best-side-ico {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.exchanges-app__best-side-rate {
+  margin-top: 0.1rem;
+  font-size: 0.93rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+}
+
 .exchanges-app__best-widget-body--compact {
   min-height: 4.15rem;
   align-items: center;
@@ -5987,6 +6068,44 @@ a.app-shell__metric-link:hover {
   margin-top: 0.35rem;
 }
 
+.exchange-panel__map-wrap {
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed rgba(58, 11, 71, 0.18);
+}
+
+.exchange-panel__map-title {
+  margin: 0 0 0.45rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.exchange-panel__map-postcode {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  background: rgba(58, 11, 71, 0.07);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+
+.exchange-panel__map-frame-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(58, 11, 71, 0.14);
+  box-shadow: 0 8px 24px rgba(58, 11, 71, 0.1);
+}
+
+.exchange-panel__map-frame {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+  border: 0;
+}
+
 /* کارت نمونه: نرخ ویژه امروز / خرید و فروش به تومان / پرداخت با */
 .exchange-featured {
   margin-bottom: var(--space-lg);
@@ -8464,6 +8583,16 @@ body.page-home main#main > *:not(.hero) {
 
 /* خانه + لیست: موبایل باریک — فاصله، تایپ، یک ستونهٔ دسته‌ها */
 @media (max-width: 480px) {
+  .listings-page--exchanges .exchanges-app__hero,
+  .listings-page--exchanges .exchanges-app__body {
+    padding-inline: max(10px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
+  .listings-page--exchanges .exchanges-app__best-widget-shell {
+    width: auto;
+    margin-inline: max(10px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  }
+
   .listing-cards,
   .card-grid,
   .page-home .page-home__listing-cards,

@@ -214,10 +214,19 @@ export default function ExchangesListingsPage() {
     setFullscreenBanner(next);
   }, [fullscreenBanners]);
 
-  const bestRatePick = useMemo(
-    () => pickBestRateExchangeInList(filtered, selectedCurrencyCode, exchangeMode),
-    [filtered, selectedCurrencyCode, exchangeMode]
+  const widgetCurrencyCode = useMemo(() => {
+    if (ratesForCalc.some((r) => r.code === "USD")) return "USD";
+    return ratesForCalc[0]?.code || selectedCurrencyCode || "USD";
+  }, [ratesForCalc, selectedCurrencyCode]);
+  const bestSellPick = useMemo(
+    () => pickBestRateExchangeInList(filtered, widgetCurrencyCode, "sell"),
+    [filtered, widgetCurrencyCode]
   );
+  const bestBuyPick = useMemo(
+    () => pickBestRateExchangeInList(filtered, widgetCurrencyCode, "buy"),
+    [filtered, widgetCurrencyCode]
+  );
+  const bestTitlePick = bestSellPick || bestBuyPick || null;
 
   const seo = useMemo(() => {
     const q = (searchParams.get("q") || "").trim();
@@ -374,7 +383,7 @@ export default function ExchangesListingsPage() {
           </form>
         </div>
 
-        {!loading && !err && bestRatePick && selectedRate ? (
+        {!loading && !err && (bestSellPick || bestBuyPick) ? (
           <aside
             id="exchange-best-rates-section"
             className="exchanges-app__best-widget-shell"
@@ -388,46 +397,62 @@ export default function ExchangesListingsPage() {
               loading="lazy"
               decoding="async"
             />
-            <div className="exchanges-app__best-widget-toolbar exchanges-app__best-widget-toolbar--compact">
-              <label className="visually-hidden" htmlFor="ex-list-best-currency">
-                ارز برای مقایسه
-              </label>
-              <select
-                id="ex-list-best-currency"
-                className="exchanges-app__best-widget-select"
-                value={selectedCurrencyCode}
-                onChange={(e) => setSelectedCurrencyCode(e.target.value)}
-              >
-                {ratesForCalc.map((r) => (
-                  <option key={r.code} value={r.code}>
-                    {r.code}
-                    {r.name ? ` — ${r.name}` : ""}
-                  </option>
-                ))}
-              </select>
-              <label className="visually-hidden" htmlFor="ex-list-best-mode">
-                نوع نرخ
-              </label>
-              <select
-                id="ex-list-best-mode"
-                className="exchanges-app__best-widget-select"
-                value={exchangeMode}
-                onChange={(e) => setExchangeMode(e.target.value)}
-              >
-                <option value="buy">خرید</option>
-                <option value="sell">فروش</option>
-              </select>
-            </div>
-            <Link
-              className="exchanges-app__best-widget-body exchanges-app__best-widget-body--compact"
-              to={`/business?slug=${encodeURIComponent(bestRatePick.business.slug)}`}
-              aria-label={`مشاهده جزئیات صرافی با بهترین نرخ: ${bestRatePick.business.name_fa || "صرافی"}`}
-            >
+            <div className="exchanges-app__best-widget-body exchanges-app__best-widget-body--dual">
+              {bestTitlePick ? (
+                <Link
+                  className="exchanges-app__best-widget-title-logo-link"
+                  to={`/business?slug=${encodeURIComponent(bestTitlePick.business.slug)}`}
+                  aria-label={`مشاهده صرافی: ${bestTitlePick.business.name_fa || "صرافی"}`}
+                >
+                  {(bestTitlePick.business.cover_image_url || "").trim() ? (
+                    <img
+                      className="exchanges-app__best-widget-title-logo"
+                      src={bestTitlePick.business.cover_image_url}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <span className="exchanges-app__best-widget-title-logo exchanges-app__best-widget-title-logo--fallback" aria-hidden>
+                      {String(bestTitlePick.business.name_fa || "E").trim().charAt(0)}
+                    </span>
+                  )}
+                </Link>
+              ) : null}
               <p className="exchanges-app__best-widget-kicker">بهترین نرخ در این فهرست</p>
-              <p className="exchanges-app__best-widget-rate" dir="ltr">
-                {formatExchangeRateToman(bestRatePick.raw)}
-              </p>
-            </Link>
+              <div className="exchanges-app__best-widget-dual">
+                {bestSellPick ? (
+                  <Link
+                    className="exchanges-app__best-side exchanges-app__best-side--sell"
+                    to={`/business?slug=${encodeURIComponent(bestSellPick.business.slug)}`}
+                    aria-label={`بهترین نرخ فروش: ${bestSellPick.business.name_fa || "صرافی"}`}
+                  >
+                    <span className="exchanges-app__best-side-label">
+                      <i className="fa-solid fa-arrow-up-right-dots exchanges-app__best-side-ico" aria-hidden="true" />
+                      فروش
+                    </span>
+                    <span className="exchanges-app__best-side-rate" dir="ltr">
+                      {formatExchangeRateToman(bestSellPick.raw)}
+                    </span>
+                  </Link>
+                ) : null}
+                {bestBuyPick ? (
+                  <Link
+                    className="exchanges-app__best-side exchanges-app__best-side--buy"
+                    to={`/business?slug=${encodeURIComponent(bestBuyPick.business.slug)}`}
+                    aria-label={`بهترین نرخ خرید: ${bestBuyPick.business.name_fa || "صرافی"}`}
+                  >
+                    <span className="exchanges-app__best-side-label">
+                      <i className="fa-solid fa-arrow-down-wide-short exchanges-app__best-side-ico" aria-hidden="true" />
+                      خرید
+                    </span>
+                    <span className="exchanges-app__best-side-rate" dir="ltr">
+                      {formatExchangeRateToman(bestBuyPick.raw)}
+                    </span>
+                  </Link>
+                ) : null}
+              </div>
+            </div>
           </aside>
         ) : null}
       </div>

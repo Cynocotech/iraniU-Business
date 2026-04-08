@@ -33,7 +33,7 @@ export default function ManagerLoginPage() {
 
   const afterManagerLogin = async () => {
     try {
-      const raw = sessionStorage.getItem("iraniu_dashboard_business_slug");
+      const raw = localStorage.getItem("iraniu_dashboard_business_slug");
       if (!raw) {
         const t = sessionStorage.getItem("iraniu_jwt");
         const r = await fetch("/api/auth/me", {

@@ -65,28 +65,44 @@ export function DashboardProvider({ children }) {
     if (authLoading) return;
     if (impersonation) return;
     if (me?.role !== "manager") return;
-    const linked = me?.user?.linked_businesses;
-    if (!Array.isArray(linked) || linked.length === 0) return;
-    const preferred = pickPreferredManagerSlug(linked);
-    if (!preferred) return;
+    let cancelled = false;
+    const fallback = Array.isArray(me?.user?.linked_businesses) ? me.user.linked_businesses : [];
 
-    let forceExchange = false;
-    try {
-      if (sessionStorage.getItem("iraniu_exchange_onboarding") === "1") {
-        sessionStorage.removeItem("iraniu_exchange_onboarding");
-        forceExchange = true;
-      }
-    } catch (_) {}
+    const syncFromLinked = (linked) => {
+      if (!Array.isArray(linked) || linked.length === 0) return;
+      const preferred = pickPreferredManagerSlug(linked);
+      if (!preferred) return;
 
-    const inList = linked.some((b) => b.slug === dashSlug);
-    if (forceExchange || !inList) {
-      if (dashSlug !== preferred) {
+      let forceExchange = false;
+      try {
+        if (sessionStorage.getItem("iraniu_exchange_onboarding") === "1") {
+          sessionStorage.removeItem("iraniu_exchange_onboarding");
+          forceExchange = true;
+        }
+      } catch (_) {}
+
+      const inList = linked.some((b) => b.slug === dashSlug);
+      if ((forceExchange || !inList) && dashSlug !== preferred) {
         try {
           localStorage.setItem(STORAGE_SLUG, preferred);
         } catch (_) {}
         setDashSlug(preferred);
       }
-    }
+    };
+
+    apiGet("/api/manager/linked-businesses")
+      .then((d) => {
+        if (cancelled) return;
+        const linked = Array.isArray(d?.linked_businesses) ? d.linked_businesses : fallback;
+        syncFromLinked(linked);
+      })
+      .catch(() => {
+        if (!cancelled) syncFromLinked(fallback);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [authLoading, me, impersonation, dashSlug]);
 
   const asManagerParam = searchParams.get("asManager");

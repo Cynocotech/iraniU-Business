@@ -1916,6 +1916,18 @@ app.get("/api/manager/call-logs", requireManager, (req, res) => {
   res.json(rows);
 });
 
+app.get("/api/manager/linked-businesses", requireManager, (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, slug, name_fa, category, status, claimed, package, city
+       FROM businesses
+       WHERE manager_id = ?
+       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
+    )
+    .all(req.auth.sub);
+  res.json({ linked_businesses: rows });
+});
+
 app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
   const m = db
     .prepare(
