@@ -19,7 +19,7 @@ export function requireSuperAdmin(req, res, next) {
 
 export function requireManager(req, res, next) {
   const p = parseAuthHeader(req);
-  if (!p || p.typ !== "mgr") {
+  if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) {
     return res.status(401).json({ error: "unauthorized", hint: "ورود مدیر لازم است" });
   }
   req.auth = p;
@@ -29,7 +29,7 @@ export function requireManager(req, res, next) {
 /** هر دو نقش */
 export function requireManagerOrSuperAdmin(req, res, next) {
   const p = parseAuthHeader(req);
-  if (!p || (p.typ !== "mgr" && p.typ !== "adm")) {
+  if (!p || (p.typ !== "mgr" && p.typ !== "mgrx" && p.typ !== "adm")) {
     return res.status(401).json({ error: "unauthorized" });
   }
   req.auth = p;

@@ -46,6 +46,10 @@ export function signManagerToken(managerId) {
   return jwt.sign({ typ: "mgr", sub: Number(managerId) }, JWT_SECRET, { expiresIn: "7d" });
 }
 
+export function signExchangeManagerToken(managerId) {
+  return jwt.sign({ typ: "mgrx", sub: Number(managerId) }, JWT_SECRET, { expiresIn: "7d" });
+}
+
 export function signSuperAdminToken(adminId) {
   return jwt.sign({ typ: "adm", sub: Number(adminId) }, JWT_SECRET, { expiresIn: "7d" });
 }

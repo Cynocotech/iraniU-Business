@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
+function isExchangeBusinessRow(b) {
+  const cat = String(b?.category || "").trim().toLowerCase();
+  return cat.includes("صراف") || cat.includes("exchange");
+}
+
 function randomSuffix(len = 4) {
   return Math.random().toString(36).slice(2, 2 + len).toLowerCase();
 }
@@ -59,7 +64,7 @@ export default function AdminLinkPage() {
 
   const filteredBusinesses = useMemo(() => {
     const q = bizSearch.trim().toLowerCase();
-    let list = businesses;
+    let list = businesses.filter((b) => !isExchangeBusinessRow(b));
     if (q) {
       list = businesses.filter((b) => {
         const blob = `${b.name_fa || ""} ${b.slug || ""} ${b.listing_title || ""} ${b.category || ""} ${b.city || ""}`.toLowerCase();
@@ -99,8 +104,9 @@ export default function AdminLinkPage() {
       setManagerEmail("");
       return;
     }
-    setManagerId(b.manager_id != null ? String(b.manager_id) : "");
-    const linkedManager = managers.find((m) => Number(m.id) === Number(b.manager_id));
+    const normalizedManagerId = Number.isFinite(Number(b.manager_id)) && Number(b.manager_id) > 0 ? Number(b.manager_id) : null;
+    setManagerId(normalizedManagerId != null ? String(normalizedManagerId) : "");
+    const linkedManager = managers.find((m) => Number(m.id) === normalizedManagerId);
     setManagerEmail(linkedManager?.email || "");
   }, [slug, businesses, managers]);
 
@@ -215,7 +221,9 @@ export default function AdminLinkPage() {
       </p>
       <section className="dashboard-panel">
         <h2>لینک آگهی ↔ مدیر</h2>
-        <p className="field-hint">یک مدیر را به آگهی وصل کنید (یا خالی کنید).</p>
+        <p className="field-hint">
+          یک مدیر را به آگهی وصل کنید (یا خالی کنید). آگهی‌های صرافی از این بخش حذف شده‌اند و باید در دپارتمان صرافی مدیریت شوند.
+        </p>
         <form onSubmit={save}>
           <div className="form-grid">
             <div className="field field--block">
@@ -288,7 +296,7 @@ export default function AdminLinkPage() {
             <p className="field-hint">
               manager_id فعلی در دیتابیس:{" "}
               <strong lang="en" dir="ltr">
-                {selected.manager_id ?? "—"}
+                {Number.isFinite(Number(selected.manager_id)) && Number(selected.manager_id) > 0 ? selected.manager_id : "—"}
               </strong>
             </p>
           )}

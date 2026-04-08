@@ -8,6 +8,7 @@ import {
   verifyPassword,
   validatePasswordComplexity,
   signManagerToken,
+  signExchangeManagerToken,
   signSuperAdminToken,
   parseAuthHeader,
   totpVerify,
@@ -72,7 +73,7 @@ const avatarUpload = multer({
     destination: (_req, _file, cb) => cb(null, avatarDir),
     filename: (req, file, cb) => {
       const p = parseAuthHeader(req);
-      const role = p?.typ === "adm" ? "adm" : "mgr";
+      const role = p?.typ === "adm" ? "adm" : p?.typ === "mgrx" ? "mgrx" : "mgr";
       const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
       cb(null, `${role}-${p?.sub || "u"}-${Date.now()}${ext}`);
     },
@@ -87,18 +88,25 @@ const avatarUpload = multer({
   },
 });
 
-function attachLinkedBusinesses(managerRow) {
+function attachLinkedBusinesses(managerRow, kind = "directory") {
+  const managerColumn = kind === "exchange" ? "exchange_manager_id" : "manager_id";
+  const categoryWhere =
+    kind === "exchange"
+      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
+      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
   const linked_businesses = db
     .prepare(
       `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE manager_id = ?
+       WHERE ${managerColumn} = ?
+       ${categoryWhere}
        ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
     )
     .all(managerRow.id);
   return {
     ...stripManagerRow(managerRow),
     linked_businesses,
+    manager_kind: kind,
     password_set: !!managerRow.password_hash,
     totp_enabled: !!managerRow.totp_enabled,
     twilio_auth_token_set: !!managerRow.twilio_auth_token,
@@ -171,23 +179,30 @@ export function registerAuthRoutes(app) {
     if (!pwCheck.ok) {
       return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
     }
-    if (db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)) {
+    if (
+      db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email) ||
+      db.prepare(`SELECT id FROM identity.exchange_managers WHERE email = ?`).get(email)
+    ) {
       return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً ثبت شده" });
     }
-    if (db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)) {
+    if (
+      db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username) ||
+      db.prepare(`SELECT id FROM identity.exchange_managers WHERE login_username = ?`).get(login_username)
+    ) {
       return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
     }
     const ph = hashPassword(password);
     try {
+      const table = exchange_onboarding ? "identity.exchange_managers" : "identity.managers";
       const info = db
-        .prepare(`INSERT INTO identity.managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
+        .prepare(`INSERT INTO ${table} (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
         .run(email, name, phone, ph, login_username);
       if (exchange_onboarding) {
         const slug = makeExchangeOnboardingSlug(login_username);
         const managerId = Number(info.lastInsertRowid);
         db.prepare(
           `INSERT INTO businesses
-            (slug, name_fa, category, phone, city, status, manager_id, package, listing_approval, listing_title, cta, price_range)
+            (slug, name_fa, category, phone, city, status, exchange_manager_id, package, listing_approval, listing_title, cta, price_range)
            VALUES (?, ?, ?, ?, ?, 'active', ?, 'basic', 'pending', ?, ?, ?)`
         ).run(
           slug,
@@ -206,8 +221,8 @@ export function registerAuthRoutes(app) {
           action: "exchange_onboarding_business_created",
           targetType: "business",
           targetId: slug,
-          message: `Exchange onboarding listing created for manager #${managerId}`,
-          meta: { manager_id: managerId, category: "صرافی" },
+          message: `Exchange onboarding listing created for exchange manager #${managerId}`,
+          meta: { exchange_manager_id: managerId, category: "صرافی" },
         });
       }
       writeSystemLog({
@@ -239,9 +254,14 @@ export function registerAuthRoutes(app) {
     }
     if (!assertLoginNotBlocked(req, res)) return;
 
-    const m = db
+    const mDir = db
       .prepare(`SELECT * FROM identity.managers WHERE email = ? OR login_username = ?`)
       .get(identifier, identifier);
+    const mEx = db
+      .prepare(`SELECT * FROM identity.exchange_managers WHERE email = ? OR login_username = ?`)
+      .get(identifier, identifier);
+    const managerKind = mDir ? "directory" : mEx ? "exchange" : null;
+    const m = mDir || mEx;
     if (!m || !m.password_hash) {
       recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
@@ -261,11 +281,12 @@ export function registerAuthRoutes(app) {
       }
     }
     recordLoginSuccess(req);
-    const token = signManagerToken(m.id);
+    const token = managerKind === "exchange" ? signExchangeManagerToken(m.id) : signManagerToken(m.id);
     res.json({
       token,
-      user: attachLinkedBusinesses(m),
+      user: attachLinkedBusinesses(m, managerKind || "directory"),
       role: "manager",
+      manager_kind: managerKind || "directory",
     });
   });
 
@@ -324,7 +345,18 @@ export function registerAuthRoutes(app) {
       if (!m) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "manager",
-        user: attachLinkedBusinesses(m),
+        user: attachLinkedBusinesses(m, "directory"),
+        manager_kind: "directory",
+        totp_enabled: !!m.totp_enabled,
+      });
+    }
+    if (p.typ === "mgrx") {
+      const m = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(p.sub);
+      if (!m) return res.status(401).json({ error: "invalid_token" });
+      return res.json({
+        role: "manager",
+        user: attachLinkedBusinesses(m, "exchange"),
+        manager_kind: "exchange",
         totp_enabled: !!m.totp_enabled,
       });
     }
@@ -347,7 +379,7 @@ export function registerAuthRoutes(app) {
 
   app.post("/api/auth/profile-avatar", (req, res) => {
     const p = parseAuthHeader(req);
-    if (!p || (p.typ !== "mgr" && p.typ !== "adm")) {
+    if (!p || (p.typ !== "mgr" && p.typ !== "mgrx" && p.typ !== "adm")) {
       return res.status(401).json({ error: "unauthorized" });
     }
     avatarUpload.single("avatar")(req, res, (err) => {
@@ -364,6 +396,8 @@ export function registerAuthRoutes(app) {
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
       if (p.typ === "mgr") {
         db.prepare(`UPDATE identity.managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
+      } else if (p.typ === "mgrx") {
+        db.prepare(`UPDATE identity.exchange_managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
       } else {
         db.prepare(`UPDATE identity.super_admins SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
       }
@@ -381,9 +415,10 @@ export function registerAuthRoutes(app) {
   /** شروع TOTP — ذخیرهٔ موقت secret تا تأیید با یک کد */
   app.post("/api/auth/manager/2fa/setup", (req, res) => {
     const p = parseAuthHeader(req);
-    if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
+    if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const sec = totpGenerateSecret();
-    db.prepare(`UPDATE identity.managers SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
+    const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
+    db.prepare(`UPDATE ${table} SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
     res.json({
       secret: sec.base32,
       otpauth_url: sec.otpauth_url,
@@ -392,14 +427,15 @@ export function registerAuthRoutes(app) {
 
   app.post("/api/auth/manager/2fa/enable", (req, res) => {
     const p = parseAuthHeader(req);
-    if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
+    if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const token = String((req.body && req.body.token) || "").trim();
-    const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
+    const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
+    const m = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(p.sub);
     if (!m?.totp_secret) return res.status(400).json({ error: "setup_first" });
     if (!totpVerify(m.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE identity.managers SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE ${table} SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_enabled",
@@ -412,13 +448,14 @@ export function registerAuthRoutes(app) {
 
   app.post("/api/auth/manager/2fa/disable", (req, res) => {
     const p = parseAuthHeader(req);
-    if (!p || p.typ !== "mgr") return res.status(401).json({ error: "unauthorized" });
+    if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const password = String((req.body && req.body.password) || "");
-    const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
+    const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
+    const m = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(p.sub);
     if (!m || !verifyPassword(password, m.password_hash)) {
       return res.status(401).json({ error: "invalid_password" });
     }
-    db.prepare(`UPDATE identity.managers SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
+    db.prepare(`UPDATE ${table} SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_disabled",

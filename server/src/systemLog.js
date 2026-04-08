@@ -44,5 +44,6 @@ export function actorFromAuth(auth) {
   if (!auth) return { actorType: "system", actorId: null };
   if (auth.typ === "adm") return { actorType: "superadmin", actorId: auth.sub };
   if (auth.typ === "mgr") return { actorType: "manager", actorId: auth.sub };
+  if (auth.typ === "mgrx") return { actorType: "exchange_manager", actorId: auth.sub };
   return { actorType: "system", actorId: null };
 }

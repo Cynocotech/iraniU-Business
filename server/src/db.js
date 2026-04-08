@@ -131,6 +131,7 @@ function migrateBusinessesColumns() {
     ["cta", "TEXT"],
     ["status", "TEXT"],
     ["manager_id", "INTEGER"],
+    ["exchange_manager_id", "INTEGER"],
     ["biolink_json", "TEXT"],
     ["careers_title", "TEXT"],
     ["careers_text", "TEXT"],
@@ -155,6 +156,11 @@ function migrateBusinessesColumns() {
       db.exec(`ALTER TABLE businesses ADD COLUMN ${col} ${typ}`);
     }
   }
+  // legacy cleanup: manager_id = 0 means "no manager", normalize to NULL
+  db.exec(`UPDATE businesses SET manager_id = NULL WHERE manager_id IS NOT NULL AND CAST(manager_id AS INTEGER) <= 0`);
+  db.exec(
+    `UPDATE businesses SET exchange_manager_id = NULL WHERE exchange_manager_id IS NOT NULL AND CAST(exchange_manager_id AS INTEGER) <= 0`
+  );
 }
 
 migrateBusinessesColumns();
@@ -359,6 +365,36 @@ function migrateAuthTables() {
     console.warn("[db] idx_managers_login_username:", e?.message || e);
   }
   db.exec(`
+    CREATE TABLE IF NOT EXISTS identity.exchange_managers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  const xmInfo = db.prepare("PRAGMA identity.table_info(exchange_managers)").all();
+  const xmNames = new Set(xmInfo.map((c) => c.name));
+  const xmAdd = [
+    ["login_username", "TEXT"],
+    ["password_hash", "TEXT"],
+    ["totp_secret", "TEXT"],
+    ["totp_enabled", "INTEGER NOT NULL DEFAULT 0"],
+    ["avatar_url", "TEXT"],
+  ];
+  for (const [col, typ] of xmAdd) {
+    if (!xmNames.has(col)) {
+      db.exec(`ALTER TABLE identity.exchange_managers ADD COLUMN ${col} ${typ}`);
+    }
+  }
+  try {
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_exchange_managers_login_username ON identity.exchange_managers(login_username) WHERE login_username IS NOT NULL AND length(trim(login_username)) > 0`
+    );
+  } catch (e) {
+    console.warn("[db] idx_exchange_managers_login_username:", e?.message || e);
+  }
+  db.exec(`
     CREATE TABLE IF NOT EXISTS identity.super_admins (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
@@ -391,6 +427,67 @@ function migrateAuthTables() {
 }
 
 migrateAuthTables();
+
+function migrateLegacyExchangeManagersToSeparatePool() {
+  const rows = db
+    .prepare(
+      `SELECT id, slug, manager_id
+       FROM businesses
+       WHERE manager_id IS NOT NULL
+         AND (exchange_manager_id IS NULL OR CAST(exchange_manager_id AS INTEGER) <= 0)
+        AND (
+          lower(IFNULL(TRIM(category), '')) LIKE '%exchange%'
+          OR IFNULL(TRIM(category), '') LIKE '%صراف%'
+        )`
+    )
+    .all();
+  if (!rows.length) return;
+
+  const insertExchangeMgr = db.prepare(
+    `INSERT INTO identity.exchange_managers
+      (email, name, phone, login_username, password_hash, totp_secret, totp_enabled, avatar_url)
+     VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const pickExchangeByEmail = db.prepare(`SELECT * FROM identity.exchange_managers WHERE lower(email) = lower(?)`);
+  const pickExchangeByUsername = db.prepare(
+    `SELECT * FROM identity.exchange_managers WHERE login_username IS NOT NULL AND lower(login_username) = lower(?)`
+  );
+  const pickDirMgr = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`);
+  const setExchangeLink = db.prepare(`UPDATE businesses SET exchange_manager_id = ?, manager_id = NULL WHERE id = ?`);
+
+  const tx = db.transaction((items) => {
+    for (const row of items) {
+      const dirMgr = pickDirMgr.get(row.manager_id);
+      if (!dirMgr) continue;
+      const email = String(dirMgr.email || "").trim().toLowerCase();
+      const loginUsername = String(dirMgr.login_username || "").trim().toLowerCase() || null;
+      if (!email) continue;
+
+      let exMgr = pickExchangeByEmail.get(email);
+      if (!exMgr && loginUsername) exMgr = pickExchangeByUsername.get(loginUsername);
+      if (!exMgr) {
+        const info = insertExchangeMgr.run(
+          email,
+          String(dirMgr.name || "").trim() || "Exchange Manager",
+          String(dirMgr.phone || "").trim() || null,
+          loginUsername,
+          dirMgr.password_hash || null,
+          dirMgr.totp_secret || null,
+          Number(dirMgr.totp_enabled) === 1 ? 1 : 0,
+          dirMgr.avatar_url || null
+        );
+        exMgr = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(info.lastInsertRowid);
+      }
+      if (!exMgr?.id) continue;
+      setExchangeLink.run(exMgr.id, row.id);
+    }
+  });
+
+  tx(rows);
+}
+
+migrateLegacyExchangeManagersToSeparatePool();
 
 function ensureAdminWorkspaceTables() {
   db.exec(`

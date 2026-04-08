@@ -106,16 +106,19 @@ export function DashboardProvider({ children }) {
   }, [authLoading, me, impersonation, dashSlug]);
 
   const asManagerParam = searchParams.get("asManager");
+  const asExchangeManagerParam = searchParams.get("asExchangeManager");
 
   useEffect(() => {
-    if (!asManagerParam) return;
-    const id = parseInt(String(asManagerParam), 10);
+    const managerParam = asManagerParam || asExchangeManagerParam;
+    if (!managerParam) return;
+    const id = parseInt(String(managerParam), 10);
     if (!Number.isFinite(id)) {
       setSearchParams({}, { replace: true });
       return;
     }
+    const endpoint = asExchangeManagerParam ? `/api/exchange-managers/${id}` : `/api/managers/${id}`;
     let cancelled = false;
-    apiGet(`/api/managers/${id}`)
+    apiGet(endpoint)
       .then((data) => {
         if (cancelled) return;
         const list = data.linked_businesses || [];
@@ -154,7 +157,7 @@ export function DashboardProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [asManagerParam, setSearchParams]);
+  }, [asManagerParam, asExchangeManagerParam, setSearchParams]);
 
   const onSlugChange = useCallback((s) => {
     try {

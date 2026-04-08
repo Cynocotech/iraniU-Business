@@ -43,6 +43,7 @@ const PATCHABLE_BUSINESS = new Set([
   "claimed",
   "package",
   "manager_id",
+  "exchange_manager_id",
   "biolink_json",
   "careers_title",
   "careers_text",
@@ -664,7 +665,11 @@ app.get("/api/businesses/:slug", (req, res) => {
       (auth &&
         auth.typ === "mgr" &&
         row.manager_id != null &&
-        Number(row.manager_id) === Number(auth.sub));
+        Number(row.manager_id) === Number(auth.sub)) ||
+      (auth &&
+        auth.typ === "mgrx" &&
+        row.exchange_manager_id != null &&
+        Number(row.exchange_manager_id) === Number(auth.sub));
     if (!canSee) return res.status(404).json({ error: "not_found", slug: req.params.slug });
   }
   const twilioOn = isTwilioModuleEnabled();
@@ -1249,18 +1254,25 @@ app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, (req, res) =
   res.json(db.prepare(`SELECT * FROM claim_requests WHERE id = ?`).get(id));
 });
 
-function attachLinkedBusinesses(managerRow) {
+function attachLinkedBusinesses(managerRow, kind = "directory") {
+  const managerColumn = kind === "exchange" ? "exchange_manager_id" : "manager_id";
+  const categoryWhere =
+    kind === "exchange"
+      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
+      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
   const linked_businesses = db
     .prepare(
       `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE manager_id = ?
+       WHERE ${managerColumn} = ?
+       ${categoryWhere}
        ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
     )
     .all(managerRow.id);
   return {
     ...stripManagerRow(managerRow),
     linked_businesses,
+    manager_kind: kind,
     password_set: !!managerRow.password_hash,
     totp_enabled: !!managerRow.totp_enabled,
   };
@@ -1277,6 +1289,19 @@ app.get("/api/managers/:id", requireSuperAdmin, (req, res) => {
   const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(id);
   if (!m) return res.status(404).json({ error: "not_found" });
   res.json(attachLinkedBusinesses(m));
+});
+
+app.get("/api/exchange-managers", requireSuperAdmin, (_req, res) => {
+  const rows = db.prepare(`SELECT * FROM identity.exchange_managers ORDER BY created_at DESC`).all();
+  res.json(rows.map((m) => attachLinkedBusinesses(m, "exchange")));
+});
+
+app.get("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
+  const id = parseInt(String(req.params.id || ""), 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+  const m = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(id);
+  if (!m) return res.status(404).json({ error: "not_found" });
+  res.json(attachLinkedBusinesses(m, "exchange"));
 });
 
 const MANAGER_LOGIN_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
@@ -1337,10 +1362,78 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
   }
 });
 
+app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+  const email = String(b.email || "").trim().toLowerCase();
+  const name = String(b.name || "").trim();
+  const password = String(b.password || "").trim();
+  const login_username_raw = String(b.login_username || b.username || "").trim().toLowerCase();
+  const phone = String(b.phone || "").trim();
+  if (!email || !name) return res.status(400).json({ error: "missing_email_or_name" });
+  if (!phone) return res.status(400).json({ error: "missing_phone", hint: "تلفن الزامی است" });
+  if (!login_username_raw) {
+    return res.status(400).json({ error: "missing_username", hint: "نام کاربری الزامی است" });
+  }
+  const pwCheck = validatePasswordComplexity(password);
+  if (!pwCheck.ok) {
+    return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
+  }
+  const login_username = login_username_raw;
+  if (!MANAGER_LOGIN_USERNAME_RE.test(login_username)) {
+    return res.status(400).json({
+      error: "invalid_username",
+      hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
+    });
+  }
+  if (
+    db.prepare(`SELECT id FROM identity.exchange_managers WHERE email = ?`).get(email) ||
+    db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)
+  ) {
+    return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً برای یک مدیر ثبت شده" });
+  }
+  if (
+    db.prepare(`SELECT id FROM identity.exchange_managers WHERE login_username = ?`).get(login_username) ||
+    db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)
+  ) {
+    return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
+  }
+  try {
+    const ph = hashPassword(password);
+    const info = db
+      .prepare(
+        `INSERT INTO identity.exchange_managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(email, name, phone, ph, login_username);
+    const row = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(info.lastInsertRowid);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "exchange_manager_created",
+      targetType: "exchange_manager",
+      targetId: row.id,
+      message: `Exchange manager created: ${row.email}`,
+    });
+    res.status(201).json(attachLinkedBusinesses(row, "exchange"));
+  } catch (e) {
+    if (String(e.message || "").includes("UNIQUE")) {
+      return res.status(409).json({
+        error: "email_or_username_taken",
+        hint: "ایمیل یا نام کاربری تکراری است",
+      });
+    }
+    throw e;
+  }
+});
+
 app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
-  const exists = db.prepare(`SELECT slug FROM businesses WHERE slug = ?`).get(slug);
+  const exists = db.prepare(`SELECT slug, category FROM businesses WHERE slug = ?`).get(slug);
   if (!exists) return res.status(404).json({ error: "not_found" });
+  const cat = String(exists.category || "").trim();
+  if (cat.includes("صراف") || cat.toLowerCase().includes("exchange")) {
+    return res
+      .status(400)
+      .json({ error: "exchange_use_separate_manager", hint: "برای صرافی‌ها از لینک مدیر صرافی استفاده کنید." });
+  }
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
   const managerIdentifier = String(b.manager_email || b.manager_login || "")
@@ -1407,6 +1500,64 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
   const manager =
     row?.manager_id != null
       ? db.prepare(`SELECT id, name, email, login_username FROM identity.managers WHERE id = ?`).get(row.manager_id)
+      : null;
+  res.json({ ...row, manager });
+});
+
+app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (req, res) => {
+  const slug = decodeURIComponent(String(req.params.slug || "").trim());
+  const exists = db
+    .prepare(`SELECT slug, category FROM businesses WHERE slug = ?`)
+    .get(slug);
+  if (!exists) return res.status(404).json({ error: "not_found" });
+  const cat = String(exists.category || "").trim();
+  if (!(cat.includes("صراف") || cat.toLowerCase().includes("exchange"))) {
+    return res.status(400).json({ error: "not_exchange_business" });
+  }
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+  const mid = b.manager_id;
+  const managerIdentifier = String(b.manager_email || b.manager_login || "")
+    .trim()
+    .toLowerCase();
+  if ((mid === null || mid === undefined || mid === "") && !managerIdentifier) {
+    db.prepare(`UPDATE businesses SET exchange_manager_id = NULL WHERE slug = ?`).run(slug);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "exchange_business_manager_unlinked",
+      targetType: "business",
+      targetId: slug,
+      message: `Exchange manager unlinked from business ${slug}`,
+    });
+  } else {
+    let id = null;
+    let managerRow = null;
+    if (mid !== null && mid !== undefined && mid !== "") {
+      const parsed = parseInt(String(mid), 10);
+      if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
+      id = parsed;
+      managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
+    } else if (managerIdentifier) {
+      managerRow = db
+        .prepare(`SELECT id FROM identity.exchange_managers WHERE lower(email) = ? OR lower(login_username) = ?`)
+        .get(managerIdentifier, managerIdentifier);
+      if (managerRow) id = Number(managerRow.id);
+    }
+    if (!managerRow) {
+      return res.status(400).json({ error: "invalid_exchange_manager_identifier", hint: "ایمیل یا نام کاربری مدیر صرافی پیدا نشد" });
+    }
+    db.prepare(`UPDATE businesses SET exchange_manager_id = ? WHERE slug = ?`).run(id, slug);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "exchange_business_manager_linked",
+      targetType: "business",
+      targetId: slug,
+      message: `Exchange manager #${id} linked to business ${slug}`,
+    });
+  }
+  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const manager =
+    row?.exchange_manager_id != null
+      ? db.prepare(`SELECT id, name, email, login_username FROM identity.exchange_managers WHERE id = ?`).get(row.exchange_manager_id)
       : null;
   res.json({ ...row, manager });
 });
@@ -1588,7 +1739,7 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
   const level = String(req.query.level || "").trim().toLowerCase();
   const actor = String(req.query.actor_type || "").trim().toLowerCase();
   const levelOk = ["info", "warn", "error"].includes(level);
-  const actorOk = ["system", "superadmin", "manager"].includes(actor);
+  const actorOk = ["system", "superadmin", "manager", "exchange_manager"].includes(actor);
   const where = [];
   const params = [];
   if (levelOk) {
@@ -1602,7 +1753,7 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const q = `
     SELECT sl.*,
-      COALESCE(sa.name, mg.name) AS actor_name
+      COALESCE(sa.name, mg.name, xmg.name) AS actor_name
     FROM system_logs sl
     LEFT JOIN identity.super_admins sa
       ON sl.actor_type = 'superadmin'
@@ -1612,6 +1763,10 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
       ON sl.actor_type = 'manager'
       AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
       AND mg.id = CAST(sl.actor_id AS INTEGER)
+    LEFT JOIN identity.exchange_managers xmg
+      ON sl.actor_type = 'exchange_manager'
+      AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
+      AND xmg.id = CAST(sl.actor_id AS INTEGER)
     ${whereSql}
     ORDER BY datetime(sl.created_at) DESC, sl.id DESC
     LIMIT ?
@@ -1629,13 +1784,15 @@ function updateBusinessBySlug(req, res) {
   if (!slug) {
     return res.status(400).json({ error: "missing_slug" });
   }
-  const exists = db.prepare(`SELECT slug, manager_id FROM businesses WHERE slug = ?`).get(slug);
+  const exists = db
+    .prepare(`SELECT slug, manager_id, exchange_manager_id FROM businesses WHERE slug = ?`)
+    .get(slug);
   if (!exists) {
     return res.status(404).json({ error: "not_found", slug, hint: "GET /api/businesses برای فهرست نامک‌ها" });
   }
 
   const auth = parseAuthHeader(req);
-  if (!auth || (auth.typ !== "mgr" && auth.typ !== "adm")) {
+  if (!auth || (auth.typ !== "mgr" && auth.typ !== "mgrx" && auth.typ !== "adm")) {
     return res.status(401).json({
       error: "unauthorized",
       hint: "برای ذخیرهٔ آگهی ابتدا به‌عنوان مدیر یا سوپرادمین وارد شوید",
@@ -1644,6 +1801,11 @@ function updateBusinessBySlug(req, res) {
   if (auth.typ === "mgr") {
     if (exists.manager_id == null || Number(exists.manager_id) !== Number(auth.sub)) {
       return res.status(403).json({ error: "forbidden", hint: "این آگهی به حساب شما وصل نیست" });
+    }
+  }
+  if (auth.typ === "mgrx") {
+    if (exists.exchange_manager_id == null || Number(exists.exchange_manager_id) !== Number(auth.sub)) {
+      return res.status(403).json({ error: "forbidden", hint: "این آگهی صرافی به حساب شما وصل نیست" });
     }
   }
 
@@ -1686,6 +1848,18 @@ function updateBusinessBySlug(req, res) {
         if (!Number.isFinite(mid)) continue;
         const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(mid);
         if (!m) return res.status(400).json({ error: "invalid_manager_id" });
+        updates[key] = mid;
+      }
+      continue;
+    }
+    if (key === "exchange_manager_id") {
+      if (val === null || val === "") {
+        updates[key] = null;
+      } else {
+        const mid = parseInt(String(val), 10);
+        if (!Number.isFinite(mid)) continue;
+        const m = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(mid);
+        if (!m) return res.status(400).json({ error: "invalid_exchange_manager_id" });
         updates[key] = mid;
       }
       continue;
@@ -1734,6 +1908,7 @@ function updateBusinessBySlug(req, res) {
 
   if (auth.typ === "mgr") {
     delete updates.manager_id;
+    delete updates.exchange_manager_id;
     delete updates.claimed;
     delete updates.package;
     delete updates.exchange_company_verified;
@@ -1742,6 +1917,16 @@ function updateBusinessBySlug(req, res) {
       delete updates.call_tracking_number;
       delete updates.call_forward_number;
     }
+  }
+  if (auth.typ === "mgrx") {
+    delete updates.manager_id;
+    delete updates.exchange_manager_id;
+    delete updates.claimed;
+    delete updates.package;
+    delete updates.exchange_company_verified;
+    delete updates.call_tracking_enabled;
+    delete updates.call_tracking_number;
+    delete updates.call_forward_number;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -1959,11 +2144,17 @@ app.get("/api/manager/call-logs", requireManager, (req, res) => {
 });
 
 app.get("/api/manager/linked-businesses", requireManager, (req, res) => {
+  const managerColumn = req.auth.typ === "mgrx" ? "exchange_manager_id" : "manager_id";
+  const categoryWhere =
+    req.auth.typ === "mgrx"
+      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
+      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
   const rows = db
     .prepare(
       `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE manager_id = ?
+       WHERE ${managerColumn} = ?
+       ${categoryWhere}
        ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
     )
     .all(req.auth.sub);
