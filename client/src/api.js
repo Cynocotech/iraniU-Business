@@ -88,7 +88,7 @@ export async function apiPatchUrl(path, body) {
     ...fetchOpts,
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || String(r.status));
+  if (!r.ok) throw new Error(data.hint ? `${data.error}: ${data.hint}` : data.error || String(r.status));
   return data;
 }
 

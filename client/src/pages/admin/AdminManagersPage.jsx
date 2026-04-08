@@ -73,7 +73,10 @@ export default function AdminManagersPage() {
   };
 
   const deleteSelectedManager = async () => {
-    const id = parseInt(String(deleteId || ""), 10);
+    const selectedFromDom =
+      typeof document !== "undefined" ? document.querySelector('input[name="manager-delete"]:checked')?.value || "" : "";
+    const rawId = String(deleteId || selectedFromDom || "");
+    const id = parseInt(rawId, 10);
     if (!Number.isFinite(id) || id <= 0) {
       setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
       return;
@@ -203,9 +206,11 @@ export default function AdminManagersPage() {
                     <input
                       type="radio"
                       name="manager-delete"
+                      value={String(r.id)}
                       aria-label={`انتخاب مدیر ${r.name} برای حذف`}
                       checked={String(deleteId) === String(r.id)}
-                      onChange={() => setDeleteId(String(r.id))}
+                      onChange={(e) => setDeleteId(String(e.target.value || r.id))}
+                      onClick={(e) => setDeleteId(String(e.currentTarget.value || r.id))}
                     />
                   </td>
                   <td dir="ltr">{r.id}</td>

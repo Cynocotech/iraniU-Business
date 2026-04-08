@@ -61,26 +61,6 @@ function normalizeChannelId(raw) {
   return s;
 }
 
-function formatTimings(hoursJson) {
-  try {
-    const arr = JSON.parse(typeof hoursJson === "string" ? hoursJson : "[]");
-    if (!Array.isArray(arr) || arr.length === 0) return "";
-    const lines = arr
-      .map((r) => {
-        const day = String(r?.day || "").trim();
-        const hours = String(r?.hours || "").trim();
-        if (!day || !hours) return "";
-        return `• ${escapeHtml(day)}: ${escapeHtml(hours)}`;
-      })
-      .filter(Boolean)
-      .slice(0, 5);
-    if (!lines.length) return "";
-    return lines.join("\n");
-  } catch {
-    return "";
-  }
-}
-
 async function telegramPost(token, method, body) {
   const url = `https://api.telegram.org/bot${token}/${method}`;
   const r = await fetch(url, {
@@ -125,7 +105,6 @@ export async function sendBusinessDirectoryPost(slug) {
   const address = String(row.address || "").trim();
   const phone = String(row.phone || "").trim();
   const cat = String(row.category || "").trim();
-  const timings = formatTimings(row.hours_json);
 
   const mapsUrl = address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
@@ -140,11 +119,6 @@ export async function sendBusinessDirectoryPost(slug) {
     "",
     `📍 <b>موقعیت:</b> <b>${address ? escapeHtml(truncate(address, 220)) : "—"}</b>`,
   ];
-  if (timings) {
-    parts.push("", `⏰ <b>ساعت کاری:</b>\n<b>${timings}</b>`);
-  } else {
-    parts.push("", "⏰ <b>ساعت کاری:</b> <b>—</b>");
-  }
   if (phone) parts.push("", `📞 <b>تماس:</b> <b>${escapeHtml(phone)}</b>`);
   if (descHtml) parts.push("", `📝 <b>توضیحات:</b>\n<b>${descHtml}</b>`);
 

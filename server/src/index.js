@@ -1567,14 +1567,9 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
 
 app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
-  const exists = db
-    .prepare(`SELECT slug, category FROM businesses WHERE slug = ?`)
-    .get(slug);
+  const exists = db.prepare(`SELECT slug, category FROM businesses WHERE slug = ?`).get(slug);
   if (!exists) return res.status(404).json({ error: "not_found" });
-  const cat = String(exists.category || "").trim();
-  if (!(cat.includes("صراف") || cat.toLowerCase().includes("exchange"))) {
-    return res.status(400).json({ error: "not_exchange_business" });
-  }
+  // Super admin can pre-link exchange managers even before category is persisted as "exchange".
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
   const managerIdentifier = String(b.manager_email || b.manager_login || "")

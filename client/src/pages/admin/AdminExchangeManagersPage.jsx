@@ -176,7 +176,12 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
   };
 
   const deleteSelectedManager = async () => {
-    const id = parseInt(String(deletingId || ""), 10);
+    const selectedFromDom =
+      typeof document !== "undefined"
+        ? document.querySelector('input[name="exchange-manager-delete"]:checked')?.value || ""
+        : "";
+    const rawId = String(deletingId || selectedFromDom || "");
+    const id = parseInt(rawId, 10);
     if (!Number.isFinite(id) || id <= 0) {
       setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
       return;
@@ -378,9 +383,11 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
                     <input
                       type="radio"
                       name="exchange-manager-delete"
+                      value={String(r.id)}
                       aria-label={`انتخاب مدیر ${r.name} برای حذف`}
                       checked={String(deletingId) === String(r.id)}
-                      onChange={() => setDeletingId(String(r.id))}
+                      onChange={(e) => setDeletingId(String(e.target.value || r.id))}
+                      onClick={(e) => setDeletingId(String(e.currentTarget.value || r.id))}
                     />
                   </td>
                   <td dir="ltr">{r.id}</td>
