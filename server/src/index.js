@@ -1517,6 +1517,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
   const managerIdentifier = String(b.manager_email || b.manager_login || "")
+    .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
     .trim()
     .toLowerCase();
   if ((mid === null || mid === undefined || mid === "") && !managerIdentifier) {
@@ -1531,19 +1532,36 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
   } else {
     let id = null;
     let managerRow = null;
+    let source = "id";
     if (mid !== null && mid !== undefined && mid !== "") {
       const parsed = parseInt(String(mid), 10);
       if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
       id = parsed;
       managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
     } else if (managerIdentifier) {
+      source = "email_or_username";
       managerRow = db
         .prepare(`SELECT id FROM identity.exchange_managers WHERE lower(email) = ? OR lower(login_username) = ?`)
         .get(managerIdentifier, managerIdentifier);
       if (managerRow) id = Number(managerRow.id);
     }
+    // If ID was sent but no longer valid, fallback to email/login when provided.
+    if (!managerRow && managerIdentifier) {
+      source = "email_or_username_fallback";
+      const mByIdent = db
+        .prepare(`SELECT id FROM identity.exchange_managers WHERE lower(email) = ? OR lower(login_username) = ?`)
+        .get(managerIdentifier, managerIdentifier);
+      if (mByIdent) {
+        id = Number(mByIdent.id);
+        managerRow = mByIdent;
+      }
+    }
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_manager_id" });
     if (!managerRow) {
-      return res.status(400).json({ error: "invalid_exchange_manager_identifier", hint: "ایمیل یا نام کاربری مدیر صرافی پیدا نشد" });
+      if (managerIdentifier) {
+        return res.status(400).json({ error: "invalid_exchange_manager_identifier", hint: "ایمیل یا نام کاربری مدیر صرافی پیدا نشد" });
+      }
+      return res.status(400).json({ error: "invalid_exchange_manager_id" });
     }
     db.prepare(`UPDATE businesses SET exchange_manager_id = ? WHERE slug = ?`).run(id, slug);
     writeSystemLog({
@@ -1551,7 +1569,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
       action: "exchange_business_manager_linked",
       targetType: "business",
       targetId: slug,
-      message: `Exchange manager #${id} linked to business ${slug}`,
+      message: `Exchange manager #${id} linked to business ${slug} (${source})`,
     });
   }
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
