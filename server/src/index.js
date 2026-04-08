@@ -1341,8 +1341,13 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
   const exists = db.prepare(`SELECT slug FROM businesses WHERE slug = ?`).get(slug);
   if (!exists) return res.status(404).json({ error: "not_found" });
-  const mid = req.body && req.body.manager_id;
-  if (mid === null || mid === undefined || mid === "") {
+  const b = req.body && typeof req.body === "object" ? req.body : {};
+  const mid = b.manager_id;
+  const managerIdentifier = String(b.manager_email || b.manager_login || "")
+    .trim()
+    .toLowerCase();
+
+  if ((mid === null || mid === undefined || mid === "") && !managerIdentifier) {
     db.prepare(`UPDATE businesses SET manager_id = NULL WHERE slug = ?`).run(slug);
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -1352,7 +1357,22 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       message: `Manager unlinked from business ${slug}`,
     });
   } else {
-    const id = parseInt(String(mid), 10);
+    let id = null;
+    let source = "id";
+    if (mid !== null && mid !== undefined && mid !== "") {
+      const parsed = parseInt(String(mid), 10);
+      if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
+      id = parsed;
+    } else if (managerIdentifier) {
+      source = "email_or_username";
+      const mByIdent = db
+        .prepare(`SELECT id FROM identity.managers WHERE lower(email) = ? OR lower(login_username) = ?`)
+        .get(managerIdentifier, managerIdentifier);
+      if (!mByIdent) {
+        return res.status(400).json({ error: "invalid_manager_identifier", hint: "ایمیل یا نام‌کاربری مدیر پیدا نشد" });
+      }
+      id = Number(mByIdent.id);
+    }
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_manager_id" });
     const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
     if (!m) return res.status(400).json({ error: "invalid_manager_id" });
@@ -1362,11 +1382,15 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       action: "business_manager_linked",
       targetType: "business",
       targetId: slug,
-      message: `Manager #${id} linked to business ${slug}`,
+      message: `Manager #${id} linked to business ${slug} (${source})`,
     });
   }
   const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
-  res.json(row);
+  const manager =
+    row?.manager_id != null
+      ? db.prepare(`SELECT id, name, email, login_username FROM identity.managers WHERE id = ?`).get(row.manager_id)
+      : null;
+  res.json({ ...row, manager });
 });
 
 app.post("/api/admin/businesses/:slug/send-to-telegram-channel", requireSuperAdmin, async (req, res) => {
