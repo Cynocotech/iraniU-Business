@@ -419,7 +419,6 @@ export default function ExchangesListingsPage() {
                   )}
                 </Link>
               ) : null}
-              <p className="exchanges-app__best-widget-kicker">بهترین نرخ در این فهرست</p>
               <div className="exchanges-app__best-widget-dual">
                 {bestSellPick ? (
                   <Link

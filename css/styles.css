@@ -1864,16 +1864,17 @@ body.page-map main#main {
     0 0 34px rgba(211, 47, 47, 0.38),
     0 12px 26px rgba(58, 11, 71, 0.14);
   animation: exchanges-best-red-glow 2.1s ease-in-out infinite;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .exchanges-app__best-widget-tag {
   position: absolute;
-  top: -24px;
-  left: -24px;
-  width: 64px;
+  top: -38px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
   height: auto;
-  z-index: 2;
+  z-index: 4;
   pointer-events: none;
 }
 
@@ -1883,9 +1884,10 @@ body.page-map main#main {
   }
 
   .exchanges-app__best-widget-tag {
-    width: 56px;
-    top: -20px;
-    left: -20px;
+    width: 80px;
+    top: -34px;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 
@@ -1925,7 +1927,8 @@ body.page-map main#main {
 .exchanges-app__best-widget-title-logo-link {
   align-self: center;
   display: inline-flex;
-  margin-bottom: 0.2rem;
+  margin-top: calc(0.8rem + 10px);
+  margin-bottom: 0.1rem;
 }
 
 .exchanges-app__best-widget-title-logo {
