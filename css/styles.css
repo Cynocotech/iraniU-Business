@@ -331,6 +331,10 @@ textarea:focus-visible {
   justify-content: flex-end;
 }
 
+.site-header--logo-only .site-header__inner {
+  justify-content: center;
+}
+
 body.business-page.business-page--exchange-detail .site-header__inner {
   justify-content: center;
 }

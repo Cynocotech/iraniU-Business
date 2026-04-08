@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import ExchangeInlineCalc from "./ExchangeInlineCalc.jsx";
-import { businessHasExchangeRatesData, getCalculatorRateOrDemo } from "../lib/exchangeRates.js";
+import { businessHasExchangeRatesData, getCalculatorRateOrDemo, parseLocalizedNumber } from "../lib/exchangeRates.js";
 
 /**
  * ماشین‌حساب نرخ در مودال — همان منطق صفحهٔ /exchanges/calculator، با state ارز/خریدفروش از والد.
@@ -43,7 +43,7 @@ export default function ExchangeCalcModal({
     [selectedRate, exchangeMode]
   );
 
-  const exchangeAmountNum = Number.parseFloat(String(exchangeAmount || "").replace(",", "."));
+  const exchangeAmountNum = parseLocalizedNumber(exchangeAmount);
   const exchangeResult =
     Number.isFinite(selectedRateNum) && Number.isFinite(exchangeAmountNum)
       ? selectedRateNum * exchangeAmountNum

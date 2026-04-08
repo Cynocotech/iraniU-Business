@@ -3,7 +3,7 @@ import { useDashboard } from "../../context/DashboardContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
-import { isExchangeBusiness, parseExchangeRatesJson } from "../../lib/exchangeRates.js";
+import { isExchangeBusiness, parseExchangeRatesJson, parseLocalizedNumber } from "../../lib/exchangeRates.js";
 
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
@@ -20,7 +20,7 @@ function formatRatingDisplay(rating) {
 }
 
 function parseRateNum(raw) {
-  const n = Number.parseFloat(String(raw || "").replace(",", ".").replace(/\s/g, ""));
+  const n = parseLocalizedNumber(raw);
   return Number.isFinite(n) ? n : null;
 }
 

@@ -28,6 +28,26 @@ export const EXCHANGE_FEATURES = [
 
 export const EXCHANGE_DEFAULT_FEATURE_IDS = EXCHANGE_FEATURES.map((f) => f.id);
 
+const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+function normalizeLocalizedNumberString(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  return s
+    .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
+    .replace(/[٬،]/g, "")
+    .replace(/٫/g, ".")
+    .replace(/,/g, ".")
+    .replace(/\s/g, "");
+}
+
+export function parseLocalizedNumber(raw) {
+  const n = Number.parseFloat(normalizeLocalizedNumberString(raw));
+  return Number.isFinite(n) ? n : null;
+}
+
 function normalizeRateRow(row) {
   const code = String(row?.code || "")
     .trim()
@@ -167,7 +187,7 @@ export function parseExchangeRatesJsonOrEmpty(json) {
 }
 
 function parseStoredRateNumber(raw) {
-  const n = Number.parseFloat(String(raw ?? "").replace(/,/g, ".").replace(/\s/g, ""));
+  const n = parseLocalizedNumber(raw);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
@@ -271,7 +291,7 @@ const CALC_DEMO_TOMAN = {
 export function getCalculatorRateOrDemo(row, mode) {
   if (!row) return { rateNum: null, raw: "", isDemo: false };
   const raw = getEffectiveRateRaw(row, mode);
-  const n = Number.parseFloat(String(raw || "").replace(/,/g, ".").replace(/\s/g, ""));
+  const n = parseLocalizedNumber(raw);
   if (Number.isFinite(n) && n > 0) return { rateNum: n, raw: String(raw).trim(), isDemo: false };
   const code = String(row.code || "")
     .trim()
@@ -300,7 +320,7 @@ export function pickBestRateExchangeInList(businesses, currencyCode, mode) {
     const row = rows.find((r) => r.code === code);
     if (!row) continue;
     const raw = getEffectiveRateRaw(row, m);
-    const n = Number.parseFloat(String(raw || "").replace(",", "."));
+    const n = parseLocalizedNumber(raw);
     if (!Number.isFinite(n)) continue;
     const isBetter = (candidate, current) => {
       if (m === "buy") return candidate > current;
@@ -317,7 +337,7 @@ export function pickBestRateExchangeInList(businesses, currencyCode, mode) {
 export function formatExchangeRateToman(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "—";
-  const n = Number.parseFloat(raw.replace(/,/g, ".").replace(/\s/g, ""));
+  const n = parseLocalizedNumber(raw);
   if (!Number.isFinite(n)) return raw;
   const formatted = n.toLocaleString("fa-IR", {
     maximumFractionDigits: n % 1 === 0 ? 0 : 4,

@@ -21,6 +21,7 @@ import {
   isExchangeBusiness,
   isExchangeCompanyVerified,
   isExchangeCategory,
+  parseLocalizedNumber,
   parseExchangePaymentMethodsJson,
   parseExchangeRatesJson,
 } from "../lib/exchangeRates.js";
@@ -302,8 +303,8 @@ export default function BusinessPage() {
     exchangeRatesRows.find((r) => r.code === selectedCurrencyCode) || exchangeRatesRows[0] || null;
   const showExchangeCalcFab = isExchangeBusiness(b) && !!selectedRate;
   const selectedRateRaw = getEffectiveRateRaw(selectedRate, exchangeMode);
-  const selectedRateNum = Number.parseFloat(String(selectedRateRaw || "").replace(",", "."));
-  const exchangeAmountNum = Number.parseFloat(String(exchangeAmount || "").replace(",", "."));
+  const selectedRateNum = parseLocalizedNumber(selectedRateRaw);
+  const exchangeAmountNum = parseLocalizedNumber(exchangeAmount);
   const exchangeResult =
     Number.isFinite(selectedRateNum) && Number.isFinite(exchangeAmountNum)
       ? selectedRateNum * exchangeAmountNum

@@ -8,6 +8,7 @@ import {
   businessHasExchangeRatesData,
   getCalculatorRateOrDemo,
   isExchangeBusiness,
+  parseLocalizedNumber,
   parseExchangeRatesJson,
 } from "../lib/exchangeRates.js";
 
@@ -45,7 +46,7 @@ export default function ExchangeCalculatorPage() {
     [selectedRate, exchangeMode]
   );
 
-  const exchangeAmountNum = Number.parseFloat(String(exchangeAmount || "").replace(",", "."));
+  const exchangeAmountNum = parseLocalizedNumber(exchangeAmount);
   const exchangeResult =
     Number.isFinite(selectedRateNum) && Number.isFinite(exchangeAmountNum)
       ? selectedRateNum * exchangeAmountNum
