@@ -3,6 +3,7 @@ import { apiDelete, apiGet, apiPatchJson, apiPost, apiPostMultipart } from "../.
 
 const defaultForm = {
   title: "",
+  image_url: "",
   link_url: "",
   page_scope: "exchange",
   placement: "between",
@@ -92,14 +93,16 @@ export default function AdminExchangeBannersPage() {
   const onUpload = async (e) => {
     e.preventDefault();
     setMsg("");
-    if (!file) {
-      setMsg("تصویر بنر را انتخاب کنید.");
+    const imageSource = String(form.image_url || "").trim();
+    if (!file && !imageSource) {
+      setMsg("تصویر بنر را آپلود کنید یا لینک تصویر وارد کنید.");
       return;
     }
     setBusy(true);
     try {
       const fd = new FormData();
-      fd.append("image", file);
+      if (file) fd.append("image", file);
+      fd.append("image_url", imageSource);
       fd.append("title", form.title.trim());
       fd.append("link_url", form.link_url.trim());
       fd.append("page_scope", form.page_scope);
@@ -143,6 +146,7 @@ export default function AdminExchangeBannersPage() {
     try {
       const out = await patchBanner(row.id, {
         title: row.title || "",
+        image_url: row.image_url || "",
         link_url: row.link_url || "",
         page_scope: row.page_scope || "exchange",
         placement: row.placement || "between",
@@ -300,6 +304,17 @@ export default function AdminExchangeBannersPage() {
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+          <span className="field-hint">اگر آپلود نشد، از فیلد لینک تصویر استفاده کنید.</span>
+        </div>
+        <div className="field field--block">
+          <label htmlFor="ex-banner-image-url">لینک منبع تصویر (اختیاری)</label>
+          <input
+            id="ex-banner-image-url"
+            dir="ltr"
+            value={form.image_url}
+            onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+            placeholder="https://... یا /uploads/..."
           />
         </div>
         <div className="field field--block">
@@ -578,6 +593,16 @@ export default function AdminExchangeBannersPage() {
                       {imageSavingId === editDraft.id ? "در حال ذخیره تصویر…" : "ذخیره تصویر"}
                     </button>
                   </div>
+                </div>
+                <div className="field field--block" style={{ marginTop: "0.7rem" }}>
+                  <label>لینک منبع تصویر</label>
+                  <input
+                    dir="ltr"
+                    value={editDraft.image_url || ""}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, image_url: e.target.value }))}
+                    placeholder="https://... یا /uploads/..."
+                  />
+                  <span className="field-hint">با «ذخیره تغییرات» اعمال می‌شود.</span>
                 </div>
               </div>
 

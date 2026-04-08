@@ -39,6 +39,7 @@ const EXCHANGE_CITY_LABELS = {
   birmingham: "برمنگام",
   glasgow: "گلاسگو",
 };
+const BEST_RATE_TAG_SRC = "/images/exchange-best-tag.png?v=20260408-1";
 
 function faDigits(n) {
   return Number(n).toLocaleString("fa-IR");
@@ -403,7 +404,7 @@ export default function ExchangesListingsPage() {
           >
             <img
               className="exchanges-app__best-widget-tag"
-              src="/images/exchange-best-tag.png"
+              src={BEST_RATE_TAG_SRC}
               alt=""
               aria-hidden="true"
               loading="lazy"
@@ -446,7 +447,17 @@ export default function ExchangesListingsPage() {
                       {formatExchangeRateToman(bestSellPick.raw)}
                     </span>
                   </Link>
-                ) : null}
+                ) : (
+                  <span className="exchanges-app__best-side exchanges-app__best-side--sell" aria-label="بهترین نرخ فروش موجود نیست">
+                    <span className="exchanges-app__best-side-label">
+                      <i className="fa-solid fa-arrow-up-right-dots exchanges-app__best-side-ico" aria-hidden="true" />
+                      فروش
+                    </span>
+                    <span className="exchanges-app__best-side-rate" dir="ltr">
+                      —
+                    </span>
+                  </span>
+                )}
                 {bestBuyPick ? (
                   <Link
                     className="exchanges-app__best-side exchanges-app__best-side--buy"
@@ -461,7 +472,17 @@ export default function ExchangesListingsPage() {
                       {formatExchangeRateToman(bestBuyPick.raw)}
                     </span>
                   </Link>
-                ) : null}
+                ) : (
+                  <span className="exchanges-app__best-side exchanges-app__best-side--buy" aria-label="بهترین نرخ خرید موجود نیست">
+                    <span className="exchanges-app__best-side-label">
+                      <i className="fa-solid fa-arrow-down-wide-short exchanges-app__best-side-ico" aria-hidden="true" />
+                      خرید
+                    </span>
+                    <span className="exchanges-app__best-side-rate" dir="ltr">
+                      —
+                    </span>
+                  </span>
+                )}
               </div>
             </div>
           </aside>

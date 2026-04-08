@@ -1867,6 +1867,17 @@ body.page-map main#main {
   overflow: visible;
 }
 
+/* Best-rate widget should be mobile-only on exchanges list. */
+.listings-page--exchanges .exchanges-app__best-widget-shell {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .listings-page--exchanges .exchanges-app__best-widget-shell {
+    display: block;
+  }
+}
+
 .exchanges-app__best-widget-tag {
   position: absolute;
   top: -38px;

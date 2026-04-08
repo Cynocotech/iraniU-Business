@@ -135,7 +135,16 @@ app.get("/api/twilio-module-status", (_req, res) => {
 
 function isListingApproved(row) {
   const a = row && row.listing_approval;
-  return a === "approved" || a == null || a === "";
+  if (a === "approved" || a == null || a === "") return true;
+  if (a === "pending") {
+    const cat = String(row?.category || "").trim().toLowerCase();
+    return (
+      row?.exchange_manager_id != null ||
+      cat.includes("صراف") ||
+      cat.includes("exchange")
+    );
+  }
+  return false;
 }
 
 /** آگهی روی سایت عمومی — فقط فعال (یا بدون وضعیت = فعال) */
@@ -161,6 +170,14 @@ function normalizeExchangeBannerScope(v) {
 }
 
 function parseExchangeBannerLink(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  if (s.startsWith("/")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  return "";
+}
+
+function parseExchangeBannerImageSource(v) {
   const s = String(v || "").trim();
   if (!s) return "";
   if (s.startsWith("/")) return s;
@@ -284,15 +301,20 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
       return res.status(400).json({ error: "upload_failed", hint: String(err.message || err) });
     }
     try {
-      if (!req.file?.buffer?.length) {
-        return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است." });
+      let imageUrl = "";
+      if (req.file?.buffer?.length) {
+        const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+        const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+        const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+        const absPath = path.join(exchangeBannerDir, filename);
+        fs.writeFileSync(absPath, req.file.buffer);
+        imageUrl = `/uploads/exchange-banners/${filename}`;
+      } else {
+        imageUrl = parseExchangeBannerImageSource(req.body?.image_url);
       }
-      const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
-      const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
-      const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
-      const absPath = path.join(exchangeBannerDir, filename);
-      fs.writeFileSync(absPath, req.file.buffer);
-      const imageUrl = `/uploads/exchange-banners/${filename}`;
+      if (!imageUrl) {
+        return res.status(400).json({ error: "missing_image_source", hint: "فایل تصویر یا لینک تصویر لازم است." });
+      }
       const title = String(req.body?.title || "").trim();
       const linkUrl = parseExchangeBannerLink(req.body?.link_url);
       const pageScope = normalizeExchangeBannerScope(req.body?.page_scope);
@@ -399,6 +421,11 @@ app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
     }
     const prev = db.prepare(`SELECT * FROM exchange_banners WHERE id = ?`).get(id);
     if (!prev) return res.status(404).json({ error: "not_found" });
+    const nextImage =
+      req.body?.image_url == null ? String(prev.image_url || "") : parseExchangeBannerImageSource(req.body.image_url);
+    if (!nextImage) {
+      return res.status(400).json({ error: "missing_image_source", hint: "لینک تصویر معتبر لازم است." });
+    }
     const nextTitle = req.body?.title == null ? prev.title : String(req.body.title || "").trim();
     const nextLink = req.body?.link_url == null ? prev.link_url || "" : parseExchangeBannerLink(req.body.link_url);
     const nextScope = req.body?.page_scope == null ? prev.page_scope : normalizeExchangeBannerScope(req.body.page_scope);
@@ -416,9 +443,9 @@ app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
     const nextActive = req.body?.is_active == null ? prev.is_active : req.body.is_active ? 1 : 0;
     db.prepare(
       `UPDATE exchange_banners
-       SET title = ?, link_url = ?, page_scope = ?, placement = ?, daily_user_cap = ?, start_at = ?, end_at = ?, sort_order = ?, is_active = ?
+       SET title = ?, image_url = ?, link_url = ?, page_scope = ?, placement = ?, daily_user_cap = ?, start_at = ?, end_at = ?, sort_order = ?, is_active = ?
        WHERE id = ?`
-    ).run(nextTitle, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id);
+    ).run(nextTitle, nextImage, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id);
     const row = db
       .prepare(
         `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
