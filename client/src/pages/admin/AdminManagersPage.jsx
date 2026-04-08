@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPost, apiPatchUrl } from "../../api.js";
+import { apiDelete, apiGet, apiPost, apiPatchUrl } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
 function isExchangeLinkedBusiness(b) {
@@ -17,6 +17,8 @@ export default function AdminManagersPage() {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState(null);
   const [rowPw, setRowPw] = useState({});
+  const [deleteId, setDeleteId] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => {
     apiGet("/api/managers").then(setRows).catch(() => setRows([]));
@@ -67,6 +69,28 @@ export default function AdminManagersPage() {
       setMsg(`رمز مدیر ${id} به‌روز شد.`);
     } catch (err) {
       setMsg(err.message || String(err));
+    }
+  };
+
+  const deleteSelectedManager = async () => {
+    const id = parseInt(String(deleteId || ""), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
+      return;
+    }
+    const ok = window.confirm("مدیر انتخاب‌شده حذف شود؟ لینک آگهی‌های متصل هم قطع می‌شود.");
+    if (!ok) return;
+    setDeleting(true);
+    setMsg(null);
+    try {
+      await apiDelete(`/api/managers/${id}`);
+      setDeleteId("");
+      load();
+      setMsg("مدیر حذف شد.");
+    } catch (err) {
+      setMsg(err.message || String(err));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -147,9 +171,20 @@ export default function AdminManagersPage() {
         </form>
 
         <div className="table-wrap">
+          <div className="dashboard-actions" style={{ marginBottom: "0.6rem" }}>
+            <button
+              type="button"
+              className="btn btn--danger"
+              disabled={deleting || !deleteId}
+              onClick={deleteSelectedManager}
+            >
+              {deleting ? "در حال حذف…" : "حذف مدیر انتخاب‌شده"}
+            </button>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
+                <th>حذف</th>
                 <th>شناسه</th>
                 <th>نام</th>
                 <th>ایمیل</th>
@@ -164,6 +199,15 @@ export default function AdminManagersPage() {
             <tbody>
               {nonExchangeRows.map((r) => (
                 <tr key={r.id}>
+                  <td style={{ textAlign: "center" }}>
+                    <input
+                      type="radio"
+                      name="manager-delete"
+                      aria-label={`انتخاب مدیر ${r.name} برای حذف`}
+                      checked={String(deleteId) === String(r.id)}
+                      onChange={() => setDeleteId(String(r.id))}
+                    />
+                  </td>
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>
                   <td dir="ltr">{r.email}</td>

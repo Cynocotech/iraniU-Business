@@ -1304,6 +1304,46 @@ app.get("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
   res.json(attachLinkedBusinesses(m, "exchange"));
 });
 
+app.delete("/api/managers/:id", requireSuperAdmin, (req, res) => {
+  const id = parseInt(String(req.params.id || ""), 10);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
+  const existing = db.prepare(`SELECT id, email FROM identity.managers WHERE id = ?`).get(id);
+  if (!existing) return res.status(404).json({ error: "not_found" });
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE businesses SET manager_id = NULL WHERE manager_id = ?`).run(id);
+    db.prepare(`DELETE FROM identity.managers WHERE id = ?`).run(id);
+  });
+  tx();
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "manager_deleted",
+    targetType: "manager",
+    targetId: id,
+    message: `Manager deleted: #${id} (${existing.email})`,
+  });
+  res.json({ ok: true, id });
+});
+
+app.delete("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
+  const id = parseInt(String(req.params.id || ""), 10);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
+  const existing = db.prepare(`SELECT id, email FROM identity.exchange_managers WHERE id = ?`).get(id);
+  if (!existing) return res.status(404).json({ error: "not_found" });
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE businesses SET exchange_manager_id = NULL WHERE exchange_manager_id = ?`).run(id);
+    db.prepare(`DELETE FROM identity.exchange_managers WHERE id = ?`).run(id);
+  });
+  tx();
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "exchange_manager_deleted",
+    targetType: "exchange_manager",
+    targetId: id,
+    message: `Exchange manager deleted: #${id} (${existing.email})`,
+  });
+  res.json({ ok: true, id });
+});
+
 const MANAGER_LOGIN_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
 
 app.post("/api/managers", requireSuperAdmin, (req, res) => {
@@ -1365,12 +1405,27 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
 app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const email = String(b.email || "").trim().toLowerCase();
-  const name = String(b.name || "").trim();
+  let name = String(b.name || "").trim();
   const password = String(b.password || "").trim();
-  const login_username_raw = String(b.login_username || b.username || "").trim().toLowerCase();
+  let login_username_raw = String(b.login_username || b.username || "").trim().toLowerCase();
   const phone = String(b.phone || "").trim();
-  if (!email || !name) return res.status(400).json({ error: "missing_email_or_name" });
-  if (!phone) return res.status(400).json({ error: "missing_phone", hint: "تلفن الزامی است" });
+  if (!email) return res.status(400).json({ error: "missing_email", hint: "ایمیل الزامی است" });
+  if (!name) {
+    const fromEmail = String(email.split("@")[0] || "")
+      .replace(/[._-]+/g, " ")
+      .trim();
+    name = fromEmail || "Exchange Manager";
+  }
+  if (!login_username_raw) {
+    const base = String(email.split("@")[0] || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const suffix = Math.random().toString(36).slice(2, 6).toLowerCase();
+    const candidate = (base.length >= 3 ? base : `exmgr_${suffix}`).slice(0, 32);
+    login_username_raw = candidate;
+  }
   if (!login_username_raw) {
     return res.status(400).json({ error: "missing_username", hint: "نام کاربری الزامی است" });
   }
@@ -1403,7 +1458,7 @@ app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
       .prepare(
         `INSERT INTO identity.exchange_managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
       )
-      .run(email, name, phone, ph, login_username);
+      .run(email, name, phone || null, ph, login_username);
     const row = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(info.lastInsertRowid);
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -1437,6 +1492,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
   const managerIdentifier = String(b.manager_email || b.manager_login || "")
+    .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
     .trim()
     .toLowerCase();
 
@@ -1455,9 +1511,14 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
     let source = "id";
     if (mid !== null && mid !== undefined && mid !== "") {
       const parsed = parseInt(String(mid), 10);
-      if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
-      id = parsed;
-      managerRow = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
+      if (Number.isFinite(parsed)) {
+        id = parsed;
+        managerRow = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
+      } else if (!managerIdentifier) {
+        return res.status(400).json({ error: "bad_manager_id" });
+      } else {
+        source = "email_or_username_after_bad_id";
+      }
     } else if (managerIdentifier) {
       source = "email_or_username";
       const mByIdent = db
@@ -1535,9 +1596,14 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
     let source = "id";
     if (mid !== null && mid !== undefined && mid !== "") {
       const parsed = parseInt(String(mid), 10);
-      if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
-      id = parsed;
-      managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
+      if (Number.isFinite(parsed)) {
+        id = parsed;
+        managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
+      } else if (!managerIdentifier) {
+        return res.status(400).json({ error: "bad_manager_id" });
+      } else {
+        source = "email_or_username_after_bad_id";
+      }
     } else if (managerIdentifier) {
       source = "email_or_username";
       managerRow = db

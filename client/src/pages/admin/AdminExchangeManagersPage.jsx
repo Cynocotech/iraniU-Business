@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
+import { apiDelete, apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
 function isExchangeBusinessRow(b) {
@@ -46,6 +46,8 @@ export default function AdminExchangeManagersPage() {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [newMgr, setNewMgr] = useState({
     name: "",
     email: "",
@@ -170,6 +172,31 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
       setMsg("متن ارسال اطلاعات ورود کپی شد.");
     } catch {
       setMsg("کپی انجام نشد. لطفاً متن را دستی کپی کنید.");
+    }
+  };
+
+  const deleteSelectedManager = async () => {
+    const id = parseInt(String(deletingId || ""), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
+      return;
+    }
+    const ok = window.confirm("مدیر انتخاب‌شده حذف شود؟ لینک آگهی‌های متصل هم قطع می‌شود.");
+    if (!ok) return;
+    setDeleting(true);
+    setMsg("");
+    try {
+      await apiDelete(`/api/exchange-managers/${id}`);
+      const [mgrs, biz] = await Promise.all([apiGet("/api/exchange-managers"), apiGet("/api/businesses")]);
+      setRows(Array.isArray(mgrs) ? mgrs : []);
+      setBusinesses(Array.isArray(biz) ? biz : []);
+      if (String(managerId) === String(id)) setManagerId("");
+      setDeletingId("");
+      setMsg("مدیر صرافی حذف شد.");
+    } catch (err) {
+      setMsg(err.message || "حذف مدیر صرافی ناموفق بود.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -321,9 +348,20 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
 
       {!loading && exchangeRows.length > 0 ? (
         <div className="table-wrap">
+          <div className="dashboard-actions" style={{ marginBottom: "0.6rem" }}>
+            <button
+              type="button"
+              className="btn btn--danger"
+              disabled={deleting || !deletingId}
+              onClick={deleteSelectedManager}
+            >
+              {deleting ? "در حال حذف…" : "حذف مدیر انتخاب‌شده"}
+            </button>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
+                <th>حذف</th>
                 <th>شناسه</th>
                 <th>نام</th>
                 <th>ایمیل</th>
@@ -336,6 +374,15 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
             <tbody>
               {exchangeRows.map((r) => (
                 <tr key={r.id}>
+                  <td style={{ textAlign: "center" }}>
+                    <input
+                      type="radio"
+                      name="exchange-manager-delete"
+                      aria-label={`انتخاب مدیر ${r.name} برای حذف`}
+                      checked={String(deletingId) === String(r.id)}
+                      onChange={() => setDeletingId(String(r.id))}
+                    />
+                  </td>
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>
                   <td dir="ltr">{r.email}</td>
