@@ -1,3 +1,5 @@
+import { formatLocalizedNumberFromRaw, formatNumberInputWithThousands } from "../lib/exchangeRates.js";
+
 /**
  * ماشین‌حساب نرخ — بدون انتخاب ارز (ارز از والد هماهنگ می‌شود).
  */
@@ -12,12 +14,18 @@ export default function ExchangeInlineCalc({
   exchangeResult,
   exchangeAmountNum,
   selectedRateNum,
+  selectedRateRaw = "",
   /** true وقتی نرخ از جدول نمونه است (صرافی هنوز نرخ ثبت نکرده) */
   rateIsDemo = false,
   className = "",
 }) {
   const modeId = `${idPrefix}-mode`;
   const amountId = `${idPrefix}-amount`;
+  const amountDisplay = formatLocalizedNumberFromRaw(exchangeAmount, { fallback: "—", maxFractionDigits: 6 });
+  const rateDisplay = formatLocalizedNumberFromRaw(
+    selectedRateRaw || (Number.isFinite(selectedRateNum) ? String(selectedRateNum) : ""),
+    { fallback: "—", maxFractionDigits: 6 }
+  );
 
   return (
     <div className={`exchange-calc exchange-calc--hero ${className}`.trim()}>
@@ -40,7 +48,7 @@ export default function ExchangeInlineCalc({
           <input
             id={amountId}
             value={exchangeAmount}
-            onChange={(e) => onExchangeAmountChange(e.target.value)}
+            onChange={(e) => onExchangeAmountChange(formatNumberInputWithThousands(e.target.value))}
             dir="ltr"
             inputMode="decimal"
             className="exchange-calc__amount-input"
@@ -50,7 +58,7 @@ export default function ExchangeInlineCalc({
       <p className="exchange-calc__result exchange-calc__result--hero" dir="ltr">
         {exchangeResult == null || !Number.isFinite(selectedRateNum) || !Number.isFinite(exchangeAmountNum)
           ? "—"
-          : `${exchangeAmountNum.toLocaleString("fa-IR", { maximumFractionDigits: 6 })} × ${selectedRateNum.toLocaleString("fa-IR", { maximumFractionDigits: 6 })} = ${exchangeResult.toLocaleString("fa-IR", {
+          : `${amountDisplay} × ${rateDisplay} = ${exchangeResult.toLocaleString("fa-IR", {
               maximumFractionDigits: 2,
             })} تومان`}
       </p>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { searchExchangeCatalog, getCatalogEntry } from "../lib/exchangeCurrencyCatalog.js";
+import { formatNumberInputWithThousands } from "../lib/exchangeRates.js";
 
 function emptyRowFromCatalog(entry) {
   return {
@@ -205,7 +206,7 @@ export default function ExchangeRatesEditor({ rows, setRows }) {
                   <td>
                     <input
                       value={row.buy ?? ""}
-                      onChange={(e) => patchRow(i, { buy: e.target.value })}
+                      onChange={(e) => patchRow(i, { buy: formatNumberInputWithThousands(e.target.value) })}
                       inputMode="decimal"
                       placeholder="0"
                       dir="ltr"
@@ -226,7 +227,7 @@ export default function ExchangeRatesEditor({ rows, setRows }) {
                   <td>
                     <input
                       value={row.sell ?? ""}
-                      onChange={(e) => patchRow(i, { sell: e.target.value })}
+                      onChange={(e) => patchRow(i, { sell: formatNumberInputWithThousands(e.target.value) })}
                       inputMode="decimal"
                       placeholder="0"
                       dir="ltr"

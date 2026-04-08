@@ -41,7 +41,7 @@ export default function ExchangeCalculatorPage() {
   const selectedRate =
     ratesForCalc.find((r) => r.code === selectedCurrencyCode) || ratesForCalc[0] || null;
 
-  const { rateNum: selectedRateNum, isDemo: rateIsDemo } = useMemo(
+  const { rateNum: selectedRateNum, raw: selectedRateRaw, isDemo: rateIsDemo } = useMemo(
     () => getCalculatorRateOrDemo(selectedRate, exchangeMode),
     [selectedRate, exchangeMode]
   );
@@ -161,6 +161,7 @@ export default function ExchangeCalculatorPage() {
             exchangeResult={exchangeResult}
             exchangeAmountNum={exchangeAmountNum}
             selectedRateNum={selectedRateNum}
+            selectedRateRaw={selectedRateRaw}
             rateIsDemo={rateIsDemo}
           />
         </>

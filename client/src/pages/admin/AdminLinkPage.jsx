@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
+import { isExchangeBusiness } from "../../lib/exchangeRates.js";
 
 function isExchangeBusinessRow(b) {
-  const cat = String(b?.category || "").trim().toLowerCase();
-  return cat.includes("صراف") || cat.includes("exchange");
+  return isExchangeBusiness(b);
 }
 
 function randomSuffix(len = 4) {

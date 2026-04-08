@@ -72,11 +72,8 @@ export default function AdminManagersPage() {
     }
   };
 
-  const deleteSelectedManager = async () => {
-    const selectedFromDom =
-      typeof document !== "undefined" ? document.querySelector('input[name="manager-delete"]:checked')?.value || "" : "";
-    const rawId = String(deleteId || selectedFromDom || "");
-    const id = parseInt(rawId, 10);
+  const deleteManagerById = async (rawId) => {
+    const id = parseInt(String(rawId || ""), 10);
     if (!Number.isFinite(id) || id <= 0) {
       setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
       return;
@@ -95,6 +92,11 @@ export default function AdminManagersPage() {
     } finally {
       setDeleting(false);
     }
+  };
+  const deleteSelectedManager = async () => {
+    const selectedFromDom =
+      typeof document !== "undefined" ? document.querySelector('input[name="manager-delete"]:checked')?.value || "" : "";
+    await deleteManagerById(deleteId || selectedFromDom || "");
   };
 
   const nonExchangeRows = rows.filter((r) => {
@@ -203,15 +205,17 @@ export default function AdminManagersPage() {
               {nonExchangeRows.map((r) => (
                 <tr key={r.id}>
                   <td style={{ textAlign: "center" }}>
-                    <input
-                      type="radio"
-                      name="manager-delete"
-                      value={String(r.id)}
-                      aria-label={`انتخاب مدیر ${r.name} برای حذف`}
-                      checked={String(deleteId) === String(r.id)}
-                      onChange={(e) => setDeleteId(String(e.target.value || r.id))}
-                      onClick={(e) => setDeleteId(String(e.currentTarget.value || r.id))}
-                    />
+                    <button
+                      type="button"
+                      className="btn btn--danger"
+                      aria-label={`حذف مدیر ${r.name}`}
+                      title="حذف مدیر"
+                      disabled={deleting}
+                      onClick={() => deleteManagerById(r.id)}
+                      style={{ minWidth: "2rem", height: "2rem", lineHeight: 1, padding: 0 }}
+                    >
+                      ×
+                    </button>
                   </td>
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>

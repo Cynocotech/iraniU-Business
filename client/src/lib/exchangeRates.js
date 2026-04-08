@@ -34,13 +34,34 @@ const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 function normalizeLocalizedNumberString(raw) {
   const s = String(raw ?? "").trim();
   if (!s) return "";
-  return s
+  let out = s
     .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
     .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
     .replace(/[٬،]/g, "")
     .replace(/٫/g, ".")
-    .replace(/,/g, ".")
     .replace(/\s/g, "");
+  // Heuristic for English comma:
+  // - 123,000 or 1,234,567 => thousand separator
+  // - 123,45 => decimal comma
+  if (out.includes(",")) {
+    if (out.includes(".")) {
+      // Both exist: treat comma as thousand separator.
+      out = out.replace(/,/g, "");
+    } else {
+      const parts = out.split(",");
+      const looksThousands =
+        parts.length > 1 &&
+        parts[0].length >= 1 &&
+        parts.slice(1).every((p) => p.length === 3 && /^\d+$/.test(p));
+      if (looksThousands) {
+        out = out.replace(/,/g, "");
+      } else {
+        // Decimal comma fallback
+        out = out.replace(",", ".");
+      }
+    }
+  }
+  return out;
 }
 
 export function parseLocalizedNumber(raw) {
@@ -337,11 +358,54 @@ export function pickBestRateExchangeInList(businesses, currencyCode, mode) {
 export function formatExchangeRateToman(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "—";
+  const formattedNumber = formatLocalizedNumberFromRaw(raw, { fallback: raw, maxFractionDigits: 6 });
+  if (!formattedNumber || formattedNumber === raw) {
+    const n = parseLocalizedNumber(raw);
+    if (!Number.isFinite(n)) return raw;
+    return `${n.toLocaleString("fa-IR")} تومان`;
+  }
+  return `${formattedNumber} تومان`;
+}
+
+export function formatLocalizedNumberFromRaw(value, { fallback = "—", maxFractionDigits = 6 } = {}) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  const normalized = normalizeLocalizedNumberString(raw);
   const n = parseLocalizedNumber(raw);
   if (!Number.isFinite(n)) return raw;
-  const formatted = n.toLocaleString("fa-IR", {
-    maximumFractionDigits: n % 1 === 0 ? 0 : 4,
-    minimumFractionDigits: 0,
+  const decimalPart = normalized.includes(".") ? normalized.split(".")[1] || "" : "";
+  const hasExplicitDecimals = decimalPart.length > 0;
+  // Preserve explicitly entered trailing zeros (e.g. 1234.00) in UI.
+  const explicitFractionDigits = hasExplicitDecimals ? Math.min(decimalPart.length, Math.max(0, maxFractionDigits)) : 0;
+  return n.toLocaleString("fa-IR", {
+    maximumFractionDigits: hasExplicitDecimals ? explicitFractionDigits : n % 1 === 0 ? 0 : Math.max(0, maxFractionDigits),
+    minimumFractionDigits: hasExplicitDecimals ? explicitFractionDigits : 0,
   });
-  return `${formatted} تومان`;
+}
+
+/**
+ * For editable LTR numeric inputs:
+ * - keeps English digits
+ * - adds comma thousand separators
+ * - preserves decimal part while typing
+ */
+export function formatNumberInputWithThousands(raw) {
+  const source = String(raw ?? "");
+  if (!source.trim()) return "";
+  const normalized = source
+    .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
+    .replace(/[٬،]/g, "")
+    .replace(/\s/g, "");
+  const hasTrailingSep = /[.,]$/.test(normalized);
+  const sepIndex = Math.max(normalized.lastIndexOf("."), normalized.lastIndexOf(","));
+  const intRaw = (sepIndex >= 0 ? normalized.slice(0, sepIndex) : normalized).replace(/[^0-9]/g, "");
+  const fracRaw = (sepIndex >= 0 ? normalized.slice(sepIndex + 1) : "").replace(/[^0-9]/g, "");
+  if (!intRaw && !fracRaw) return "";
+  const intFormatted = intRaw ? intRaw.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "0";
+  if (sepIndex >= 0) {
+    if (hasTrailingSep) return `${intFormatted}.`;
+    return `${intFormatted}.${fracRaw}`;
+  }
+  return intFormatted;
 }

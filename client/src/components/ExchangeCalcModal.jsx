@@ -38,7 +38,7 @@ export default function ExchangeCalcModal({
     [ratesForCalc, selectedCurrencyCode]
   );
 
-  const { rateNum: selectedRateNum, isDemo: rateIsDemo } = useMemo(
+  const { rateNum: selectedRateNum, raw: selectedRateRaw, isDemo: rateIsDemo } = useMemo(
     () => getCalculatorRateOrDemo(selectedRate, exchangeMode),
     [selectedRate, exchangeMode]
   );
@@ -148,6 +148,7 @@ export default function ExchangeCalcModal({
                 exchangeResult={exchangeResult}
                 exchangeAmountNum={exchangeAmountNum}
                 selectedRateNum={selectedRateNum}
+                selectedRateRaw={selectedRateRaw}
                 rateIsDemo={rateIsDemo}
               />
             </>

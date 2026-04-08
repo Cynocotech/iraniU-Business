@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiDelete, apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
+import { isExchangeBusiness } from "../../lib/exchangeRates.js";
 
 function isExchangeBusinessRow(b) {
-  const cat = String(b?.category || "").trim().toLowerCase();
-  return cat.includes("صراف") || cat.includes("exchange");
+  return isExchangeBusiness(b);
 }
 
 function randomSuffix(len = 4) {
@@ -175,13 +175,8 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
     }
   };
 
-  const deleteSelectedManager = async () => {
-    const selectedFromDom =
-      typeof document !== "undefined"
-        ? document.querySelector('input[name="exchange-manager-delete"]:checked')?.value || ""
-        : "";
-    const rawId = String(deletingId || selectedFromDom || "");
-    const id = parseInt(rawId, 10);
+  const deleteManagerById = async (rawId) => {
+    const id = parseInt(String(rawId || ""), 10);
     if (!Number.isFinite(id) || id <= 0) {
       setMsg("ابتدا یک مدیر را برای حذف انتخاب کنید.");
       return;
@@ -203,6 +198,13 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
     } finally {
       setDeleting(false);
     }
+  };
+  const deleteSelectedManager = async () => {
+    const selectedFromDom =
+      typeof document !== "undefined"
+        ? document.querySelector('input[name="exchange-manager-delete"]:checked')?.value || ""
+        : "";
+    await deleteManagerById(deletingId || selectedFromDom || "");
   };
 
   return (
@@ -380,15 +382,17 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
               {exchangeRows.map((r) => (
                 <tr key={r.id}>
                   <td style={{ textAlign: "center" }}>
-                    <input
-                      type="radio"
-                      name="exchange-manager-delete"
-                      value={String(r.id)}
-                      aria-label={`انتخاب مدیر ${r.name} برای حذف`}
-                      checked={String(deletingId) === String(r.id)}
-                      onChange={(e) => setDeletingId(String(e.target.value || r.id))}
-                      onClick={(e) => setDeletingId(String(e.currentTarget.value || r.id))}
-                    />
+                    <button
+                      type="button"
+                      className="btn btn--danger"
+                      aria-label={`حذف مدیر ${r.name}`}
+                      title="حذف مدیر"
+                      disabled={deleting}
+                      onClick={() => deleteManagerById(r.id)}
+                      style={{ minWidth: "2rem", height: "2rem", lineHeight: 1, padding: 0 }}
+                    >
+                      ×
+                    </button>
                   </td>
                   <td dir="ltr">{r.id}</td>
                   <td>{r.name}</td>

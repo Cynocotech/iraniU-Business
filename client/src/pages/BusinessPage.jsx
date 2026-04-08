@@ -665,6 +665,7 @@ export default function BusinessPage() {
                         exchangeResult={exchangeResult}
                         exchangeAmountNum={exchangeAmountNum}
                         selectedRateNum={selectedRateNum}
+                        selectedRateRaw={selectedRateRaw}
                       />
                     </div>
                   ) : null}
@@ -1065,6 +1066,7 @@ export default function BusinessPage() {
                   exchangeResult={exchangeResult}
                   exchangeAmountNum={exchangeAmountNum}
                   selectedRateNum={selectedRateNum}
+                  selectedRateRaw={selectedRateRaw}
                 />
               </section>
             </div>

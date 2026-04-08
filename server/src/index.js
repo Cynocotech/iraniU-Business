@@ -1491,12 +1491,16 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
   }
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
+  const midRaw = String(mid ?? "")
+    .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
+    .trim();
+  const midLooksEmpty = !midRaw || /^(null|undefined|nan)$/i.test(midRaw);
   const managerIdentifier = String(b.manager_email || b.manager_login || "")
     .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
     .trim()
     .toLowerCase();
 
-  if ((mid === null || mid === undefined || mid === "") && !managerIdentifier) {
+  if (midLooksEmpty && !managerIdentifier) {
     db.prepare(`UPDATE businesses SET manager_id = NULL WHERE slug = ?`).run(slug);
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -1509,8 +1513,8 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
     let id = null;
     let managerRow = null;
     let source = "id";
-    if (mid !== null && mid !== undefined && mid !== "") {
-      const parsed = parseInt(String(mid), 10);
+    if (!midLooksEmpty) {
+      const parsed = parseInt(midRaw, 10);
       if (Number.isFinite(parsed)) {
         id = parsed;
         managerRow = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
@@ -1572,11 +1576,15 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
   // Super admin can pre-link exchange managers even before category is persisted as "exchange".
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const mid = b.manager_id;
+  const midRaw = String(mid ?? "")
+    .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
+    .trim();
+  const midLooksEmpty = !midRaw || /^(null|undefined|nan)$/i.test(midRaw);
   const managerIdentifier = String(b.manager_email || b.manager_login || "")
     .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, "")
     .trim()
     .toLowerCase();
-  if ((mid === null || mid === undefined || mid === "") && !managerIdentifier) {
+  if (midLooksEmpty && !managerIdentifier) {
     db.prepare(`UPDATE businesses SET exchange_manager_id = NULL WHERE slug = ?`).run(slug);
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -1589,8 +1597,8 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
     let id = null;
     let managerRow = null;
     let source = "id";
-    if (mid !== null && mid !== undefined && mid !== "") {
-      const parsed = parseInt(String(mid), 10);
+    if (!midLooksEmpty) {
+      const parsed = parseInt(midRaw, 10);
       if (Number.isFinite(parsed)) {
         id = parsed;
         managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
