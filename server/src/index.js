@@ -1358,11 +1358,13 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
     });
   } else {
     let id = null;
+    let managerRow = null;
     let source = "id";
     if (mid !== null && mid !== undefined && mid !== "") {
       const parsed = parseInt(String(mid), 10);
       if (!Number.isFinite(parsed)) return res.status(400).json({ error: "bad_manager_id" });
       id = parsed;
+      managerRow = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
     } else if (managerIdentifier) {
       source = "email_or_username";
       const mByIdent = db
@@ -1372,10 +1374,26 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
         return res.status(400).json({ error: "invalid_manager_identifier", hint: "ایمیل یا نام‌کاربری مدیر پیدا نشد" });
       }
       id = Number(mByIdent.id);
+      managerRow = mByIdent;
+    }
+    // If ID was sent but no longer valid, fallback to email/login when provided.
+    if (!managerRow && managerIdentifier) {
+      source = "email_or_username_fallback";
+      const mByIdent = db
+        .prepare(`SELECT id FROM identity.managers WHERE lower(email) = ? OR lower(login_username) = ?`)
+        .get(managerIdentifier, managerIdentifier);
+      if (mByIdent) {
+        id = Number(mByIdent.id);
+        managerRow = mByIdent;
+      }
     }
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_manager_id" });
-    const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
-    if (!m) return res.status(400).json({ error: "invalid_manager_id" });
+    if (!managerRow) {
+      if (managerIdentifier) {
+        return res.status(400).json({ error: "invalid_manager_identifier", hint: "ایمیل یا نام‌کاربری مدیر پیدا نشد" });
+      }
+      return res.status(400).json({ error: "invalid_manager_id" });
+    }
     db.prepare(`UPDATE businesses SET manager_id = ? WHERE slug = ?`).run(id, slug);
     writeSystemLog({
       ...actorFromAuth(req.auth),

@@ -1,7 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPatchUrl } from "../../api.js";
+import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
+
+function randomSuffix(len = 4) {
+  return Math.random().toString(36).slice(2, 2 + len).toLowerCase();
+}
+
+function suggestUsername(email) {
+  const base = String(email || "")
+    .trim()
+    .toLowerCase()
+    .split("@")[0]
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const safe = base.length >= 3 ? base : `manager_${randomSuffix(5)}`;
+  return `${safe}_${randomSuffix(3)}`.slice(0, 32);
+}
+
+function generateStrongPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%";
+  const all = upper + lower + digits + special;
+  const pick = (set) => set[Math.floor(Math.random() * set.length)];
+  let out = [pick(upper), pick(lower), pick(digits), pick(special)];
+  for (let i = out.length; i < 14; i += 1) out.push(pick(all));
+  out = out.sort(() => Math.random() - 0.5);
+  return out.join("");
+}
 
 export default function AdminLinkPage() {
   const [businesses, setBusinesses] = useState([]);
@@ -13,6 +42,15 @@ export default function AdminLinkPage() {
   const [saving, setSaving] = useState(false);
   const [bizSearch, setBizSearch] = useState("");
   const [mgrSearch, setMgrSearch] = useState("");
+  const [newMgr, setNewMgr] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    login_username: "",
+    password: "",
+  });
+  const [creatingManager, setCreatingManager] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState(null);
 
   useEffect(() => {
     apiGet("/api/businesses").then(setBusinesses).catch(() => {});
@@ -94,6 +132,77 @@ export default function AdminLinkPage() {
       setMsg(err.message || String(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const createAndLinkManager = async (e) => {
+    e.preventDefault();
+    if (!slug) {
+      setMsg("ابتدا یک آگهی انتخاب کنید.");
+      return;
+    }
+    setCreatingManager(true);
+    setMsg(null);
+    setCreatedCreds(null);
+    try {
+      const email = String(newMgr.email || "").trim().toLowerCase();
+      const name = String(newMgr.name || "").trim();
+      const phone = String(newMgr.phone || "").trim();
+      const login_username = String(newMgr.login_username || "").trim().toLowerCase();
+      const password = String(newMgr.password || "").trim();
+      if (!email || !name || !phone || !login_username || !password) {
+        throw new Error("نام، ایمیل، تلفن، نام کاربری و رمز الزامی است.");
+      }
+
+      const created = await apiPost("/api/managers", {
+        email,
+        name,
+        phone,
+        login_username,
+        password,
+      });
+
+      await apiPatchUrl(`/api/admin/businesses/${encodeURIComponent(slug)}/manager`, {
+        manager_id: created?.id,
+      });
+
+      const [nextBusinesses, nextManagers] = await Promise.all([apiGet("/api/businesses"), apiGet("/api/managers")]);
+      setBusinesses(nextBusinesses);
+      setManagers(nextManagers);
+      setManagerId(String(created?.id || ""));
+      setManagerEmail(email);
+      setCreatedCreds({ name, email, phone, login_username, password, slug });
+      setMsg("مدیر ساخته شد و آگهی به او لینک شد.");
+      setNewMgr({
+        name: "",
+        email: "",
+        phone: "",
+        login_username: "",
+        password: "",
+      });
+    } catch (err) {
+      setMsg(err.message || String(err));
+    } finally {
+      setCreatingManager(false);
+    }
+  };
+
+  const copyCreds = async () => {
+    if (!createdCreds) return;
+    const text = `سلام ${createdCreds.name || "مدیر محترم"}،
+حساب پنل شما در ایرانیو ساخته شد.
+
+ایمیل: ${createdCreds.email}
+نام کاربری: ${createdCreds.login_username}
+رمز عبور: ${createdCreds.password}
+ورود: https://iraniu.uk/login
+آگهی متصل: ${createdCreds.slug}
+`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setMsg("متن ورود برای مدیر کپی شد.");
+    } catch {
+      setMsg("کپی انجام نشد. لطفاً دستی کپی کنید.");
     }
   };
 
@@ -190,6 +299,101 @@ export default function AdminLinkPage() {
           </div>
           {msg && <p className="field-hint">{msg}</p>}
         </form>
+      </section>
+
+      <section className="dashboard-panel" style={{ marginTop: "var(--space-md)" }}>
+        <h2>ساخت مدیر جدید + لینک خودکار</h2>
+        <p className="field-hint">اگر مدیر هنوز حساب ندارد، همین‌جا حساب بسازید و مستقیم به آگهی وصل کنید.</p>
+        <form onSubmit={createAndLinkManager}>
+          <div className="form-grid">
+            <div className="field field--block">
+              <label htmlFor="new-mgr-name">نام مدیر</label>
+              <input
+                id="new-mgr-name"
+                value={newMgr.name}
+                onChange={(e) => setNewMgr((p) => ({ ...p, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="new-mgr-email">ایمیل</label>
+              <input
+                id="new-mgr-email"
+                type="email"
+                dir="ltr"
+                value={newMgr.email}
+                onChange={(e) =>
+                  setNewMgr((p) => {
+                    const email = e.target.value;
+                    return {
+                      ...p,
+                      email,
+                      login_username: p.login_username || suggestUsername(email),
+                    };
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="new-mgr-phone">تلفن</label>
+              <input
+                id="new-mgr-phone"
+                dir="ltr"
+                value={newMgr.phone}
+                onChange={(e) => setNewMgr((p) => ({ ...p, phone: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="new-mgr-username">نام کاربری</label>
+              <input
+                id="new-mgr-username"
+                dir="ltr"
+                value={newMgr.login_username}
+                onChange={(e) => setNewMgr((p) => ({ ...p, login_username: e.target.value.toLowerCase() }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="new-mgr-password">رمز عبور</label>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <input
+                  id="new-mgr-password"
+                  dir="ltr"
+                  value={newMgr.password}
+                  onChange={(e) => setNewMgr((p) => ({ ...p, password: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setNewMgr((p) => ({ ...p, password: generateStrongPassword() }))}
+                >
+                  تولید رمز
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="dashboard-actions">
+            <button type="submit" className="btn btn--primary" disabled={creatingManager || !slug}>
+              {creatingManager ? "در حال ساخت…" : "ساخت مدیر و لینک به آگهی انتخاب‌شده"}
+            </button>
+          </div>
+        </form>
+
+        {createdCreds ? (
+          <div style={{ marginTop: "0.8rem" }}>
+            <p className="field-hint" style={{ marginBottom: "0.4rem" }}>
+              اطلاعات ورود ساخته شد. برای ارسال به مدیر، کپی کنید:
+            </p>
+            <div className="dashboard-actions">
+              <button type="button" className="btn btn--ghost" onClick={copyCreds}>
+                کپی متن ارسال به مدیر
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </>
   );
