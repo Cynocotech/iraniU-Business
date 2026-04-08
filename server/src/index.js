@@ -191,7 +191,19 @@ app.get("/api/businesses", (req, res) => {
     ? db.prepare(`SELECT * FROM businesses ORDER BY name_fa`).all()
     : db
         .prepare(
-          `SELECT * FROM businesses WHERE (listing_approval = 'approved' OR listing_approval IS NULL OR listing_approval = '')
+          `SELECT * FROM businesses WHERE (
+             listing_approval = 'approved'
+             OR listing_approval IS NULL
+             OR listing_approval = ''
+             OR (
+               listing_approval = 'pending'
+               AND (
+                 exchange_manager_id IS NOT NULL
+                 OR IFNULL(category, '') LIKE '%صراف%'
+                 OR lower(IFNULL(category, '')) LIKE '%exchange%'
+               )
+             )
+           )
            AND (status IS NULL OR status = '' OR status = 'active')
            ORDER BY name_fa`
         )
