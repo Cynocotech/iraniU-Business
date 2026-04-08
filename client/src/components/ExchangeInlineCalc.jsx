@@ -12,6 +12,8 @@ export default function ExchangeInlineCalc({
   exchangeResult,
   exchangeAmountNum,
   selectedRateNum,
+  /** true وقتی نرخ از جدول نمونه است (صرافی هنوز نرخ ثبت نکرده) */
+  rateIsDemo = false,
   className = "",
 }) {
   const modeId = `${idPrefix}-mode`;
@@ -52,6 +54,11 @@ export default function ExchangeInlineCalc({
               maximumFractionDigits: 2,
             })} تومان`}
       </p>
+      {rateIsDemo ? (
+        <p className="exchange-calc__demo-note field-hint" dir="rtl">
+          نرخ نمونه‌ای برای نمایش؛ پس از ثبت نرخ توسط صرافی‌ها، میانگین واقعی در همین صفحه محاسبه می‌شود.
+        </p>
+      ) : null}
     </div>
   );
 }

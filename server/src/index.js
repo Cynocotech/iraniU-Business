@@ -89,6 +89,18 @@ const uploadSqlite = multer({
   },
 });
 
+const uploadExchangeBanner = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype || "")) {
+      cb(new Error("bad_file_type"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
 const looseReviewRedirect =
@@ -104,6 +116,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const exchangeBannerDir = path.join(uploadsDir, "exchange-banners");
+if (!fs.existsSync(exchangeBannerDir)) fs.mkdirSync(exchangeBannerDir, { recursive: true });
 app.use("/uploads", express.static(uploadsDir));
 
 ensureSuperAdminFromEnv();
@@ -134,6 +148,41 @@ function isBusinessVisibleToPublic(row) {
   return isListingApproved(row) && isBusinessActiveForPublic(row);
 }
 
+function normalizeExchangeBannerPlacement(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (s === "top") return "top";
+  if (s === "fullscreen") return "fullscreen";
+  return "between";
+}
+
+function normalizeExchangeBannerScope(v) {
+  return String(v || "").trim() === "directory" ? "directory" : "exchange";
+}
+
+function parseExchangeBannerLink(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  if (s.startsWith("/")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  return "";
+}
+
+function normalizeBannerDateTime(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  // accepts: YYYY-MM-DDTHH:mm or YYYY-MM-DD HH:mm[:ss]
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return "";
+  const sec = m[4] || "00";
+  return `${m[1]} ${m[2]}:${m[3]}:${sec}`;
+}
+
+function normalizeBannerDailyUserCap(v) {
+  const n = Number.parseInt(String(v ?? "2"), 10);
+  if (!Number.isFinite(n)) return 2;
+  return Math.max(1, Math.min(50, n));
+}
+
 app.get("/api/businesses", (req, res) => {
   const auth = parseAuthHeader(req);
   const isAdmin = auth && auth.typ === "adm";
@@ -147,6 +196,294 @@ app.get("/api/businesses", (req, res) => {
         )
         .all();
   res.json(rows);
+});
+
+/** بنرهای تبلیغی صرافی — عمومی */
+app.get("/api/exchange-banners", (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
+       FROM exchange_banners
+       WHERE is_active = 1 AND page_scope = 'exchange'
+         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= datetime('now'))
+         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= datetime('now'))
+       ORDER BY placement = 'top' DESC, sort_order ASC, id DESC`
+    )
+    .all();
+  res.json(rows);
+});
+
+/** بنرهای تبلیغی دایرکتوری — عمومی */
+app.get("/api/directory-banners", (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
+       FROM exchange_banners
+       WHERE is_active = 1 AND page_scope = 'directory'
+         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= datetime('now'))
+         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= datetime('now'))
+       ORDER BY placement = 'top' DESC, sort_order ASC, id DESC`
+    )
+    .all();
+  res.json(rows);
+});
+
+/** ثبت کلیک بنر تبلیغاتی (عمومی) */
+app.post("/api/banner-clicks", (req, res) => {
+  try {
+    const bannerId = Number.parseInt(String(req.body?.banner_id || "0"), 10);
+    if (!Number.isFinite(bannerId) || bannerId <= 0) {
+      return res.status(400).json({ error: "bad_banner_id" });
+    }
+    const row = db.prepare(`SELECT id, page_scope FROM exchange_banners WHERE id = ?`).get(bannerId);
+    if (!row) return res.status(404).json({ error: "not_found" });
+    const scope = row.page_scope === "directory" ? "directory" : "exchange";
+    db.prepare(`INSERT INTO exchange_banner_clicks (banner_id, page_scope) VALUES (?, ?)`).run(bannerId, scope);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("banner-clicks create", e);
+    return res.status(500).json({ error: "click_log_failed", hint: String(e.message || e) });
+  }
+});
+
+/** بنرهای تبلیغی صرافی — ادمین */
+app.get("/api/admin/exchange-banners", requireSuperAdmin, (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+              COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
+       FROM exchange_banners
+       ORDER BY sort_order ASC, id DESC`
+    )
+    .all();
+  res.json(rows);
+});
+
+app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
+  uploadExchangeBanner.single("image")(req, res, (err) => {
+    if (err) {
+      if (String(err.message || "").includes("bad_file_type")) {
+        return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif مجاز است." });
+      }
+      if (String(err.message || "").toLowerCase().includes("file too large")) {
+        return res.status(400).json({ error: "file_too_large", hint: "حداکثر حجم تصویر ۸ مگابایت است." });
+      }
+      return res.status(400).json({ error: "upload_failed", hint: String(err.message || err) });
+    }
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است." });
+      }
+      const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+      const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+      const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+      const absPath = path.join(exchangeBannerDir, filename);
+      fs.writeFileSync(absPath, req.file.buffer);
+      const imageUrl = `/uploads/exchange-banners/${filename}`;
+      const title = String(req.body?.title || "").trim();
+      const linkUrl = parseExchangeBannerLink(req.body?.link_url);
+      const pageScope = normalizeExchangeBannerScope(req.body?.page_scope);
+      const placement = normalizeExchangeBannerPlacement(req.body?.placement);
+      const dailyUserCap = normalizeBannerDailyUserCap(req.body?.daily_user_cap);
+      const startAt = normalizeBannerDateTime(req.body?.start_at);
+      const endAt = normalizeBannerDateTime(req.body?.end_at);
+      if (startAt && endAt && endAt < startAt) {
+        return res.status(400).json({ error: "bad_schedule", hint: "تاریخ پایان باید بعد از تاریخ شروع باشد." });
+      }
+      const sortOrderNum = Number.parseInt(String(req.body?.sort_order || "0"), 10);
+      const sortOrder = Number.isFinite(sortOrderNum) ? sortOrderNum : 0;
+      const isActive = String(req.body?.is_active || "1") === "0" ? 0 : 1;
+      const info = db
+        .prepare(
+          `INSERT INTO exchange_banners (title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(title, imageUrl, linkUrl, pageScope, placement, dailyUserCap, startAt, endAt, sortOrder, isActive);
+      const row = db
+        .prepare(
+          `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+                  COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
+           FROM exchange_banners WHERE id = ?`
+        )
+        .get(info.lastInsertRowid);
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "exchange_banner_created",
+        targetType: "exchange_banner",
+        targetId: String(info.lastInsertRowid),
+        message: "Exchange banner uploaded",
+      });
+      return res.json(row);
+    } catch (e) {
+      console.error("admin exchange-banners create", e);
+      return res.status(500).json({ error: "create_failed", hint: String(e.message || e) });
+    }
+  });
+});
+
+app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) => {
+  uploadExchangeBanner.single("image")(req, res, (err) => {
+    if (err) {
+      if (String(err.message || "").includes("bad_file_type")) {
+        return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif مجاز است." });
+      }
+      if (String(err.message || "").toLowerCase().includes("file too large")) {
+        return res.status(400).json({ error: "file_too_large", hint: "حداکثر حجم تصویر ۸ مگابایت است." });
+      }
+      return res.status(400).json({ error: "upload_failed", hint: String(err.message || err) });
+    }
+    try {
+      const id = Number.parseInt(String(req.params.id || "0"), 10);
+      if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
+      const prev = db.prepare(`SELECT id, image_url FROM exchange_banners WHERE id = ?`).get(id);
+      if (!prev) return res.status(404).json({ error: "not_found" });
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است." });
+      }
+      const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+      const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+      const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+      const absPath = path.join(exchangeBannerDir, filename);
+      fs.writeFileSync(absPath, req.file.buffer);
+      const imageUrl = `/uploads/exchange-banners/${filename}`;
+      db.prepare(`UPDATE exchange_banners SET image_url = ? WHERE id = ?`).run(imageUrl, id);
+
+      const prevRel = String(prev.image_url || "");
+      if (prevRel.startsWith("/uploads/exchange-banners/")) {
+        const prevAbs = path.join(uploadsDir, prevRel.replace(/^\/uploads\//, ""));
+        try {
+          if (fs.existsSync(prevAbs)) fs.unlinkSync(prevAbs);
+        } catch {}
+      }
+
+      const row = db
+        .prepare(
+          `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+                  COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
+           FROM exchange_banners WHERE id = ?`
+        )
+        .get(id);
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "exchange_banner_image_updated",
+        targetType: "exchange_banner",
+        targetId: String(id),
+        message: "Exchange banner image updated",
+      });
+      return res.json(row);
+    } catch (e) {
+      console.error("admin exchange-banners image", e);
+      return res.status(500).json({ error: "image_update_failed", hint: String(e.message || e) });
+    }
+  });
+});
+
+app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
+  try {
+    const id = Number.parseInt(String(req.params.id || "0"), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: "bad_id" });
+    }
+    const prev = db.prepare(`SELECT * FROM exchange_banners WHERE id = ?`).get(id);
+    if (!prev) return res.status(404).json({ error: "not_found" });
+    const nextTitle = req.body?.title == null ? prev.title : String(req.body.title || "").trim();
+    const nextLink = req.body?.link_url == null ? prev.link_url || "" : parseExchangeBannerLink(req.body.link_url);
+    const nextScope = req.body?.page_scope == null ? prev.page_scope : normalizeExchangeBannerScope(req.body.page_scope);
+    const nextPlacement = req.body?.placement == null ? prev.placement : normalizeExchangeBannerPlacement(req.body.placement);
+    const nextDailyCap =
+      req.body?.daily_user_cap == null ? Number(prev.daily_user_cap || 2) : normalizeBannerDailyUserCap(req.body.daily_user_cap);
+    const nextStart = req.body?.start_at == null ? prev.start_at || "" : normalizeBannerDateTime(req.body.start_at);
+    const nextEnd = req.body?.end_at == null ? prev.end_at || "" : normalizeBannerDateTime(req.body.end_at);
+    if (nextStart && nextEnd && nextEnd < nextStart) {
+      return res.status(400).json({ error: "bad_schedule", hint: "تاریخ پایان باید بعد از تاریخ شروع باشد." });
+    }
+    const rawSort = req.body?.sort_order;
+    const nextSort =
+      rawSort == null ? prev.sort_order : Number.isFinite(Number.parseInt(String(rawSort), 10)) ? Number.parseInt(String(rawSort), 10) : prev.sort_order;
+    const nextActive = req.body?.is_active == null ? prev.is_active : req.body.is_active ? 1 : 0;
+    db.prepare(
+      `UPDATE exchange_banners
+       SET title = ?, link_url = ?, page_scope = ?, placement = ?, daily_user_cap = ?, start_at = ?, end_at = ?, sort_order = ?, is_active = ?
+       WHERE id = ?`
+    ).run(nextTitle, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id);
+    const row = db
+      .prepare(
+        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+                COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
+         FROM exchange_banners WHERE id = ?`
+      )
+      .get(id);
+    res.json(row);
+  } catch (e) {
+    console.error("admin exchange-banners patch", e);
+    res.status(500).json({ error: "update_failed", hint: String(e.message || e) });
+  }
+});
+
+app.post("/api/admin/exchange-banners/reorder", requireSuperAdmin, (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length) return res.status(400).json({ error: "missing_items" });
+    const cleaned = [];
+    const seen = new Set();
+    for (const it of items) {
+      const id = Number.parseInt(String(it?.id || "0"), 10);
+      const sort_order = Number.parseInt(String(it?.sort_order || "0"), 10);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      if (!Number.isFinite(sort_order)) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      cleaned.push({ id, sort_order });
+    }
+    if (!cleaned.length) return res.status(400).json({ error: "bad_items" });
+    const tx = db.transaction((list) => {
+      const upd = db.prepare(`UPDATE exchange_banners SET sort_order = ? WHERE id = ?`);
+      for (const r of list) upd.run(r.sort_order, r.id);
+    });
+    tx(cleaned);
+    const rows = db
+      .prepare(
+        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+                COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
+         FROM exchange_banners
+         ORDER BY sort_order ASC, id DESC`
+      )
+      .all();
+    res.json({ ok: true, items: rows });
+  } catch (e) {
+    console.error("admin exchange-banners reorder", e);
+    res.status(500).json({ error: "reorder_failed", hint: String(e.message || e) });
+  }
+});
+
+app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
+  try {
+    const id = Number.parseInt(String(req.params.id || "0"), 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: "bad_id" });
+    }
+    const row = db.prepare(`SELECT id, image_url FROM exchange_banners WHERE id = ?`).get(id);
+    if (!row) return res.status(404).json({ error: "not_found" });
+    db.prepare(`DELETE FROM exchange_banners WHERE id = ?`).run(id);
+    const rel = String(row.image_url || "");
+    if (rel.startsWith("/uploads/exchange-banners/")) {
+      const abs = path.join(uploadsDir, rel.replace(/^\/uploads\//, ""));
+      try {
+        if (fs.existsSync(abs)) fs.unlinkSync(abs);
+      } catch {}
+    }
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "exchange_banner_deleted",
+      targetType: "exchange_banner",
+      targetId: String(id),
+      message: "Exchange banner deleted",
+    });
+    res.json({ ok: true, id });
+  } catch (e) {
+    console.error("admin exchange-banners delete", e);
+    res.status(500).json({ error: "delete_failed", hint: String(e.message || e) });
+  }
 });
 
 function adminBusinessMatchesSearchTokens(row, tokens) {

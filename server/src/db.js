@@ -252,10 +252,58 @@ function ensureAdminTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_business_reports_slug ON business_reports(business_slug);
     CREATE INDEX IF NOT EXISTS idx_business_reports_created ON business_reports(created_at DESC);
+    CREATE TABLE IF NOT EXISTS exchange_banners (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT,
+      image_url TEXT NOT NULL,
+      link_url TEXT,
+      page_scope TEXT NOT NULL DEFAULT 'exchange',
+      placement TEXT NOT NULL DEFAULT 'between',
+      daily_user_cap INTEGER NOT NULL DEFAULT 2,
+      start_at TEXT,
+      end_at TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_exchange_banners_active_place_sort
+      ON exchange_banners(is_active, placement, sort_order, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_exchange_banners_scope_active_place_sort
+      ON exchange_banners(page_scope, is_active, placement, sort_order, id DESC);
+    CREATE TABLE IF NOT EXISTS exchange_banner_clicks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      banner_id INTEGER NOT NULL,
+      page_scope TEXT NOT NULL DEFAULT 'exchange',
+      clicked_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (banner_id) REFERENCES exchange_banners(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_exchange_banner_clicks_banner
+      ON exchange_banner_clicks(banner_id, clicked_at DESC);
   `);
 }
 
 ensureAdminTables();
+
+function migrateExchangeBannersColumns() {
+  const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='exchange_banners'`).get();
+  if (!exists) return;
+  const info = db.prepare("PRAGMA table_info(exchange_banners)").all();
+  const names = new Set(info.map((c) => c.name));
+  if (!names.has("page_scope")) {
+    db.exec(`ALTER TABLE exchange_banners ADD COLUMN page_scope TEXT NOT NULL DEFAULT 'exchange'`);
+  }
+  if (!names.has("start_at")) {
+    db.exec(`ALTER TABLE exchange_banners ADD COLUMN start_at TEXT`);
+  }
+  if (!names.has("end_at")) {
+    db.exec(`ALTER TABLE exchange_banners ADD COLUMN end_at TEXT`);
+  }
+  if (!names.has("daily_user_cap")) {
+    db.exec(`ALTER TABLE exchange_banners ADD COLUMN daily_user_cap INTEGER NOT NULL DEFAULT 2`);
+  }
+}
+
+migrateExchangeBannersColumns();
 
 function seedBusinessCategories() {
   const c = db.prepare(`SELECT COUNT(*) AS c FROM business_categories`).get().c;

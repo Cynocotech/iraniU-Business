@@ -37,6 +37,9 @@ export default function AdminExchangeHubLayout() {
             <Link className="btn btn--ghost" to="/admin/exchanges/managers">
               مدیران صرافی
             </Link>
+            <Link className="btn btn--ghost" to="/admin/exchanges/banners">
+              بنرهای تبلیغاتی
+            </Link>
             <Link className="btn btn--accent" to="/admin/exchanges/add">
               افزودن آگهی صرافی
             </Link>

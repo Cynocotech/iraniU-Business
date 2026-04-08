@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ListingCard from "../components/ListingCard.jsx";
 import Seo from "../components/Seo.jsx";
-import { apiGet } from "../api.js";
+import { apiGet, apiPost } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
 import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 import { filterListingsByCategoryParams, LEGACY_CATEGORY_SELECT_OPTIONS } from "../lib/categoryFilters.js";
@@ -12,14 +12,75 @@ function filterRows(rows, searchParams) {
   return filterListingsByCategoryParams(rows, searchParams);
 }
 
+function dailyBannerSeenKey(scope) {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `iraniu_fs_seen_${scope}_${y}-${m}-${day}`;
+}
+
+function getDailyBannerSeenCount(scope, bannerId) {
+  try {
+    const raw = localStorage.getItem(dailyBannerSeenKey(scope));
+    const map = raw ? JSON.parse(raw) : {};
+    const n = Number(map?.[String(bannerId)] || 0);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementDailyBannerSeenCount(scope, bannerId) {
+  try {
+    const k = dailyBannerSeenKey(scope);
+    const raw = localStorage.getItem(k);
+    const map = raw ? JSON.parse(raw) : {};
+    const key = String(bannerId);
+    const n = Number(map?.[key] || 0);
+    map[key] = Number.isFinite(n) ? n + 1 : 1;
+    localStorage.setItem(k, JSON.stringify(map));
+  } catch {}
+}
+
+function DirectoryAdBanner({ banner, onBannerClick }) {
+  if (!banner?.image_url) return null;
+  const link = String(banner.link_url || "").trim();
+  const external = /^https?:\/\//i.test(link);
+  const label = banner.title || "بنر تبلیغاتی";
+  if (link) {
+    return (
+      <a
+        className="listings-page__ad-banner"
+        href={link}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+        aria-label={label}
+        onClick={onBannerClick}
+      >
+        <span className="ad-badge-sponsor">Sponsored</span>
+        <img src={banner.image_url} alt={label} loading="lazy" decoding="async" />
+      </a>
+    );
+  }
+  return (
+    <div className="listings-page__ad-banner" aria-label={label} onClick={onBannerClick}>
+      <span className="ad-badge-sponsor">Sponsored</span>
+      <img src={banner.image_url} alt={label} loading="lazy" decoding="async" />
+    </div>
+  );
+}
+
 export default function ListingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { categories: categoryOptions } = useBusinessCategories();
   const [rows, setRows] = useState([]);
+  const [directoryBanners, setDirectoryBanners] = useState([]);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [fullscreenBanner, setFullscreenBanner] = useState(null);
   const PAGE_SIZE = 9;
 
   useEffect(() => {
@@ -29,6 +90,12 @@ export default function ListingsPage() {
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setErr("خطا در بارگذاری"))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    apiGet("/api/directory-banners")
+      .then((d) => setDirectoryBanners(Array.isArray(d) ? d : []))
+      .catch(() => setDirectoryBanners([]));
   }, []);
 
   const filtered = useMemo(() => filterRows(rows, searchParams), [rows, searchParams]);
@@ -50,6 +117,60 @@ export default function ListingsPage() {
   const qDefault = searchParams.get("q") || "";
   const cityDefault = searchParams.get("city") || "";
   const catDefault = searchParams.get("cat") || "";
+  const normalizedDirectoryBanners = useMemo(
+    () =>
+      (Array.isArray(directoryBanners) ? directoryBanners : [])
+        .filter((b) => String(b?.image_url || "").trim())
+        .map((b) => ({
+          ...b,
+          placement:
+            String(b?.placement || "").trim().toLowerCase() === "top"
+              ? "top"
+              : String(b?.placement || "").trim().toLowerCase() === "fullscreen"
+                ? "fullscreen"
+                : "between",
+        })),
+    [directoryBanners]
+  );
+  const topBanners = useMemo(
+    () => normalizedDirectoryBanners.filter((b) => b.placement === "top"),
+    [normalizedDirectoryBanners]
+  );
+  const betweenBanners = useMemo(
+    () => normalizedDirectoryBanners.filter((b) => b.placement === "between"),
+    [normalizedDirectoryBanners]
+  );
+  const fullscreenBanners = useMemo(
+    () => normalizedDirectoryBanners.filter((b) => b.placement === "fullscreen"),
+    [normalizedDirectoryBanners]
+  );
+  const betweenBannerSlotsCount = useMemo(
+    () => Math.floor(Math.max(0, pagedRows.length) / 2),
+    [pagedRows.length]
+  );
+  const betweenBannersForPage = useMemo(
+    () => betweenBanners.slice(0, betweenBannerSlotsCount),
+    [betweenBanners, betweenBannerSlotsCount]
+  );
+  const trackBannerClick = (bannerId) => {
+    const id = Number.parseInt(String(bannerId || "0"), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    apiPost("/api/banner-clicks", { banner_id: id }).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!fullscreenBanners.length) {
+      setFullscreenBanner(null);
+      return;
+    }
+    const next = fullscreenBanners.find((b) => {
+      const cap = Math.max(1, Number.parseInt(String(b?.daily_user_cap || "2"), 10) || 2);
+      return getDailyBannerSeenCount("directory", b.id) < cap;
+    });
+    if (!next) return;
+    incrementDailyBannerSeenCount("directory", next.id);
+    setFullscreenBanner(next);
+  }, [fullscreenBanners]);
 
   const listingsSeo = useMemo(() => {
     const q = (searchParams.get("q") || "").trim();
@@ -74,6 +195,19 @@ export default function ListingsPage() {
       aria-labelledby="listings-title"
     >
       <Seo title={listingsSeo.title} description={listingsSeo.description || SEO_DEFAULT_DESCRIPTION} />
+      {fullscreenBanner ? (
+        <div className="admin-detail-modal public-fs-banner-modal">
+          <div className="admin-detail-modal__backdrop" onClick={() => setFullscreenBanner(null)} />
+          <div className="admin-detail-modal__panel public-fs-banner-modal__panel" role="dialog" aria-modal="true" aria-label="تبلیغ تمام‌صفحه">
+            <button type="button" className="admin-detail-modal__close" onClick={() => setFullscreenBanner(null)} aria-label="بستن">
+              ×
+            </button>
+            <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--fullscreen">
+              <DirectoryAdBanner banner={fullscreenBanner} onBannerClick={() => trackBannerClick(fullscreenBanner.id)} />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="listings-page__intro">
         <p className="listings-page__eyebrow">فهرست ایرانیو</p>
         <h1 id="listings-title">لیست کسب‌وکارها</h1>
@@ -157,11 +291,11 @@ export default function ListingsPage() {
               <span className="listings-error">{err}</span>
             ) : filtered.length === rows.length ? (
               <>
-                <span className="listings-toolbar__count">{rows.length}</span> مورد
+                <span className="listings-toolbar__count">{rows.length}</span>
               </>
             ) : (
               <>
-                <span className="listings-toolbar__count">{filtered.length}</span> مورد از {rows.length} (با فیلتر جستجو)
+                <span className="listings-toolbar__count">{filtered.length}</span> (با فیلتر جستجو)
               </>
             )}
           </p>
@@ -190,8 +324,25 @@ export default function ListingsPage() {
           </div>
         ) : (
           <div className="listing-cards">
-            {pagedRows.map((b) => (
-              <ListingCard key={b.slug} b={b} />
+            {!loading && !err && topBanners[0] ? (
+              <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--top">
+                <DirectoryAdBanner banner={topBanners[0]} onBannerClick={() => trackBannerClick(topBanners[0]?.id)} />
+              </div>
+            ) : null}
+            {pagedRows.map((b, idx) => (
+              <Fragment key={b.slug}>
+                <div className="listings-page__stack-item">
+                  <ListingCard b={b} />
+                </div>
+                {idx % 2 === 1 && betweenBannersForPage[Math.floor(idx / 2)] ? (
+                  <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--between">
+                    <DirectoryAdBanner
+                      banner={betweenBannersForPage[Math.floor(idx / 2)]}
+                      onBannerClick={() => trackBannerClick(betweenBannersForPage[Math.floor(idx / 2)]?.id)}
+                    />
+                  </div>
+                ) : null}
+              </Fragment>
             ))}
           </div>
         )}

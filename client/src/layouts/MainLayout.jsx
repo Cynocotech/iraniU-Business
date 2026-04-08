@@ -4,17 +4,18 @@ import SiteHeader from "../components/SiteHeader.jsx";
 import FloatingBackButton from "../components/FloatingBackButton.jsx";
 
 export default function MainLayout() {
-  const location = useLocation();
-  const hideSiteHeader = location.pathname === "/exchanges";
   const [headerLogoHref, setHeaderLogoHref] = useState("/");
+  const { pathname } = useLocation();
+  const hideSiteHeader = pathname === "/exchanges";
+  const hamburgerOnlyHeader = pathname === "/listings" || pathname === "/";
 
   return (
     <>
       <a className="skip-link" href="#main">
         پرش به محتوا
       </a>
-      {!hideSiteHeader ? <SiteHeader logoHref={headerLogoHref} /> : null}
-      <main id="main">
+      {!hideSiteHeader && <SiteHeader logoHref={headerLogoHref} hamburgerOnly={hamburgerOnlyHeader} />}
+      <main id="main" className={hideSiteHeader ? "main--no-site-header" : undefined}>
         <Outlet context={{ setHeaderLogoHref }} />
       </main>
       <FloatingBackButton />

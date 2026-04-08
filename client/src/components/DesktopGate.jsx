@@ -9,6 +9,7 @@ function allowDesktopPathname(pathname) {
   if (normalized.startsWith("/l/")) return true;
   if (normalized.startsWith("/login")) return true;
   if (normalized.startsWith("/onboarding/exchange")) return true;
+  if (normalized.startsWith("/exchanges")) return true;
   return false;
 }
 

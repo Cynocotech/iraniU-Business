@@ -26,10 +26,14 @@ const adminNavDirectory = [
   { to: "/admin-billing", label: "صورت‌حساب", icon: "billing" },
   { to: "/admin-managers", label: "حساب‌های مدیر", icon: "managers" },
   { to: "/admin-chat-log", label: "گفتگو و لاگ سایت", icon: "chatLog" },
+  { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
   { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
 ];
 
-const adminNavExchange = [{ to: "/admin/exchanges", label: "دپارتمان صرافی", icon: "exchanges" }];
+const adminNavExchange = [
+  { to: "/admin/exchanges", label: "دپارتمان صرافی", icon: "exchanges" },
+  { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
+];
 
 const adminNavSections = [
   { id: "directory", title: "دایرکتوری", items: adminNavDirectory },

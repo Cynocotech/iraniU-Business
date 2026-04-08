@@ -541,7 +541,7 @@ export default function DashboardBusinessForm({
 
         {showExchangeFields && (
           <>
-            <h3 style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>
+            <h3 id="dash-rates-section" style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>
               نرخ ارز و رمز ارز (ویژهٔ صرافی)
             </h3>
             <p className="field-hint">

@@ -254,6 +254,34 @@ export function getEffectiveRateRaw(row, mode) {
   return row.sell == null ? "" : String(row.sell).trim();
 }
 
+/** نرخ‌های نمونه (تومان) وقتی هنوز صرافی نرخ ثبت نکرده — فقط برای نمایش ماشین‌حساب */
+const CALC_DEMO_TOMAN = {
+  USD: { buy: 92000, sell: 91500 },
+  EUR: { buy: 100800, sell: 100200 },
+  GBP: { buy: 117500, sell: 117000 },
+  AED: { buy: 25100, sell: 24800 },
+  TRY: { buy: 2850, sell: 2820 },
+  CAD: { buy: 67800, sell: 67500 },
+};
+
+/**
+ * اگر نرخ واقعی نبود، مقدار نمونه برمی‌گردد تا ماشین‌حساب «—» نشود.
+ * @returns {{ rateNum: number | null, raw: string, isDemo: boolean }}
+ */
+export function getCalculatorRateOrDemo(row, mode) {
+  if (!row) return { rateNum: null, raw: "", isDemo: false };
+  const raw = getEffectiveRateRaw(row, mode);
+  const n = Number.parseFloat(String(raw || "").replace(/,/g, ".").replace(/\s/g, ""));
+  if (Number.isFinite(n) && n > 0) return { rateNum: n, raw: String(raw).trim(), isDemo: false };
+  const code = String(row.code || "")
+    .trim()
+    .toUpperCase();
+  const d = CALC_DEMO_TOMAN[code];
+  if (!d) return { rateNum: null, raw: "", isDemo: false };
+  const v = mode === "sell" ? d.sell : d.buy;
+  return { rateNum: v, raw: String(v), isDemo: true };
+}
+
 /**
  * صرافی با بهترین نرخ در فهرست برای یک ارز و نوع نرخ:
  * خرید — بالاتر بهتر؛ فروش — پایین‌تر بهتر (برای خرید ارز از صرافی).

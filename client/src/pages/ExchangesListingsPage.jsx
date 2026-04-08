@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import ExchangeBestRatesSheet from "../components/ExchangeBestRatesSheet.jsx";
+import ExchangeCalcModal from "../components/ExchangeCalcModal.jsx";
 import ListingCard from "../components/ListingCard.jsx";
 import Seo from "../components/Seo.jsx";
-import ExchangeInlineCalc from "../components/ExchangeInlineCalc.jsx";
-import { apiGet } from "../api.js";
+import { apiGet, apiPost } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
 import { SEO_DEFAULT_DESCRIPTION } from "../lib/seoDefaults.js";
 import { filterListingsByCategoryParams } from "../lib/categoryFilters.js";
 import {
   averageExchangeRatesFromBusinesses,
-  businessHasExchangeRatesData,
   formatExchangeRateToman,
-  getEffectiveRateRaw,
   isExchangeBusiness,
   parseExchangeRatesJson,
   pickBestRateExchangeInList,
@@ -29,17 +28,75 @@ const EXCHANGE_CITY_LABELS = {
   glasgow: "گلاسگو",
 };
 
+function faDigits(n) {
+  return Number(n).toLocaleString("fa-IR");
+}
+
+function dailyBannerSeenKey(scope) {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `iraniu_fs_seen_${scope}_${y}-${m}-${day}`;
+}
+
+function getDailyBannerSeenCount(scope, bannerId) {
+  try {
+    const raw = localStorage.getItem(dailyBannerSeenKey(scope));
+    const map = raw ? JSON.parse(raw) : {};
+    const n = Number(map?.[String(bannerId)] || 0);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementDailyBannerSeenCount(scope, bannerId) {
+  try {
+    const k = dailyBannerSeenKey(scope);
+    const raw = localStorage.getItem(k);
+    const map = raw ? JSON.parse(raw) : {};
+    const key = String(bannerId);
+    const n = Number(map?.[key] || 0);
+    map[key] = Number.isFinite(n) ? n + 1 : 1;
+    localStorage.setItem(k, JSON.stringify(map));
+  } catch {}
+}
+
+function ExchangeAdBanner({ banner, onBannerClick }) {
+  if (!banner?.image_url) return null;
+  const link = String(banner.link_url || "").trim();
+  const external = /^https?:\/\//i.test(link);
+  const label = banner.title || "بنر تبلیغاتی";
+  if (link) {
+    return (
+      <a className="exchanges-app__ad-banner" href={link} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} aria-label={label} onClick={onBannerClick}>
+        <span className="ad-badge-sponsor">Sponsored</span>
+        <img src={banner.image_url} alt={label} loading="lazy" decoding="async" />
+      </a>
+    );
+  }
+  return (
+    <div className="exchanges-app__ad-banner" aria-label={label} onClick={onBannerClick}>
+      <span className="ad-badge-sponsor">Sponsored</span>
+      <img src={banner.image_url} alt={label} loading="lazy" decoding="async" />
+    </div>
+  );
+}
+
 export default function ExchangesListingsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
+  const [exchangeBanners, setExchangeBanners] = useState([]);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [exchangeMode, setExchangeMode] = useState("buy");
-  const [exchangeAmount, setExchangeAmount] = useState("1");
   const [selectedCurrencyCode, setSelectedCurrencyCode] = useState("USD");
-  const [calcSheetOpen, setCalcSheetOpen] = useState(false);
+  const [calcModalOpen, setCalcModalOpen] = useState(false);
+  const [bestRatesSheetOpen, setBestRatesSheetOpen] = useState(false);
+  const [fullscreenBanner, setFullscreenBanner] = useState(null);
   const PAGE_SIZE = 9;
 
   useEffect(() => {
@@ -49,6 +106,12 @@ export default function ExchangesListingsPage() {
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setErr("خطا در بارگذاری"))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    apiGet("/api/exchange-banners")
+      .then((d) => setExchangeBanners(Array.isArray(d) ? d : []))
+      .catch(() => setExchangeBanners([]));
   }, []);
 
   const filtered = useMemo(() => filterExchangeRows(rows, searchParams), [rows, searchParams]);
@@ -68,13 +131,6 @@ export default function ExchangesListingsPage() {
 
   const selectedRate =
     ratesForCalc.find((r) => r.code === selectedCurrencyCode) || ratesForCalc[0] || null;
-  const selectedRateRaw = getEffectiveRateRaw(selectedRate, exchangeMode);
-  const selectedRateNum = Number.parseFloat(String(selectedRateRaw || "").replace(",", "."));
-  const exchangeAmountNum = Number.parseFloat(String(exchangeAmount || "").replace(",", "."));
-  const exchangeResult =
-    Number.isFinite(selectedRateNum) && Number.isFinite(exchangeAmountNum)
-      ? selectedRateNum * exchangeAmountNum
-      : null;
 
   useEffect(() => {
     if (!ratesForCalc.length) return;
@@ -101,39 +157,67 @@ export default function ExchangesListingsPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  useEffect(() => {
-    if (!calcSheetOpen) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setCalcSheetOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [calcSheetOpen]);
-
   const qDefault = searchParams.get("q") || "";
   const cityDefault = searchParams.get("city") || "";
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => Boolean(cityDefault));
+
+  useEffect(() => {
+    if (cityDefault) setShowAdvancedFilters(true);
+  }, [cityDefault]);
 
   const hasActiveFilters = Boolean(qDefault.trim() || cityDefault);
+  const normalizedExchangeBanners = useMemo(
+    () =>
+      (Array.isArray(exchangeBanners) ? exchangeBanners : [])
+        .filter((b) => String(b?.image_url || "").trim())
+        .map((b) => ({
+          ...b,
+          placement:
+            String(b?.placement || "").trim().toLowerCase() === "top"
+              ? "top"
+              : String(b?.placement || "").trim().toLowerCase() === "fullscreen"
+                ? "fullscreen"
+                : "between",
+        })),
+    [exchangeBanners]
+  );
+  const topBanners = useMemo(() => normalizedExchangeBanners.filter((b) => b.placement === "top"), [normalizedExchangeBanners]);
+  const betweenBanners = useMemo(
+    () => normalizedExchangeBanners.filter((b) => b.placement === "between"),
+    [normalizedExchangeBanners]
+  );
+  const fullscreenBanners = useMemo(
+    () => normalizedExchangeBanners.filter((b) => b.placement === "fullscreen"),
+    [normalizedExchangeBanners]
+  );
+  const betweenBannersForPage = useMemo(
+    () => betweenBanners.slice(0, Math.max(0, pagedRows.length)),
+    [betweenBanners, pagedRows.length]
+  );
+  const trackBannerClick = (bannerId) => {
+    const id = Number.parseInt(String(bannerId || "0"), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    apiPost("/api/banner-clicks", { banner_id: id }).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!fullscreenBanners.length) {
+      setFullscreenBanner(null);
+      return;
+    }
+    const next = fullscreenBanners.find((b) => {
+      const cap = Math.max(1, Number.parseInt(String(b?.daily_user_cap || "2"), 10) || 2);
+      return getDailyBannerSeenCount("exchange", b.id) < cap;
+    });
+    if (!next) return;
+    incrementDailyBannerSeenCount("exchange", next.id);
+    setFullscreenBanner(next);
+  }, [fullscreenBanners]);
 
   const bestRatePick = useMemo(
     () => pickBestRateExchangeInList(filtered, selectedCurrencyCode, exchangeMode),
     [filtered, selectedCurrencyCode, exchangeMode]
   );
-
-  const calcHint = useMemo(() => {
-    const withData = filtered.filter(businessHasExchangeRatesData);
-    if (withData.length >= 2) {
-      return `میانگین نرخ از ${withData.length} صرافی در همین فهرست؛ برای نرخ قطعی همان لحظه با صرافی تماس بگیرید یا صفحهٔ آگهی را ببینید.`;
-    }
-    if (withData.length === 1) {
-      const name = (withData[0].name_fa || withData[0].slug || "").trim() || "صرافی";
-      return `فقط این صرافی در فهرست نرخ ثبت کرده — همان نرخ (میانگین تک‌صرافی). برای نرخ قطعی صفحهٔ «${name}» را ببینید.`;
-    }
-    if (filtered.length) {
-      return "هیچ صرافی در این فهرست نرخ ثبت نکرده — نمایش نمونه؛ برای نرخ دقیق صفحهٔ آگهی را باز کنید.";
-    }
-    return "پس از نمایش صرافی‌ها، میانگین از نرخ‌های ثبت‌شده محاسبه می‌شود.";
-  }, [filtered]);
 
   const seo = useMemo(() => {
     const q = (searchParams.get("q") || "").trim();
@@ -156,40 +240,60 @@ export default function ExchangesListingsPage() {
       aria-labelledby="exchanges-title"
     >
       <Seo title={seo.title} description={seo.description || SEO_DEFAULT_DESCRIPTION} />
+      {fullscreenBanner ? (
+        <div className="admin-detail-modal public-fs-banner-modal">
+          <div className="admin-detail-modal__backdrop" onClick={() => setFullscreenBanner(null)} />
+          <div className="admin-detail-modal__panel public-fs-banner-modal__panel" role="dialog" aria-modal="true" aria-label="تبلیغ تمام‌صفحه">
+            <button type="button" className="admin-detail-modal__close" onClick={() => setFullscreenBanner(null)} aria-label="بستن">
+              ×
+            </button>
+            <div className="exchanges-app__ad-banner-wrap exchanges-app__ad-banner-wrap--fullscreen">
+              <ExchangeAdBanner banner={fullscreenBanner} onBannerClick={() => trackBannerClick(fullscreenBanner.id)} />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <h1 id="exchanges-title" className="visually-hidden">
         {seo.title}
       </h1>
 
       <nav className="exchanges-app__float-nav" aria-label="ناوبری سریع صرافی‌ها">
         <a className="exchanges-app__float-btn" href="#exchange-list-section">
-          لیست صرافی‌ها
+          <span className="exchanges-app__float-btn-inner">
+            <i className="fa-solid fa-list-ul exchanges-app__float-ico" aria-hidden="true" />
+            <span className="exchanges-app__float-label">لیست صرافی‌ها</span>
+          </span>
         </a>
-        <Link className="exchanges-app__float-btn" to="/exchanges/best-rates">
-          مقایسه نرخ و بهترین‌ها
-        </Link>
+        <button
+          type="button"
+          className="exchanges-app__float-btn exchanges-app__float-btn--action"
+          onClick={() => {
+            setCalcModalOpen(false);
+            setBestRatesSheetOpen(true);
+          }}
+        >
+          <span className="exchanges-app__float-btn-inner">
+            <i className="fa-solid fa-chart-line exchanges-app__float-ico" aria-hidden="true" />
+            <span className="exchanges-app__float-label">مقایسه نرخ و بهترین‌ها</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="exchanges-app__float-btn exchanges-app__float-btn--action"
+          onClick={() => {
+            setBestRatesSheetOpen(false);
+            setCalcModalOpen(true);
+          }}
+        >
+          <span className="exchanges-app__float-btn-inner">
+            <i className="fa-solid fa-calculator exchanges-app__float-ico" aria-hidden="true" />
+            <span className="exchanges-app__float-label">ماشین‌حساب نرخ</span>
+          </span>
+        </button>
       </nav>
 
       <div className="exchanges-app__hero">
         <div className="exchanges-app__filter-card">
-          <div className="exchanges-app__filter-card-header">
-            <span className="exchanges-app__filter-card-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M4 6h16M7 12h10M10 18h4"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-            <div className="exchanges-app__filter-card-headlines">
-              <p className="exchanges-app__filter-card-kicker">فیلتر نتایج</p>
-              <p className="exchanges-app__filter-card-title exchanges-app__filter-card-title--compact">
-                جستجو بر اساس نام و شهر
-              </p>
-            </div>
-          </div>
-
           {hasActiveFilters ? (
             <div className="exchanges-app__filter-chips" aria-label="فیلترهای فعال">
               {qDefault.trim() ? (
@@ -237,19 +341,35 @@ export default function ExchangesListingsPage() {
                   className="exchanges-app__input"
                 />
               </div>
-              <div className="field field--block exchanges-app__field">
-                <label htmlFor="exchanges-city">شهر</label>
-                <select id="exchanges-city" name="city" aria-label="شهر" defaultValue={cityDefault} className="exchanges-app__input">
-                  <option value="">همه شهرها</option>
-                  <option value="london">لندن</option>
-                  <option value="manchester">منچستر</option>
-                  <option value="birmingham">برمنگام</option>
-                  <option value="glasgow">گلاسگو</option>
-                </select>
+              {showAdvancedFilters ? (
+                <div className="field field--block exchanges-app__field">
+                  <label htmlFor="exchanges-city">شهر</label>
+                  <select id="exchanges-city" name="city" aria-label="شهر" defaultValue={cityDefault} className="exchanges-app__input">
+                    <option value="">همه شهرها</option>
+                    <option value="london">لندن</option>
+                    <option value="manchester">منچستر</option>
+                    <option value="birmingham">برمنگام</option>
+                    <option value="glasgow">گلاسگو</option>
+                  </select>
+                </div>
+              ) : (
+                <input type="hidden" name="city" value={cityDefault} />
+              )}
+              <div className="exchanges-app__search-tools">
+                <button
+                  type="button"
+                  className="btn btn--ghost exchanges-app__filters-toggle"
+                  aria-expanded={showAdvancedFilters}
+                  onClick={() => setShowAdvancedFilters((v) => !v)}
+                >
+                  {showAdvancedFilters ? "بستن فیلترها" : "فیلترها"}
+                </button>
+                {showAdvancedFilters ? (
+                  <button type="submit" className="btn btn--primary exchanges-app__submit">
+                    اعمال فیلتر
+                  </button>
+                ) : null}
               </div>
-              <button type="submit" className="btn btn--primary exchanges-app__submit">
-                اعمال فیلتر
-              </button>
             </div>
           </form>
         </div>
@@ -260,6 +380,36 @@ export default function ExchangesListingsPage() {
             className="exchanges-app__best-widget-shell"
             aria-label="بهترین نرخ در فهرست فعلی"
           >
+            <div className="exchanges-app__best-widget-toolbar exchanges-app__best-widget-toolbar--compact">
+              <label className="visually-hidden" htmlFor="ex-list-best-currency">
+                ارز برای مقایسه
+              </label>
+              <select
+                id="ex-list-best-currency"
+                className="exchanges-app__best-widget-select"
+                value={selectedCurrencyCode}
+                onChange={(e) => setSelectedCurrencyCode(e.target.value)}
+              >
+                {ratesForCalc.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.code}
+                    {r.name ? ` — ${r.name}` : ""}
+                  </option>
+                ))}
+              </select>
+              <label className="visually-hidden" htmlFor="ex-list-best-mode">
+                نوع نرخ
+              </label>
+              <select
+                id="ex-list-best-mode"
+                className="exchanges-app__best-widget-select"
+                value={exchangeMode}
+                onChange={(e) => setExchangeMode(e.target.value)}
+              >
+                <option value="buy">خرید</option>
+                <option value="sell">فروش</option>
+              </select>
+            </div>
             <div className="exchanges-app__best-widget-body">
               <p className="exchanges-app__best-widget-kicker">بهترین نرخ در این فهرست</p>
               <p className="exchanges-app__best-widget-meta">
@@ -299,24 +449,7 @@ export default function ExchangesListingsPage() {
       </div>
 
       <div id="exchange-list-section" className="exchanges-app__body">
-        <div className="listings-toolbar exchanges-app__toolbar">
-          <p className="listings-toolbar__status">
-            {loading ? (
-              <span className="listings-toolbar__loading">در حال بارگذاری…</span>
-            ) : err ? (
-              <span className="listings-error">{err}</span>
-            ) : (
-              <>
-                <span className="listings-toolbar__count">{filtered.length}</span> صرافی
-                {filtered.length !== rows.length ? (
-                  <span className="field-hint" style={{ marginInlineStart: "0.35rem" }}>
-                    (از {rows.length} آگهی)
-                  </span>
-                ) : null}
-              </>
-            )}
-          </p>
-        </div>
+        {err ? <p className="listings-error exchanges-app__list-err">{err}</p> : null}
 
         {loading ? (
           <div className="exchanges-app__preloader" aria-busy="true" aria-label="در حال بارگذاری صرافی‌ها">
@@ -340,114 +473,79 @@ export default function ExchangesListingsPage() {
           </div>
         ) : (
           <div className="exchanges-app__list listing-cards">
-            {pagedRows.map((b) => (
-              <div key={b.slug} className="exchanges-app__card">
-                <ListingCard b={b} titleHeading="h2" variant="exchange" />
+            {!loading && !err && topBanners[0] ? (
+              <div className="exchanges-app__ad-banner-wrap exchanges-app__ad-banner-wrap--top">
+                <ExchangeAdBanner banner={topBanners[0]} onBannerClick={() => trackBannerClick(topBanners[0]?.id)} />
+              </div>
+            ) : null}
+            {pagedRows.map((b, idx) => (
+              <div key={b.slug} className="exchanges-app__list-stack-item">
+                <div className="exchanges-app__card">
+                  <ListingCard b={b} titleHeading="h2" variant="exchange" />
+                </div>
+                {betweenBannersForPage[idx] ? (
+                  <div className="exchanges-app__ad-banner-wrap exchanges-app__ad-banner-wrap--between">
+                    <ExchangeAdBanner banner={betweenBannersForPage[idx]} onBannerClick={() => trackBannerClick(betweenBannersForPage[idx]?.id)} />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
         )}
         {!loading && !err && filtered.length > PAGE_SIZE && (
-          <nav className="listings-pagination exchanges-app__pagination" aria-label="صفحه‌بندی">
+          <nav className="exchanges-app__pagination-bar" aria-label="صفحه‌بندی">
             <button
               type="button"
-              className="btn btn--ghost listings-pagination__btn"
+              className="exchanges-app__page-btn"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
+              aria-label="صفحه قبلی"
             >
-              قبلی
+              <i className="fa-solid fa-chevron-right" aria-hidden="true" />
+              <span>قبلی</span>
             </button>
-            <p className="listings-pagination__status">
-              صفحه {safePage} از {totalPages}
-            </p>
+            <div className="exchanges-app__page-indicator">
+              <span className="exchanges-app__page-indicator-label">صفحه</span>
+              <span className="exchanges-app__page-indicator-num">{faDigits(safePage)}</span>
+              <span className="exchanges-app__page-indicator-sep" aria-hidden="true">
+                /
+              </span>
+              <span className="exchanges-app__page-indicator-total">{faDigits(totalPages)}</span>
+            </div>
             <button
               type="button"
-              className="btn btn--ghost listings-pagination__btn"
+              className="exchanges-app__page-btn"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
+              aria-label="صفحه بعدی"
             >
-              بعدی
+              <span>بعدی</span>
+              <i className="fa-solid fa-chevron-left" aria-hidden="true" />
             </button>
           </nav>
         )}
       </div>
 
-      {!loading && !err && selectedRate ? (
-        <>
-          <button
-            type="button"
-            className="exchanges-app__calc-fab"
-            onClick={() => setCalcSheetOpen(true)}
-            aria-label="باز کردن ماشین‌حساب لحظه‌ای"
-          >
-            ماشین‌حساب لحظه‌ای
-          </button>
+      <ExchangeBestRatesSheet
+        open={bestRatesSheetOpen}
+        onClose={() => setBestRatesSheetOpen(false)}
+        filtered={filtered}
+        loading={loading}
+        err={err}
+      />
 
-          {calcSheetOpen ? (
-            <div
-              className="exchanges-app__sheet-overlay exchanges-app__sheet-overlay--wide-calc"
-              onClick={() => setCalcSheetOpen(false)}
-              role="presentation"
-            >
-              <section
-                className="exchanges-app__sheet exchanges-app__sheet--wide"
-                role="dialog"
-                aria-modal="true"
-                aria-label="ماشین‌حساب لحظه‌ای"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="exchanges-app__sheet-head">
-                  <h2>ماشین‌حساب لحظه‌ای</h2>
-                  <button type="button" className="btn btn--ghost" onClick={() => setCalcSheetOpen(false)}>
-                    بستن
-                  </button>
-                </div>
-                <section className="exchanges-app__currency-mini exchanges-app__currency-mini--sheet" aria-labelledby="ex-list-curr-label-sheet">
-                  <p className="exchanges-app__currency-mini-label" id="ex-list-curr-label-sheet">
-                    ارز برای محاسبه
-                  </p>
-                  <div className="exchanges-app__currency-strip" role="listbox" aria-labelledby="ex-list-curr-label-sheet">
-                    {ratesForCalc.map((row) => {
-                      const selected = selectedCurrencyCode === row.code;
-                      return (
-                        <button
-                          key={row.code}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          className={`exchanges-app__currency-chip${selected ? " exchanges-app__currency-chip--selected" : ""}`}
-                          onClick={() => setSelectedCurrencyCode(row.code)}
-                        >
-                          <span className="exchanges-app__currency-chip-flag" aria-hidden>
-                            {row.flag || "🏳️"}
-                          </span>
-                          <span className="exchanges-app__currency-chip-body">
-                            <span className="exchanges-app__currency-chip-code" dir="ltr">
-                              {row.code}
-                            </span>
-                            {row.name ? <span className="exchanges-app__currency-chip-name">{row.name}</span> : null}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-                <ExchangeInlineCalc
-                  idPrefix="ex-list-sheet"
-                  hint={calcHint}
-                  exchangeMode={exchangeMode}
-                  onExchangeModeChange={setExchangeMode}
-                  exchangeAmount={exchangeAmount}
-                  onExchangeAmountChange={setExchangeAmount}
-                  exchangeResult={exchangeResult}
-                  exchangeAmountNum={exchangeAmountNum}
-                  selectedRateNum={selectedRateNum}
-                />
-              </section>
-            </div>
-          ) : null}
-        </>
-      ) : null}
+      <ExchangeCalcModal
+        open={calcModalOpen}
+        onClose={() => setCalcModalOpen(false)}
+        filtered={filtered}
+        ratesForCalc={ratesForCalc}
+        selectedCurrencyCode={selectedCurrencyCode}
+        setSelectedCurrencyCode={setSelectedCurrencyCode}
+        exchangeMode={exchangeMode}
+        setExchangeMode={setExchangeMode}
+        loading={loading}
+        err={err}
+      />
     </section>
   );
 }

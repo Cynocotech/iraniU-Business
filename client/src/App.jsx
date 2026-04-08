@@ -8,6 +8,7 @@ import HomePage from "./pages/HomePage.jsx";
 import ListingsPage from "./pages/ListingsPage.jsx";
 import ExchangesListingsPage from "./pages/ExchangesListingsPage.jsx";
 import ExchangeBestRatesPage from "./pages/ExchangeBestRatesPage.jsx";
+import ExchangeCalculatorPage from "./pages/ExchangeCalculatorPage.jsx";
 import BusinessPage from "./pages/BusinessPage.jsx";
 import BusinessClaimedPage from "./pages/BusinessClaimedPage.jsx";
 import ClaimPage from "./pages/ClaimPage.jsx";
@@ -22,11 +23,13 @@ import DashboardCallsPage from "./pages/dashboard/DashboardCallsPage.jsx";
 import DashboardQrPage from "./pages/dashboard/DashboardQrPage.jsx";
 import DashboardBiolinkPage from "./pages/dashboard/DashboardBiolinkPage.jsx";
 import DashboardCareersPage from "./pages/dashboard/DashboardCareersPage.jsx";
+import DashboardRatesPage from "./pages/dashboard/DashboardRatesPage.jsx";
 import BiolinkPublicPage from "./pages/BiolinkPublicPage.jsx";
 import AdminHomePage from "./pages/admin/AdminHomePage.jsx";
 import AdminBusinessesPage from "./pages/admin/AdminBusinessesPage.jsx";
 import AdminExchangesPage from "./pages/admin/AdminExchangesPage.jsx";
 import AdminExchangeManagersPage from "./pages/admin/AdminExchangeManagersPage.jsx";
+import AdminExchangeBannersPage from "./pages/admin/AdminExchangeBannersPage.jsx";
 import AdminEditBusinessPage from "./pages/admin/AdminEditBusinessPage.jsx";
 import AdminAddBusinessPage from "./pages/admin/AdminAddBusinessPage.jsx";
 import AdminAddExchangePage from "./pages/admin/AdminAddExchangePage.jsx";
@@ -80,6 +83,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/exchanges" element={<ExchangesListingsPage />} />
+        <Route path="/exchanges/calculator" element={<ExchangeCalculatorPage />} />
         <Route path="/exchanges/best-rates" element={<ExchangeBestRatesPage />} />
         <Route path="/business" element={<BusinessPage />} />
         <Route path="/business-claimed" element={<BusinessClaimedPage />} />
@@ -108,6 +112,7 @@ export default function App() {
       >
         <Route index element={<DashboardOverviewPage />} />
         <Route path="edit" element={<DashboardEditPage />} />
+        <Route path="rates" element={<DashboardRatesPage />} />
         <Route path="careers" element={<DashboardCareersPage />} />
         <Route path="media" element={<DashboardMediaPage />} />
         <Route path="twilio" element={<DashboardTwilioSettingsPage />} />
@@ -130,6 +135,7 @@ export default function App() {
           <Route index element={<AdminExchangesPage />} />
           <Route path="add" element={<AdminAddExchangePage />} />
           <Route path="managers" element={<AdminExchangeManagersPage />} />
+          <Route path="banners" element={<AdminExchangeBannersPage />} />
         </Route>
         <Route path="/admin-exchanges" element={<Navigate to="/admin/exchanges" replace />} />
         <Route path="/admin-add" element={<AdminAddBusinessPage />} />

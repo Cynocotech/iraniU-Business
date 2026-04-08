@@ -5,10 +5,10 @@ import { DashboardProvider, useDashboard } from "../context/DashboardContext.jsx
 import { useAuth } from "../context/AuthContext.jsx";
 import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
+import { isExchangeBusiness } from "../lib/exchangeRates.js";
 
 const NAV_BASE = [
   { to: "/dashboard", label: "نمای کلی", end: true, iconKey: "overview" },
-  { to: "/dashboard/edit", label: "ویرایش آگهی", iconKey: "edit" },
   { to: "/dashboard/careers", label: "فرصت‌های شغلی", iconKey: "careers" },
   { to: "/dashboard/media", label: "تصاویر", iconKey: "media" },
   { to: "/dashboard/twilio", label: "تنظیمات Twilio", twilioOnly: true, iconKey: "twilio" },
@@ -63,10 +63,11 @@ function ImpersonationBanner() {
 }
 
 function DashboardChrome() {
-  const { dashSlug, twilioModuleEnabled } = useDashboard();
+  const { dashSlug, twilioModuleEnabled, biz } = useDashboard();
   const navItems = NAV_BASE.filter((item) => !item.twilioOnly || twilioModuleEnabled);
   const { logout, me, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
+  const isExchangePanel = isExchangeBusiness(biz);
   const onLogout = () => {
     logout();
     navigate("/login", { replace: true });
@@ -80,7 +81,7 @@ function DashboardChrome() {
       <a className="skip-link" href="#main">
         پرش به محتوا
       </a>
-      <div className="app-shell" id="main">
+      <div className={`app-shell${isExchangePanel ? " app-shell--exchange-panel" : ""}`} id="main">
         <input type="checkbox" id="app-shell-sidebar-toggle" className="app-shell-sidebar-cb" />
         <label className="app-shell__sidebar-overlay" htmlFor="app-shell-sidebar-toggle" aria-hidden="true" />
         <aside className="app-shell__sidebar" aria-label="منوی پنل">
@@ -96,6 +97,33 @@ function DashboardChrome() {
             <span className="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
           </Link>
           <p className="app-shell__nav-title">پنل کسب‌وکار</p>
+          <p className="app-shell__nav-title">ویرایش آگهی</p>
+          <ul className="app-shell__nav">
+            <li>
+              <NavLink to="/dashboard/edit">
+                <span className="app-shell__nav-icon" aria-hidden="true">
+                  {dashboardIcons.edit}
+                </span>
+                <span>ویرایش آگهی</span>
+              </NavLink>
+            </li>
+          </ul>
+          {isExchangePanel ? (
+            <>
+          <p className="app-shell__nav-title">نرخ‌ها</p>
+          <ul className="app-shell__nav">
+            <li>
+              <NavLink to="/dashboard/rates">
+                <span className="app-shell__nav-icon" aria-hidden="true">
+                  {dashboardIcons.package}
+                </span>
+                <span>نرخ‌ها</span>
+              </NavLink>
+            </li>
+          </ul>
+            </>
+          ) : null}
+          <p className="app-shell__nav-title">ابزارها</p>
           <ul className="app-shell__nav">
             {navItems.map((item) => (
               <li key={item.to}>
@@ -144,8 +172,8 @@ function DashboardChrome() {
               </svg>
             </label>
             <div className="app-shell__header-text">
-              <h1>پنل کسب‌وکار</h1>
-              <p>مدیریت آگهی، لینک‌ها و ابزارها</p>
+              <h1>{isExchangePanel ? "پنل مدیریت صرافی" : "پنل کسب‌وکار"}</h1>
+              <p>{isExchangePanel ? "نرخ‌ها، وضعیت انتشار و مدیریت سریع" : "مدیریت آگهی، لینک‌ها و ابزارها"}</p>
             </div>
             <div className="app-shell__search-wrap">
               <label className="visually-hidden" htmlFor="dash-global-search">
@@ -155,7 +183,7 @@ function DashboardChrome() {
                 type="search"
                 id="dash-global-search"
                 className="app-shell__search"
-                placeholder="جستجو در پنل…"
+                placeholder={isExchangePanel ? "جستجو در پنل صرافی…" : "جستجو در پنل…"}
                 autoComplete="off"
               />
             </div>

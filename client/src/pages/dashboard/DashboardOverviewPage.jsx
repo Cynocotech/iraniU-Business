@@ -3,6 +3,7 @@ import { useDashboard } from "../../context/DashboardContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
+import { isExchangeBusiness, parseExchangeRatesJson } from "../../lib/exchangeRates.js";
 
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
@@ -18,10 +19,25 @@ function formatRatingDisplay(rating) {
   return `${toFaDigits(intPart)}٫${toFaDigits(dec)}`;
 }
 
+function parseRateNum(raw) {
+  const n = Number.parseFloat(String(raw || "").replace(",", ".").replace(/\s/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatToman(raw) {
+  const n = parseRateNum(raw);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toLocaleString("fa-IR", { maximumFractionDigits: 2 })} تومان`;
+}
+
 export default function DashboardOverviewPage() {
   const { dashSlug, biz, heroQr, phoneClickCount } = useDashboard();
   const { me } = useAuth();
   const show2faPrompt = !me?.totp_enabled;
+  const isExchange = isExchangeBusiness(biz);
+  const exchangeRows = parseExchangeRatesJson(biz?.exchange_rates_json);
+  const featuredRate = exchangeRows.find((r) => r.code === "GBP") || exchangeRows.find((r) => r.code === "USD") || exchangeRows[0] || null;
+  const statusText = biz?.status && biz.status !== "active" ? "غیرفعال" : "فعال";
 
   return (
     <DashboardMain>
@@ -38,6 +54,69 @@ export default function DashboardOverviewPage() {
         </section>
       ) : null}
 
+      {isExchange ? (
+        <section className="exchange-panel-overview" aria-labelledby="exchange-overview-heading">
+          <header className="exchange-panel-overview__head">
+            <h2 id="exchange-overview-heading" className="exchange-panel-overview__title">
+              پنل مدیریت
+            </h2>
+            <p className="exchange-panel-overview__subtitle">آگهی صرافی: {biz?.name_fa || "—"}</p>
+          </header>
+
+          <div className="exchange-panel-overview__notice" role="status">
+            در حال مشاهده پنل به عنوان مدیر — برای خروج از حساب، از منوی بالا استفاده کنید.
+          </div>
+
+          <div className="exchange-panel-overview__stats">
+            <article className="exchange-panel-overview__stat exchange-panel-overview__stat--buy">
+              <p className="exchange-panel-overview__stat-label">نرخ خرید {featuredRate?.name || featuredRate?.code || "ارز"}</p>
+              <p className="exchange-panel-overview__stat-value" dir="ltr">
+                {formatToman(featuredRate?.buy)}
+              </p>
+            </article>
+            <article className="exchange-panel-overview__stat exchange-panel-overview__stat--sell">
+              <p className="exchange-panel-overview__stat-label">نرخ فروش {featuredRate?.name || featuredRate?.code || "ارز"}</p>
+              <p className="exchange-panel-overview__stat-value" dir="ltr">
+                {formatToman(featuredRate?.sell)}
+              </p>
+            </article>
+            <article className="exchange-panel-overview__stat exchange-panel-overview__stat--status">
+              <p className="exchange-panel-overview__stat-label">وضعیت نمایش</p>
+              <p className="exchange-panel-overview__status-value">{statusText}</p>
+              <p className="exchange-panel-overview__status-sub">وضعیت آگهی/پکیج</p>
+            </article>
+          </div>
+
+          <div className="exchange-panel-overview__content">
+            <section className="exchange-panel-overview__board">
+              <h3>تابلو اعلانات</h3>
+              <ul>
+                <li>اطلاعات صرافی خود را کامل کنید تا در دایرکتوری رتبه بهتری بگیرید.</li>
+                <li>برای نمایش در لیست پیشنهادها، نرخ‌ها را منظم به‌روزرسانی کنید.</li>
+                <li>تصویر کاور استاندارد و واضح، اعتماد کاربر را بیشتر می‌کند.</li>
+              </ul>
+            </section>
+
+            <section className="exchange-panel-overview__actions">
+              <Link className="btn btn--primary" to="/dashboard/rates">
+                نرخ‌ها
+              </Link>
+              <Link className="btn btn--ghost" to="/dashboard/edit">
+                ویرایش آگهی
+              </Link>
+              <Link className="btn btn--ghost" to="/dashboard/media">
+                تصاویر و کاور
+              </Link>
+              <Link className="btn btn--ghost" to={`/business?slug=${encodeURIComponent(dashSlug)}`}>
+                پیش‌نمایش صفحهٔ عمومی
+              </Link>
+            </section>
+          </div>
+        </section>
+      ) : null}
+
+      {!isExchange ? (
+      <>
       <div className="app-shell__widgets">
         <div className="app-shell__hero-card">
           <svg className="app-shell__hero-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -131,6 +210,8 @@ export default function DashboardOverviewPage() {
           <Link to="/dashboard/careers">فرصت‌های شغلی</Link>.
         </p>
       </section>
+      </>
+      ) : null}
     </DashboardMain>
   );
 }
