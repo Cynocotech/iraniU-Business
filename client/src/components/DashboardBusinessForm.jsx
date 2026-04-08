@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPatch } from "../api.js";
+import { apiGet, apiPatch, apiPatchUrl } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "./DashboardPanelHead.jsx";
 import { DEFAULT_HOURS_ROWS, parseHoursJson, parseGalleryJson } from "../lib/businessProfile.js";
@@ -66,6 +66,11 @@ export default function DashboardBusinessForm({
   const [exchangeCompanyVerified, setExchangeCompanyVerified] = useState(false);
   const [categories, setCategories] = useState([]);
   const [twilioModuleEnabled, setTwilioModuleEnabled] = useState(true);
+  const [exchangeManagers, setExchangeManagers] = useState([]);
+  const [exchangeManagerEmail, setExchangeManagerEmail] = useState("");
+  const [exchangeManagerIdCurrent, setExchangeManagerIdCurrent] = useState(null);
+  const [exchangeManagerMsg, setExchangeManagerMsg] = useState("");
+  const [exchangeManagerSaving, setExchangeManagerSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +115,12 @@ export default function DashboardBusinessForm({
       setExchangeFeatures(parseExchangeFeaturesJson(b.exchange_features_json));
       setExchangeTodayRateEnabled(Number(b.exchange_today_rate_enabled) !== 0);
       setExchangeCompanyVerified(Number(b.exchange_company_verified) === 1);
+      setExchangeManagerIdCurrent(
+        Number.isFinite(Number(b.exchange_manager_id)) && Number(b.exchange_manager_id) > 0
+          ? Number(b.exchange_manager_id)
+          : null
+      );
+      setExchangeManagerMsg("");
       onLoaded?.(b);
     },
     [onLoaded]
@@ -145,6 +156,23 @@ export default function DashboardBusinessForm({
       .then((d) => setCategories(Array.isArray(d) ? d : []))
       .catch(() => setCategories([]));
   }, []);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    apiGet("/api/exchange-managers")
+      .then((d) => setExchangeManagers(Array.isArray(d) ? d : []))
+      .catch(() => setExchangeManagers([]));
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    if (!exchangeManagerIdCurrent) {
+      if (!exchangeManagerSaving) setExchangeManagerEmail("");
+      return;
+    }
+    const m = exchangeManagers.find((x) => Number(x.id) === Number(exchangeManagerIdCurrent));
+    if (m?.email && !exchangeManagerSaving) setExchangeManagerEmail(String(m.email).toLowerCase());
+  }, [exchangeManagerIdCurrent, exchangeManagers, isSuperAdmin, exchangeManagerSaving]);
 
   const persistSlug = (next) => {
     const s = String(next || "").trim();
@@ -226,6 +254,36 @@ export default function DashboardBusinessForm({
 
   const previewHref = `/business?slug=${encodeURIComponent(slugInput.trim())}`;
   const showExchangeFields = isExchangeCategory(category);
+  const connectExchangeManager = async (e) => {
+    e?.preventDefault?.();
+    if (!isSuperAdmin || !showExchangeFields) return;
+    const s = String(slugInput || "").trim();
+    if (!s) return;
+    setExchangeManagerSaving(true);
+    setExchangeManagerMsg("");
+    try {
+      const email = String(exchangeManagerEmail || "").trim().toLowerCase();
+      const payload = email ? { manager_email: email } : { manager_id: null };
+      const updated = await apiPatchUrl(`/api/admin/exchange-businesses/${encodeURIComponent(s)}/manager`, payload);
+      const nextId =
+        Number.isFinite(Number(updated?.exchange_manager_id)) && Number(updated.exchange_manager_id) > 0
+          ? Number(updated.exchange_manager_id)
+          : null;
+      setExchangeManagerIdCurrent(nextId);
+      if (updated?.manager?.email) {
+        setExchangeManagerEmail(String(updated.manager.email).toLowerCase());
+      } else if (!nextId) {
+        setExchangeManagerEmail("");
+      }
+      setExchangeManagerMsg(nextId ? "مدیر صرافی متصل شد." : "اتصال مدیر صرافی حذف شد.");
+      const latestManagers = await apiGet("/api/exchange-managers").catch(() => null);
+      if (Array.isArray(latestManagers)) setExchangeManagers(latestManagers);
+    } catch (err) {
+      setExchangeManagerMsg(`خطا: ${err.message || "نامشخص"}`);
+    } finally {
+      setExchangeManagerSaving(false);
+    }
+  };
   const togglePaymentMethod = (methodId, enabled) => {
     setPaymentMethods((prev) => {
       const exists = prev.includes(methodId);
@@ -541,6 +599,54 @@ export default function DashboardBusinessForm({
 
         {showExchangeFields && (
           <>
+            {isSuperAdmin ? (
+              <section className="dashboard-panel" style={{ marginTop: "1rem", marginBottom: "0.6rem" }}>
+                <h3 style={{ marginTop: 0, marginBottom: "0.35rem", fontSize: "1rem" }}>اتصال مدیر صرافی به این آگهی</h3>
+                <p className="field-hint" style={{ marginTop: 0 }}>
+                  ایمیل مدیر صرافی را وارد کنید تا همین آگهی به حساب او متصل شود. برای حذف اتصال، فیلد را خالی ذخیره کنید.
+                </p>
+                <div className="form-grid">
+                  <div className="field field--block">
+                    <label htmlFor="dash-exchange-manager-email">ایمیل مدیر صرافی</label>
+                    <input
+                      id="dash-exchange-manager-email"
+                      type="email"
+                      dir="ltr"
+                      value={exchangeManagerEmail}
+                      onChange={(e) => setExchangeManagerEmail(e.target.value)}
+                      list="dash-exchange-managers-list"
+                      placeholder="manager@example.com"
+                    />
+                    <datalist id="dash-exchange-managers-list">
+                      {exchangeManagers.map((m) => (
+                        <option key={m.id} value={String(m.email || "")} />
+                      ))}
+                    </datalist>
+                    <span className="field-hint">
+                      مدیر فعلی:{" "}
+                      <strong dir="ltr">
+                        {exchangeManagerIdCurrent != null
+                          ? exchangeManagers.find((m) => Number(m.id) === Number(exchangeManagerIdCurrent))?.email ||
+                            `#${exchangeManagerIdCurrent}`
+                          : "—"}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="field" style={{ alignSelf: "end" }}>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={connectExchangeManager}
+                      disabled={exchangeManagerSaving}
+                    >
+                      {exchangeManagerSaving ? "در حال اتصال…" : "ذخیره اتصال مدیر صرافی"}
+                    </button>
+                  </div>
+                </div>
+                {exchangeManagerMsg ? <p className="field-hint">{exchangeManagerMsg}</p> : null}
+              </section>
+            ) : null}
+
             <h3 id="dash-rates-section" style={{ marginTop: "1.25rem", marginBottom: "0.25rem", fontSize: "1.05rem" }}>
               نرخ ارز و رمز ارز (ویژهٔ صرافی)
             </h3>

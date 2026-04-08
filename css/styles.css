@@ -1869,9 +1869,9 @@ body.page-map main#main {
 
 .exchanges-app__best-widget-tag {
   position: absolute;
-  top: calc(0.12rem - 5px);
-  left: 0.45rem;
-  width: 48px;
+  top: -24px;
+  left: -24px;
+  width: 64px;
   height: auto;
   z-index: 2;
   pointer-events: none;
@@ -1883,9 +1883,9 @@ body.page-map main#main {
   }
 
   .exchanges-app__best-widget-tag {
-    width: 42px;
-    top: calc(0.08rem - 5px);
-    left: 0.35rem;
+    width: 56px;
+    top: -20px;
+    left: -20px;
   }
 }
 

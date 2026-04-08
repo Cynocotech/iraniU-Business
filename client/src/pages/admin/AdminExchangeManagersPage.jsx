@@ -1,11 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPatchUrl } from "../../api.js";
+import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
 function isExchangeBusinessRow(b) {
   const cat = String(b?.category || "").trim().toLowerCase();
   return cat.includes("صراف") || cat.includes("exchange");
+}
+
+function randomSuffix(len = 4) {
+  return Math.random().toString(36).slice(2, 2 + len).toLowerCase();
+}
+
+function suggestUsername(email) {
+  const base = String(email || "")
+    .trim()
+    .toLowerCase()
+    .split("@")[0]
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const safe = base.length >= 3 ? base : `exmgr_${randomSuffix(5)}`;
+  return `${safe}_${randomSuffix(3)}`.slice(0, 32);
+}
+
+function generateStrongPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%";
+  const all = upper + lower + digits + special;
+  const pick = (set) => set[Math.floor(Math.random() * set.length)];
+  let out = [pick(upper), pick(lower), pick(digits), pick(special)];
+  for (let i = out.length; i < 14; i += 1) out.push(pick(all));
+  out = out.sort(() => Math.random() - 0.5);
+  return out.join("");
 }
 
 export default function AdminExchangeManagersPage() {
@@ -16,6 +45,16 @@ export default function AdminExchangeManagersPage() {
   const [managerId, setManagerId] = useState("");
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newMgr, setNewMgr] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    login_username: "",
+    password: "",
+    link_slug: "",
+  });
+  const [createdCreds, setCreatedCreds] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -66,6 +105,74 @@ export default function AdminExchangeManagersPage() {
     }
   };
 
+  const createAndLinkExchangeManager = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setMsg("");
+    setCreatedCreds(null);
+    try {
+      const payload = {
+        name: String(newMgr.name || "").trim(),
+        email: String(newMgr.email || "").trim().toLowerCase(),
+        phone: String(newMgr.phone || "").trim(),
+        login_username: String(newMgr.login_username || "").trim().toLowerCase(),
+        password: String(newMgr.password || "").trim(),
+      };
+      if (!payload.name || !payload.email || !payload.phone || !payload.login_username || !payload.password) {
+        throw new Error("نام، ایمیل، تلفن، نام کاربری و رمز عبور الزامی است.");
+      }
+      const created = await apiPost("/api/exchange-managers", payload);
+      const createdId = created?.id || created?.user?.id;
+      const linkSlug = String(newMgr.link_slug || "").trim();
+      if (linkSlug && Number.isFinite(Number(createdId))) {
+        await apiPatchUrl(`/api/admin/exchange-businesses/${encodeURIComponent(linkSlug)}/manager`, {
+          manager_id: Number(createdId),
+        });
+      }
+      const [mgrs, biz] = await Promise.all([apiGet("/api/exchange-managers"), apiGet("/api/businesses")]);
+      setRows(Array.isArray(mgrs) ? mgrs : []);
+      setBusinesses(Array.isArray(biz) ? biz : []);
+      if (linkSlug) setSlug(linkSlug);
+      if (createdId) setManagerId(String(createdId));
+      setCreatedCreds({
+        ...payload,
+        link_slug: linkSlug || null,
+      });
+      setMsg(linkSlug ? "مدیر صرافی ساخته شد و آگهی لینک شد." : "مدیر صرافی ساخته شد.");
+      setNewMgr({
+        name: "",
+        email: "",
+        phone: "",
+        login_username: "",
+        password: "",
+        link_slug: "",
+      });
+    } catch (err) {
+      setMsg(err.message || "ساخت مدیر صرافی ناموفق بود.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const copyCredentials = async () => {
+    if (!createdCreds) return;
+    const text = `سلام ${createdCreds.name || "مدیر محترم"},
+حساب پنل صرافی شما در ایرانیو ساخته شد.
+
+ایمیل: ${createdCreds.email}
+نام کاربری: ${createdCreds.login_username}
+رمز عبور: ${createdCreds.password}
+ورود: https://iraniu.uk/login
+${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
+`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setMsg("متن ارسال اطلاعات ورود کپی شد.");
+    } catch {
+      setMsg("کپی انجام نشد. لطفاً متن را دستی کپی کنید.");
+    }
+  };
+
   return (
     <section className="dashboard-panel" aria-labelledby="admin-exchange-managers-h" style={{ marginTop: "var(--space-md)" }}>
       <h2 id="admin-exchange-managers-h">مدیران صرافی</h2>
@@ -106,6 +213,108 @@ export default function AdminExchangeManagersPage() {
         </div>
         {msg ? <p className="field-hint">{msg}</p> : null}
       </form>
+
+      <section className="dashboard-panel" style={{ marginBottom: "var(--space-md)" }}>
+        <h3 style={{ marginTop: 0 }}>Create Exchange Manager + send credentials</h3>
+        <p className="field-hint">ساخت مدیر صرافی جدید + لینک اختیاری به آگهی و کپی متن ارسال اطلاعات ورود.</p>
+        <form onSubmit={createAndLinkExchangeManager}>
+          <div className="form-grid">
+            <div className="field field--block">
+              <label htmlFor="ex-new-name">نام مدیر</label>
+              <input
+                id="ex-new-name"
+                value={newMgr.name}
+                onChange={(e) => setNewMgr((p) => ({ ...p, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="ex-new-email">ایمیل</label>
+              <input
+                id="ex-new-email"
+                type="email"
+                dir="ltr"
+                value={newMgr.email}
+                onChange={(e) =>
+                  setNewMgr((p) => {
+                    const email = e.target.value;
+                    return {
+                      ...p,
+                      email,
+                      login_username: p.login_username || suggestUsername(email),
+                    };
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="ex-new-phone">تلفن</label>
+              <input
+                id="ex-new-phone"
+                dir="ltr"
+                value={newMgr.phone}
+                onChange={(e) => setNewMgr((p) => ({ ...p, phone: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="ex-new-username">نام کاربری</label>
+              <input
+                id="ex-new-username"
+                dir="ltr"
+                value={newMgr.login_username}
+                onChange={(e) => setNewMgr((p) => ({ ...p, login_username: e.target.value.toLowerCase() }))}
+                required
+              />
+            </div>
+            <div className="field field--block">
+              <label htmlFor="ex-new-password">رمز عبور</label>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <input
+                  id="ex-new-password"
+                  dir="ltr"
+                  value={newMgr.password}
+                  onChange={(e) => setNewMgr((p) => ({ ...p, password: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setNewMgr((p) => ({ ...p, password: generateStrongPassword() }))}
+                >
+                  تولید رمز
+                </button>
+              </div>
+            </div>
+            <div className="field field--block">
+              <label htmlFor="ex-new-link-biz">لینک به آگهی صرافی (اختیاری)</label>
+              <select
+                id="ex-new-link-biz"
+                value={newMgr.link_slug}
+                onChange={(e) => setNewMgr((p) => ({ ...p, link_slug: e.target.value }))}
+              >
+                <option value="">— فعلاً لینک نشود —</option>
+                {exchangeBusinesses.map((b) => (
+                  <option key={b.slug} value={b.slug}>
+                    {b.name_fa} · {formatAdId(b.id) || b.slug}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="dashboard-actions">
+            <button type="submit" className="btn btn--primary" disabled={creating}>
+              {creating ? "در حال ساخت…" : "ساخت مدیر صرافی"}
+            </button>
+            {createdCreds ? (
+              <button type="button" className="btn btn--ghost" onClick={copyCredentials}>
+                کپی متن ارسال اطلاعات ورود
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </section>
 
       {loading ? <p>در حال بارگذاری…</p> : null}
       {!loading && exchangeRows.length === 0 ? <p className="field-hint">فعلاً مدیر صرافی ثبت نشده است.</p> : null}
