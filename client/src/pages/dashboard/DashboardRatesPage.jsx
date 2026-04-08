@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiPatch } from "../../api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -36,6 +36,16 @@ export default function DashboardRatesPage() {
   const [msg, setMsg] = useState("");
 
   const isExchange = isExchangeBusiness(biz);
+  const bizSyncKey = `${biz?.slug || ""}|${biz?.updated_at || ""}|${biz?.exchange_rates_json || ""}|${biz?.payment_methods_json || ""}|${biz?.exchange_features_json || ""}|${biz?.exchange_today_rate_enabled ?? ""}|${biz?.exchange_company_verified ?? ""}`;
+
+  useEffect(() => {
+    if (!biz) return;
+    setRows(parseExchangeRatesJson(biz.exchange_rates_json) || [...EXCHANGE_DEFAULT_RATES]);
+    setPaymentMethods(parseExchangePaymentMethodsJson(biz.payment_methods_json) || [...EXCHANGE_DEFAULT_PAYMENT_METHOD_IDS]);
+    setExchangeFeatures(parseExchangeFeaturesJson(biz.exchange_features_json) || [...EXCHANGE_DEFAULT_FEATURE_IDS]);
+    setExchangeTodayRateEnabled(Number(biz.exchange_today_rate_enabled) !== 0);
+    setExchangeCompanyVerified(Number(biz.exchange_company_verified) === 1);
+  }, [bizSyncKey]);
 
   const togglePaymentMethod = (methodId, enabled) => {
     setPaymentMethods((prev) => {
@@ -54,6 +64,10 @@ export default function DashboardRatesPage() {
   };
 
   const onSave = async () => {
+    if (!dashSlug) {
+      setMsg("خطا: شناسه آگهی هنوز بارگذاری نشده است. صفحه را یک‌بار رفرش کنید.");
+      return;
+    }
     setSaving(true);
     setMsg("");
     try {
