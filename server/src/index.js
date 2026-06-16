@@ -19,6 +19,7 @@ import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
 import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
 import { analyzeDuplicateNames, executeDedupeByName } from "./dedupeBusinessesByName.js";
+import { chatbotRouter } from "./chatbotApi.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -2292,6 +2293,8 @@ app.get("/go", asyncHandler(async (req, res) => {
 
 const clientDist = path.join(__dirname, "..", "..", "client", "dist");
 
+app.use("/chatbot/v1", chatbotRouter);
+
 function mountProdStatic() {
   if (!fs.existsSync(clientDist)) {
     console.warn("client/dist not found — run: npm run build --prefix client");
@@ -2299,11 +2302,11 @@ function mountProdStatic() {
   }
   const staticMw = express.static(clientDist, { index: false });
   app.use((req, res, next) => {
-    if (req.path.startsWith("/api") || req.path === "/go") return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/chatbot") || req.path === "/go") return next();
     return staticMw(req, res, next);
   });
   app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path === "/go") return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/chatbot") || req.path === "/go") return next();
     const indexHtml = path.join(clientDist, "index.html");
     if (fs.existsSync(indexHtml)) res.sendFile(indexHtml);
     else next();
