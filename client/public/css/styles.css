@@ -165,6 +165,7 @@ main {
   display: block;
   width: 100%;
   max-width: 100%;
+  padding-top: clamp(3.5rem, 12vw, 5rem);
 }
 
 img {
@@ -2518,6 +2519,36 @@ body.business-page .profile-cta-row .btn {
   display: block;
   width: 1.2rem;
   height: 1.2rem;
+}
+
+.profile-section-heading--accordion {
+  display: flex;
+  width: 100%;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  cursor: pointer;
+  min-height: 44px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.profile-section-heading__chevron {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  color: var(--color-muted);
+  transition: transform 0.2s ease;
+}
+
+.profile-section-heading--accordion[aria-expanded="true"] .profile-section-heading__chevron {
+  transform: rotate(180deg);
 }
 
 .contact-list__item {

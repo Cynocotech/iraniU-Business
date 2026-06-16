@@ -14,37 +14,12 @@
   }
 
   function update() {
-    if (allowDesktop()) {
-      document.documentElement.classList.remove("iraniu-desktop-blocked");
-      if (gate && gate.parentNode) {
-        gate.parentNode.removeChild(gate);
-      }
-      gate = null;
-      return;
+    // Desktop blocking disabled - allowing all screen sizes
+    document.documentElement.classList.remove("iraniu-desktop-blocked");
+    if (gate && gate.parentNode) {
+      gate.parentNode.removeChild(gate);
     }
-
-    var blocked = mq.matches;
-    if (blocked) {
-      document.documentElement.classList.add("iraniu-desktop-blocked");
-      if (!gate) {
-        gate = document.createElement("div");
-        gate.className = "iraniu-desktop-gate";
-        gate.setAttribute("dir", "rtl");
-        gate.setAttribute("lang", "fa");
-        gate.innerHTML =
-          '<div class="iraniu-desktop-gate__inner" role="alert" aria-live="assertive">' +
-          '<p class="iraniu-desktop-gate__title">فقط موبایل و تبلت</p>' +
-          '<p class="iraniu-desktop-gate__text">این نسخه فقط برای موبایل و تبلت است. لطفاً با گوشی یا تبلت همان آدرس را باز کنید.</p>' +
-          "</div>";
-        document.body.insertBefore(gate, document.body.firstChild);
-      }
-    } else {
-      document.documentElement.classList.remove("iraniu-desktop-blocked");
-      if (gate && gate.parentNode) {
-        gate.parentNode.removeChild(gate);
-      }
-      gate = null;
-    }
+    gate = null;
   }
 
   update();

@@ -72,7 +72,7 @@ export default function ClaimPage() {
         title="ادعای مالکیت آگهی"
         description={`درخواست تأیید مالکیت برای «${businessLabel}» در فهرست ایرانیو.`}
       />
-    <main className="container" style={{ padding: "2rem 0", maxWidth: "36rem" }}>
+    <main className="container" style={{ paddingTop: "2rem", paddingBottom: "2rem", maxWidth: "36rem" }}>
       <h1>ادعای مالکیت</h1>
       <p className="field-hint">
         آگهی: <strong>{businessLabel}</strong>

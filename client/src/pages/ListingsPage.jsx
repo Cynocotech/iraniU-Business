@@ -117,6 +117,15 @@ export default function ListingsPage() {
   const qDefault = searchParams.get("q") || "";
   const cityDefault = searchParams.get("city") || "";
   const catDefault = searchParams.get("cat") || "";
+  const cityOptions = useMemo(() => {
+    const seen = new Set();
+    for (const b of rows) {
+      const city = String(b?.city || "").trim();
+      if (!city || /^test$/i.test(city) || /[؀-ۿ]/.test(city)) continue;
+      seen.add(city);
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
   const normalizedDirectoryBanners = useMemo(
     () =>
       (Array.isArray(directoryBanners) ? directoryBanners : [])
@@ -250,10 +259,11 @@ export default function ListingsPage() {
             <label htmlFor="listings-city">شهر</label>
             <select id="listings-city" name="city" aria-label="شهر" defaultValue={cityDefault}>
               <option value="">همه شهرها</option>
-              <option value="london">لندن</option>
-              <option value="manchester">منچستر</option>
-              <option value="birmingham">برمنگام</option>
-              <option value="glasgow">گلاسگو</option>
+              {cityOptions.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
             </select>
           </div>
           <div className="field">

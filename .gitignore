@@ -18,4 +18,7 @@ London_Bussines_List.sql
 # Local backups / archives (too large for GitHub)
 bk.zip
 
+# Uploaded user/listing images (served as static files, not versioned)
+server/uploads/
+
 server/.env

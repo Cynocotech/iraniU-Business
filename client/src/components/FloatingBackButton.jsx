@@ -18,6 +18,7 @@ export default function FloatingBackButton() {
     <div className="floating-back">
       <button type="button" className="floating-back__btn" onClick={onBack} aria-label="بازگشت" title="بازگشت">
         <i className="fa-solid fa-chevron-right floating-back__ico" aria-hidden="true" />
+        <span className="floating-back__label">بازگشت</span>
       </button>
     </div>
   );

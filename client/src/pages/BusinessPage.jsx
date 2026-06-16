@@ -96,6 +96,19 @@ function extractUkPostcode(raw) {
   return m ? m[0].replace(/\s+/g, " ").trim() : "";
 }
 
+/** "82 St Mary's Pl, London W5 5EX" + "W5 5EX" => "82 St Mary's Pl, London W5" */
+function shortenAddressForDisplay(raw, postcode) {
+  const address = String(raw || "").trim();
+  if (!address || !postcode) return address;
+  const outward = postcode.split(" ")[0];
+  const escaped = postcode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = address
+    .replace(new RegExp(escaped, "gi"), "")
+    .replace(/[\s,]+$/, "")
+    .trim();
+  return outward ? `${stripped} ${outward}`.trim() : stripped;
+}
+
 /** Inline SVG defs (IDs match css / legacy business.html) */
 function ProfileSprites() {
   return (
@@ -159,6 +172,7 @@ export default function BusinessPage() {
     () => !!location.state?.onboardingComplete
   );
   const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [hoursExpanded, setHoursExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [exchangeContactSheetOpen, setExchangeContactSheetOpen] = useState(false);
   const [exchangeCalcSheetOpen, setExchangeCalcSheetOpen] = useState(false);
@@ -308,9 +322,15 @@ export default function BusinessPage() {
   const exchangeTodayRateEnabled = Number(b?.exchange_today_rate_enabled) !== 0;
   const exchangePostcode = extractUkPostcode(b?.address);
   const exchangeMapQuery = exchangePostcode || [b?.address, b?.city].filter(Boolean).join(", ").trim();
-  const exchangeMapEmbedUrl = exchangeMapQuery
+  const mapEmbedUrl = exchangeMapQuery
     ? `https://www.google.com/maps?q=${encodeURIComponent(exchangeMapQuery)}&output=embed`
     : "";
+  const directionsUrl =
+    b?.google_review_url ||
+    (exchangeMapQuery
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(exchangeMapQuery)}`
+      : "");
+  const addressLine = shortenAddressForDisplay(b?.address, exchangePostcode);
   const selectedRate =
     exchangeRatesRows.find((r) => r.code === selectedCurrencyCode) || exchangeRatesRows[0] || null;
   const showExchangeCalcFab = isExchangeBusiness(b) && !!selectedRate;
@@ -398,6 +418,17 @@ export default function BusinessPage() {
         jsonLd={businessJsonLd}
       />
     <article className="section container">
+      <nav className="business-breadcrumb" aria-label="مسیر صفحه">
+        <Link className="business-breadcrumb__link" to="/listings">
+          <i className="fa-solid fa-store" aria-hidden="true" />
+          بازگشت به فهرست
+        </Link>
+        <span className="business-breadcrumb__sep" aria-hidden="true">·</span>
+        <Link className="business-breadcrumb__link" to="/">
+          <i className="fa-solid fa-house" aria-hidden="true" />
+          خانه
+        </Link>
+      </nav>
       {showOnboardingWelcome && (
         <div
           className="onboarding-success-banner"
@@ -728,7 +759,7 @@ export default function BusinessPage() {
                   )}
                 </div>
               </div>
-              {exchangeMapEmbedUrl ? (
+              {mapEmbedUrl ? (
                 <div className="exchange-panel__map-wrap" aria-label="موقعیت صرافی روی نقشه">
                   <p className="exchange-panel__map-title">
                     موقعیت روی نقشه
@@ -741,7 +772,7 @@ export default function BusinessPage() {
                   <div className="exchange-panel__map-frame-wrap">
                     <iframe
                       title={`Google Map ${b?.name_fa || "Exchange"}`}
-                      src={exchangeMapEmbedUrl}
+                      src={mapEmbedUrl}
                       className="exchange-panel__map-frame"
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
@@ -826,22 +857,32 @@ export default function BusinessPage() {
           )}
 
           <section className="profile-panel profile-body" id="biz-hours-section" aria-labelledby="hours-title">
-            <h2 id="hours-title" className="profile-section-heading">
+            <button
+              type="button"
+              className="profile-section-heading profile-section-heading--accordion"
+              id="hours-title"
+              aria-expanded={hoursExpanded}
+              aria-controls="biz-hours-grid"
+              onClick={() => setHoursExpanded((v) => !v)}
+            >
               <span className="profile-section-heading__icon" aria-hidden="true">
                 <svg className="profile-section-heading__svg" aria-hidden="true">
                   <use href="#section-hours" />
                 </svg>
               </span>
               ساعات کاری
-            </h2>
-            <div className="biz-hours-grid" id="biz-hours-grid" role="list" aria-label="ساعات باز بودن به تفکیک روز">
-              {hoursRows.map((row, i) => (
-                <div key={`${row.day}-${i}`} className="biz-hours-row" role="listitem">
-                  <span className="biz-hours-day">{row.day}</span>
-                  <span className="biz-hours-value">{row.hours || "—"}</span>
-                </div>
-              ))}
-            </div>
+              <i className="fa-solid fa-chevron-down profile-section-heading__chevron" aria-hidden="true" />
+            </button>
+            {hoursExpanded && (
+              <div className="biz-hours-grid" id="biz-hours-grid" role="list" aria-label="ساعات باز بودن به تفکیک روز">
+                {hoursRows.map((row, i) => (
+                  <div key={`${row.day}-${i}`} className="biz-hours-row" role="listitem">
+                    <span className="biz-hours-day">{row.day}</span>
+                    <span className="biz-hours-value">{row.hours || "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {!isExchangeBusiness(b) ? (
@@ -933,6 +974,47 @@ export default function BusinessPage() {
                       </div>
                     </li>
                   )}
+                  {addressLine ? (
+                    <li className="contact-list__item contact-list__item--map">
+                      <div className="contact-map-head">
+                        <span className="contact-list__icon-wrap" aria-hidden="true">
+                          <i className="fa-solid fa-location-dot" />
+                        </span>
+                        <div className="contact-list__main">
+                          <div className="contact-map-address" dir="ltr">
+                            {addressLine}
+                          </div>
+                          {exchangePostcode ? (
+                            <span className="contact-map-postcode" dir="ltr">
+                              {exchangePostcode}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      {mapEmbedUrl ? (
+                        <div className="contact-map-frame-wrap">
+                          <iframe
+                            title={`نقشهٔ ${b?.name_fa || "کسب‌وکار"}`}
+                            src={mapEmbedUrl}
+                            className="contact-map-frame"
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : null}
+                      {directionsUrl ? (
+                        <a
+                          className="btn btn--primary btn--block"
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <i className="fa-solid fa-diamond-turn-right" aria-hidden="true" /> مسیریابی به این مکان
+                        </a>
+                      ) : null}
+                    </li>
+                  ) : null}
                 </ul>
               </>
             ) : null}
@@ -956,7 +1038,9 @@ export default function BusinessPage() {
 
       {!isExchangeBusiness(b) ? (
         <p style={{ marginTop: "1.5rem" }}>
-          <Link to="/listings">بازگشت به لیست</Link>
+          <Link className="btn btn--ghost btn--block" to="/listings">
+            <i className="fa-solid fa-arrow-right" aria-hidden="true" /> بازگشت به لیست
+          </Link>
         </p>
       ) : null}
 

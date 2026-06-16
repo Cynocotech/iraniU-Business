@@ -67,12 +67,6 @@ export default function SiteHeader({ logoHref = "/", hamburgerOnly = false, hide
                 </li>
               </ul>
               <div className="nav__cta nav__cta--labeled site-header__icon-cta">
-                <Link className="site-header__icon-btn site-header__icon-btn--ghost" to="/onboarding" title="ثبت کسب‌وکار" onClick={closeMenu}>
-                  <span className="site-header__icon-btn-inner">
-                    <i className="fa-solid fa-circle-plus" aria-hidden="true" />
-                    <span className="site-header__icon-btn-label">ثبت کسب‌وکار</span>
-                  </span>
-                </Link>
                 <Link className="site-header__icon-btn site-header__icon-btn--primary" to="/listings" title="جستجو" onClick={closeMenu}>
                   <span className="site-header__icon-btn-inner">
                     <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />

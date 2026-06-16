@@ -494,32 +494,44 @@ export default function BusinessOnboardingPage() {
         description="ثبت آگهی جدید در ایرانیو؛ پس از تأیید مدیر در فهرست نمایش داده می‌شود."
       />
     <div className="container onboarding-page" style={{ padding: "2rem 0", maxWidth: "40rem" }}>
-      <header style={{ marginBottom: "1.25rem" }}>
-        <h1 style={{ margin: "0 0 0.35rem" }}>ثبت کسب‌وکار</h1>
-        <p className="field-hint" style={{ margin: 0 }}>
-          چند مرحلهٔ کوتاه؛ آگهی با بستهٔ پایه و بدون مالک ثبت می‌شود. پس از ارسال، <strong>تا تأیید مدیر در سایت نمایش داده نمی‌شود</strong>.
-          ایمیل تماس برای ارسال نتیجهٔ تأیید یا رد آگهی <strong>الزامی</strong> است.
-          بعد از تأیید می‌توانید از صفحهٔ آگهی <strong>ادعای مالکیت</strong> کنید و پس از آن از <Link to="/dashboard">پنل کسب‌وکار</Link> برای مدیریت آگهی استفاده کنید.
-        </p>
-      </header>
+      <div className="onboarding-banner">
+        <span className="onboarding-banner__icon" aria-hidden="true">
+          <i className="fa-solid fa-store" />
+        </span>
+        <div className="onboarding-banner__text">
+          <strong>ثبت رایگان کسب‌وکار در ایرانیو</strong>
+          <span>کسب‌وکار خود را به فهرست اضافه کنید و در معرض دید کاربران ایرانی قرار بگیرید</span>
+        </div>
+      </div>
 
-      <ol className="onboarding-steps" aria-label="مراحل ثبت">
-        {STEPS.map((st, i) => (
-          <li
-            key={st.id}
-            className={
-              "onboarding-steps__item" +
-              (i === step ? " onboarding-steps__item--active" : "") +
-              (i < step ? " onboarding-steps__item--done" : "")
-            }
-          >
-            <span className="onboarding-steps__num" aria-hidden="true">
-              {i + 1}
-            </span>
-            {st.title}
-          </li>
-        ))}
-      </ol>
+      <div className="dashboard-panel onboarding-intro">
+        <header style={{ marginBottom: "1.25rem" }}>
+          <h1 style={{ margin: "0 0 0.35rem" }}>ثبت کسب‌وکار</h1>
+          <p className="field-hint" style={{ margin: 0 }}>
+            چند مرحلهٔ کوتاه؛ آگهی با بستهٔ پایه و بدون مالک ثبت می‌شود. پس از ارسال، <strong>تا تأیید مدیر در سایت نمایش داده نمی‌شود</strong>.
+            ایمیل تماس برای ارسال نتیجهٔ تأیید یا رد آگهی <strong>الزامی</strong> است.
+            بعد از تأیید می‌توانید از صفحهٔ آگهی <strong>ادعای مالکیت</strong> کنید و پس از آن از <Link to="/dashboard">پنل کسب‌وکار</Link> برای مدیریت آگهی استفاده کنید.
+          </p>
+        </header>
+
+        <ol className="onboarding-steps" aria-label="مراحل ثبت">
+          {STEPS.map((st, i) => (
+            <li
+              key={st.id}
+              className={
+                "onboarding-steps__item" +
+                (i === step ? " onboarding-steps__item--active" : "") +
+                (i < step ? " onboarding-steps__item--done" : "")
+              }
+            >
+              <span className="onboarding-steps__num" aria-hidden="true">
+                {i + 1}
+              </span>
+              {st.title}
+            </li>
+          ))}
+        </ol>
+      </div>
 
       <form className="dashboard-panel" onSubmit={step === STEPS.length - 1 ? submit : (e) => e.preventDefault()}>
         {step === 0 && (
