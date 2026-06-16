@@ -5,20 +5,9 @@ client/node_modules/
 server/node_modules/
 client/dist/
 
-# SQLite & DB dumps — never commit or push (local / production data)
-server/data/*.db
-server/data/*.db-*
-server/data/*.csv
-server/data/iraniu.db.uploaded
-/*.db
-/*.db-*
-London_Bussines_List.sql
-/*.sql
-
 # Local backups / archives (too large for GitHub)
 bk.zip
-
-# Uploaded user/listing images (served as static files, not versioned)
-server/uploads/
+London_Bussines_List.sql
+/*.sql
 
 server/.env
