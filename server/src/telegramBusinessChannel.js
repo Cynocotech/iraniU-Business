@@ -5,7 +5,7 @@
  *      PUBLIC_SITE_URL  (لینک دکمه‌ها و تصویر نسبی)
  */
 
-import { db } from "./db.js";
+import { dbGet } from "./db.js";
 import { getEffectiveTelegramConfig } from "./telegramSettings.js";
 
 function escapeHtml(s) {
@@ -21,13 +21,12 @@ function truncate(s, max) {
   return `${t.slice(0, max - 1)}…`;
 }
 
-function siteBaseUrl() {
-  const u = getEffectiveTelegramConfig().publicSiteUrl || "http://127.0.0.1:5173";
+async function siteBaseUrl() {
+  const u = (await getEffectiveTelegramConfig()).publicSiteUrl || "http://127.0.0.1:5173";
   return String(u).replace(/\/$/, "");
 }
 
-function resolvePhotoUrl(row) {
-  const base = siteBaseUrl();
+function resolvePhotoUrl(row, base) {
   const abs = (u) => {
     const s = String(u || "").trim();
     if (!s) return null;
@@ -82,12 +81,12 @@ async function telegramPost(token, method, body) {
  * @returns {Promise<{ ok: boolean, error?: string, description?: string }>}
  */
 export async function sendBusinessDirectoryPost(slug) {
-  const { botToken: token, directoryChannelId: channelRaw } = getEffectiveTelegramConfig();
+  const { botToken: token, directoryChannelId: channelRaw } = await getEffectiveTelegramConfig();
   if (!token || !channelRaw) {
     return { ok: false, error: "not_configured" };
   }
 
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(String(slug || "").trim());
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [String(slug || "").trim()]);
   if (!row) {
     return { ok: false, error: "not_found" };
   }
@@ -97,7 +96,7 @@ export async function sendBusinessDirectoryPost(slug) {
     return { ok: false, error: "bad_channel_id" };
   }
 
-  const base = siteBaseUrl();
+  const base = await siteBaseUrl();
   const bizUrl = `${base}/business?slug=${encodeURIComponent(row.slug)}`;
   const name = escapeHtml(row.name_fa || row.slug);
   const rawDesc = (row.description || row.subtitle || "").trim();
@@ -134,7 +133,7 @@ export async function sendBusinessDirectoryPost(slug) {
 
   const reply_markup = keyboard.length ? { inline_keyboard: keyboard } : undefined;
 
-  const photoUrl = resolvePhotoUrl(row);
+  const photoUrl = resolvePhotoUrl(row, base);
 
   if (photoUrl) {
     const res = await telegramPost(token, "sendPhoto", {

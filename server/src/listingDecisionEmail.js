@@ -1,16 +1,16 @@
 import { getEffectiveSmtpSettings, sendMailViaSettings } from "./smtpSettings.js";
 import { htmlListingApprovedBranded, htmlListingRejectedBranded } from "./emailBranding.js";
 
-function siteBaseSync() {
+async function siteBase() {
   return (
-    getEffectiveSmtpSettings().siteUrl ||
+    (await getEffectiveSmtpSettings()).siteUrl ||
     String(process.env.PUBLIC_SITE_URL || process.env.SITE_BASE_URL || "").replace(/\/$/, "")
   );
 }
 
 export async function sendListingApprovedEmail({ to, nameFa, slug }) {
-  const html = htmlListingApprovedBranded({ nameFa, slug });
-  const base = siteBaseSync();
+  const html = await htmlListingApprovedBranded({ nameFa, slug });
+  const base = await siteBase();
   const text = `Your listing "${nameFa || slug}" was approved and published.\n${base ? `${base}/business?slug=${slug}` : ""}`;
   return sendMailViaSettings({
     to,
@@ -21,7 +21,7 @@ export async function sendListingApprovedEmail({ to, nameFa, slug }) {
 }
 
 export async function sendListingRejectedEmail({ to, nameFa, slug, reason }) {
-  const html = htmlListingRejectedBranded({ nameFa, slug, reason });
+  const html = await htmlListingRejectedBranded({ nameFa, slug, reason });
   const text = `Your listing "${nameFa || slug}" was rejected.\nReason: ${String(reason || "").trim() || "—"}`;
   return sendMailViaSettings({
     to,

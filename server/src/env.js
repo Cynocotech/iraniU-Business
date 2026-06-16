@@ -29,3 +29,10 @@ if (fs.existsSync(envPath)) {
     }
   }
 }
+
+export const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL is required (PostgreSQL connection string, e.g. postgres://user:pass@host:5432/dbname)"
+  );
+}

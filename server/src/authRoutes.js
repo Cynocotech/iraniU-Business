@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { dbGet, dbAll, dbRun, dbTransaction } from "./db.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -47,10 +47,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarDir = path.join(__dirname, "..", "uploads", "avatars");
 if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
+/** Wrap an async Express handler so rejected promises reach the error middleware. */
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+/** Postgres unique-constraint violation (SQLSTATE 23505). */
+function isUniqueViolation(e) {
+  return e && (e.code === "23505" || String(e.message || "").toLowerCase().includes("unique"));
+}
+
 /** نام کاربری ورود به پنل مدیر — فقط حروف کوچک انگلیسی، اعداد و زیرخط */
 const MANAGER_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
 
-function makeExchangeOnboardingSlug(loginUsername) {
+async function makeExchangeOnboardingSlug(loginUsername) {
   const baseRaw = String(loginUsername || "")
     .trim()
     .toLowerCase()
@@ -61,7 +71,7 @@ function makeExchangeOnboardingSlug(loginUsername) {
   const base = baseRaw || "exchange";
   let slug = `${base}-exchange`;
   let i = 2;
-  while (db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(slug)) {
+  while (await dbGet(`SELECT 1 FROM businesses WHERE slug = $1`, [slug])) {
     slug = `${base}-exchange-${i}`;
     i += 1;
   }
@@ -88,21 +98,20 @@ const avatarUpload = multer({
   },
 });
 
-function attachLinkedBusinesses(managerRow, kind = "directory") {
+async function attachLinkedBusinesses(managerRow, kind = "directory") {
   const managerColumn = kind === "exchange" ? "exchange_manager_id" : "manager_id";
   const categoryWhere =
     kind === "exchange"
-      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
-      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
-  const linked_businesses = db
-    .prepare(
-      `SELECT id, slug, name_fa, category, status, claimed, package, city
+      ? `AND COALESCE(TRIM(category), '') = 'صرافی'`
+      : `AND COALESCE(TRIM(category), '') <> 'صرافی'`;
+  const linked_businesses = await dbAll(
+    `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE ${managerColumn} = ?
+       WHERE ${managerColumn} = $1
        ${categoryWhere}
-       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
-    )
-    .all(managerRow.id);
+       ORDER BY CASE WHEN COALESCE(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`,
+    [managerRow.id]
+  );
   return {
     ...stripManagerRow(managerRow),
     linked_businesses,
@@ -119,9 +128,9 @@ function attachLinkedBusinesses(managerRow, kind = "directory") {
   };
 }
 
-export function ensureSuperAdminFromEnv() {
+export async function ensureSuperAdminFromEnv() {
   try {
-    const n = db.prepare(`SELECT COUNT(*) AS c FROM identity.super_admins`).get().c;
+    const n = (await dbGet(`SELECT COUNT(*)::int AS c FROM identity.super_admins`)).c;
     if (n > 0) return;
     const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
     const password = process.env.SUPER_ADMIN_PASSWORD;
@@ -132,11 +141,11 @@ export function ensureSuperAdminFromEnv() {
       return;
     }
     const hash = hashPassword(password);
-    db.prepare(`INSERT INTO identity.super_admins (email, password_hash, name) VALUES (?, ?, ?)`).run(
+    await dbRun(`INSERT INTO identity.super_admins (email, password_hash, name) VALUES ($1, $2, $3)`, [
       email,
       hash,
-      "Super Admin"
-    );
+      "Super Admin",
+    ]);
     console.log("[auth] اولین سوپرادمین از متغیرهای محیط ساخته شد.");
   } catch (e) {
     console.error("[auth] ensureSuperAdminFromEnv", e);
@@ -145,7 +154,7 @@ export function ensureSuperAdminFromEnv() {
 
 export function registerAuthRoutes(app) {
   /** ثبت‌نام عمومی مدیر — نام کاربری + رمز + ایمیل */
-  app.post("/api/auth/register/manager", (req, res) => {
+  app.post("/api/auth/register/manager", asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const email = String(b.email || "")
       .trim()
@@ -180,40 +189,33 @@ export function registerAuthRoutes(app) {
       return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
     }
     if (
-      db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email) ||
-      db.prepare(`SELECT id FROM identity.exchange_managers WHERE email = ?`).get(email)
+      (await dbGet(`SELECT id FROM identity.managers WHERE email = $1`, [email])) ||
+      (await dbGet(`SELECT id FROM identity.exchange_managers WHERE email = $1`, [email]))
     ) {
       return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً ثبت شده" });
     }
     if (
-      db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username) ||
-      db.prepare(`SELECT id FROM identity.exchange_managers WHERE login_username = ?`).get(login_username)
+      (await dbGet(`SELECT id FROM identity.managers WHERE login_username = $1`, [login_username])) ||
+      (await dbGet(`SELECT id FROM identity.exchange_managers WHERE login_username = $1`, [login_username]))
     ) {
       return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
     }
     const ph = hashPassword(password);
     try {
       const table = exchange_onboarding ? "identity.exchange_managers" : "identity.managers";
-      const info = db
-        .prepare(`INSERT INTO ${table} (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`)
-        .run(email, name, phone, ph, login_username);
+      const info = await dbRun(
+        `INSERT INTO ${table} (email, name, phone, password_hash, login_username) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [email, name, phone, ph, login_username]
+      );
+      const newManagerId = info.rows[0].id;
       if (exchange_onboarding) {
-        const slug = makeExchangeOnboardingSlug(login_username);
-        const managerId = Number(info.lastInsertRowid);
-        db.prepare(
+        const slug = await makeExchangeOnboardingSlug(login_username);
+        const managerId = Number(newManagerId);
+        await dbRun(
           `INSERT INTO businesses
             (slug, name_fa, category, phone, city, status, exchange_manager_id, package, listing_approval, listing_title, cta, price_range)
-           VALUES (?, ?, ?, ?, ?, 'active', ?, 'basic', 'pending', ?, ?, ?)`
-        ).run(
-          slug,
-          name,
-          "صرافی",
-          phone || null,
-          "",
-          managerId,
-          `${name} | صرافی`,
-          "تماس با ما",
-          "—"
+           VALUES ($1, $2, $3, $4, $5, 'active', $6, 'basic', 'pending', $7, $8, $9)`,
+          [slug, name, "صرافی", phone || null, "", managerId, `${name} | صرافی`, "تماس با ما", "—"]
         );
         writeSystemLog({
           level: "info",
@@ -230,19 +232,19 @@ export function registerAuthRoutes(app) {
         actorType: "system",
         action: "manager_self_registered",
         targetType: "manager",
-        targetId: String(info.lastInsertRowid),
+        targetId: String(newManagerId),
         message: `Manager registered: ${email} (@${login_username})`,
       });
-      res.status(201).json({ ok: true, id: info.lastInsertRowid });
+      res.status(201).json({ ok: true, id: newManagerId });
     } catch (e) {
-      if (String(e.message || "").includes("UNIQUE")) {
+      if (isUniqueViolation(e)) {
         return res.status(409).json({ error: "username_or_email_taken" });
       }
       throw e;
     }
-  });
+  }));
 
-  app.post("/api/auth/login/manager", (req, res) => {
+  app.post("/api/auth/login/manager", asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const identifier = String(b.email || b.login || "")
       .trim()
@@ -252,45 +254,47 @@ export function registerAuthRoutes(app) {
     if (!identifier || !password) {
       return res.status(400).json({ error: "missing_credentials" });
     }
-    if (!assertLoginNotBlocked(req, res)) return;
+    if (!(await assertLoginNotBlocked(req, res))) return;
 
-    const mDir = db
-      .prepare(`SELECT * FROM identity.managers WHERE email = ? OR login_username = ?`)
-      .get(identifier, identifier);
-    const mEx = db
-      .prepare(`SELECT * FROM identity.exchange_managers WHERE email = ? OR login_username = ?`)
-      .get(identifier, identifier);
+    const mDir = await dbGet(
+      `SELECT * FROM identity.managers WHERE email = $1 OR login_username = $1`,
+      [identifier]
+    );
+    const mEx = await dbGet(
+      `SELECT * FROM identity.exchange_managers WHERE email = $1 OR login_username = $1`,
+      [identifier]
+    );
     const managerKind = mDir ? "directory" : mEx ? "exchange" : null;
     const m = mDir || mEx;
     if (!m || !m.password_hash) {
-      recordLoginFailure(req);
+      await recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
     }
     if (!verifyPassword(password, m.password_hash)) {
-      recordLoginFailure(req);
+      await recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
     }
     if (m.totp_enabled) {
       if (!totp || !m.totp_secret) {
-        recordLoginFailure(req);
+        await recordLoginFailure(req);
         return res.status(401).json({ error: "totp_required", hint: "کد Google Authenticator را وارد کنید" });
       }
       if (!totpVerify(m.totp_secret, totp)) {
-        recordLoginFailure(req);
+        await recordLoginFailure(req);
         return res.status(401).json({ error: "invalid_totp" });
       }
     }
-    recordLoginSuccess(req);
+    await recordLoginSuccess(req);
     const token = managerKind === "exchange" ? signExchangeManagerToken(m.id) : signManagerToken(m.id);
     res.json({
       token,
-      user: attachLinkedBusinesses(m, managerKind || "directory"),
+      user: await attachLinkedBusinesses(m, managerKind || "directory"),
       role: "manager",
       manager_kind: managerKind || "directory",
     });
-  });
+  }));
 
-  app.post("/api/auth/login/admin", (req, res) => {
+  app.post("/api/auth/login/admin", asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const email = String(b.email || "")
       .trim()
@@ -300,28 +304,28 @@ export function registerAuthRoutes(app) {
     if (!email || !password) {
       return res.status(400).json({ error: "missing_credentials" });
     }
-    if (!assertLoginNotBlocked(req, res)) return;
+    if (!(await assertLoginNotBlocked(req, res))) return;
 
-    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE email = ?`).get(email);
+    const a = await dbGet(`SELECT * FROM identity.super_admins WHERE email = $1`, [email]);
     if (!a) {
-      recordLoginFailure(req);
+      await recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
     }
     if (!verifyPassword(password, a.password_hash)) {
-      recordLoginFailure(req);
+      await recordLoginFailure(req);
       return res.status(401).json({ error: "invalid_credentials" });
     }
     if (a.totp_enabled) {
       if (!totp || !a.totp_secret) {
-        recordLoginFailure(req);
+        await recordLoginFailure(req);
         return res.status(401).json({ error: "totp_required" });
       }
       if (!totpVerify(a.totp_secret, totp)) {
-        recordLoginFailure(req);
+        await recordLoginFailure(req);
         return res.status(401).json({ error: "invalid_totp" });
       }
     }
-    recordLoginSuccess(req);
+    await recordLoginSuccess(req);
     const token = signSuperAdminToken(a.id);
     void notifyTelegramSuperAdminLogin({
       email: a.email,
@@ -335,33 +339,33 @@ export function registerAuthRoutes(app) {
       user: stripSuperAdminRow(a),
       role: "superadmin",
     });
-  });
+  }));
 
-  app.get("/api/auth/me", (req, res) => {
+  app.get("/api/auth/me", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p) return res.status(401).json({ error: "unauthorized" });
     if (p.typ === "mgr") {
-      const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(p.sub);
+      const m = await dbGet(`SELECT * FROM identity.managers WHERE id = $1`, [p.sub]);
       if (!m) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "manager",
-        user: attachLinkedBusinesses(m, "directory"),
+        user: await attachLinkedBusinesses(m, "directory"),
         manager_kind: "directory",
         totp_enabled: !!m.totp_enabled,
       });
     }
     if (p.typ === "mgrx") {
-      const m = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(p.sub);
+      const m = await dbGet(`SELECT * FROM identity.exchange_managers WHERE id = $1`, [p.sub]);
       if (!m) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "manager",
-        user: attachLinkedBusinesses(m, "exchange"),
+        user: await attachLinkedBusinesses(m, "exchange"),
         manager_kind: "exchange",
         totp_enabled: !!m.totp_enabled,
       });
     }
     if (p.typ === "adm") {
-      const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
+      const a = await dbGet(`SELECT * FROM identity.super_admins WHERE id = $1`, [p.sub]);
       if (!a) return res.status(401).json({ error: "invalid_token" });
       return res.json({
         role: "superadmin",
@@ -371,7 +375,7 @@ export function registerAuthRoutes(app) {
       });
     }
     return res.status(401).json({ error: "unauthorized" });
-  });
+  }));
 
   app.post("/api/auth/logout", (_req, res) => {
     res.json({ ok: true });
@@ -394,48 +398,53 @@ export function registerAuthRoutes(app) {
       }
       if (!req.file) return res.status(400).json({ error: "missing_file" });
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-      if (p.typ === "mgr") {
-        db.prepare(`UPDATE identity.managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
-      } else if (p.typ === "mgrx") {
-        db.prepare(`UPDATE identity.exchange_managers SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
-      } else {
-        db.prepare(`UPDATE identity.super_admins SET avatar_url = ? WHERE id = ?`).run(avatarUrl, p.sub);
-      }
-      writeSystemLog({
-        ...actorFromAuth(p),
-        action: "profile_avatar_uploaded",
-        targetType: p.typ === "adm" ? "superadmin" : "manager",
-        targetId: p.sub,
-        message: "Profile avatar updated",
+      (async () => {
+        if (p.typ === "mgr") {
+          await dbRun(`UPDATE identity.managers SET avatar_url = $1 WHERE id = $2`, [avatarUrl, p.sub]);
+        } else if (p.typ === "mgrx") {
+          await dbRun(`UPDATE identity.exchange_managers SET avatar_url = $1 WHERE id = $2`, [avatarUrl, p.sub]);
+        } else {
+          await dbRun(`UPDATE identity.super_admins SET avatar_url = $1 WHERE id = $2`, [avatarUrl, p.sub]);
+        }
+        writeSystemLog({
+          ...actorFromAuth(p),
+          action: "profile_avatar_uploaded",
+          targetType: p.typ === "adm" ? "superadmin" : "manager",
+          targetId: p.sub,
+          message: "Profile avatar updated",
+        });
+        res.json({ ok: true, avatar_url: avatarUrl });
+      })().catch((e) => {
+        console.error("profile-avatar", e);
+        res.status(500).json({ error: "server_error" });
       });
-      res.json({ ok: true, avatar_url: avatarUrl });
     });
   });
 
   /** شروع TOTP — ذخیرهٔ موقت secret تا تأیید با یک کد */
-  app.post("/api/auth/manager/2fa/setup", (req, res) => {
+  app.post("/api/auth/manager/2fa/setup", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const sec = totpGenerateSecret();
     const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
-    db.prepare(`UPDATE ${table} SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
+    await dbRun(`UPDATE ${table} SET totp_secret = $1, totp_enabled = 0 WHERE id = $2`, [sec.base32, p.sub]);
     res.json({
       secret: sec.base32,
       otpauth_url: sec.otpauth_url,
     });
-  });
+  }));
 
-  app.post("/api/auth/manager/2fa/enable", (req, res) => {
+  app.post("/api/auth/manager/2fa/enable", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const token = String((req.body && req.body.token) || "").trim();
     const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
-    const m = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(p.sub);
+    const m = await dbGet(`SELECT * FROM ${table} WHERE id = $1`, [p.sub]);
     if (!m?.totp_secret) return res.status(400).json({ error: "setup_first" });
     if (!totpVerify(m.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE ${table} SET totp_enabled = 1 WHERE id = ?`).run(p.sub);
+    await dbRun(`UPDATE ${table} SET totp_enabled = 1 WHERE id = $1`, [p.sub]);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_enabled",
@@ -444,18 +453,18 @@ export function registerAuthRoutes(app) {
       message: "Manager enabled 2FA",
     });
     res.json({ ok: true, totp_enabled: true });
-  });
+  }));
 
-  app.post("/api/auth/manager/2fa/disable", (req, res) => {
+  app.post("/api/auth/manager/2fa/disable", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) return res.status(401).json({ error: "unauthorized" });
     const password = String((req.body && req.body.password) || "");
     const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
-    const m = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(p.sub);
+    const m = await dbGet(`SELECT * FROM ${table} WHERE id = $1`, [p.sub]);
     if (!m || !verifyPassword(password, m.password_hash)) {
       return res.status(401).json({ error: "invalid_password" });
     }
-    db.prepare(`UPDATE ${table} SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
+    await dbRun(`UPDATE ${table} SET totp_secret = NULL, totp_enabled = 0 WHERE id = $1`, [p.sub]);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "manager_2fa_disabled",
@@ -464,31 +473,31 @@ export function registerAuthRoutes(app) {
       message: "Manager disabled 2FA",
     });
     res.json({ ok: true, totp_enabled: false });
-  });
+  }));
 
-  app.post("/api/auth/admin/2fa/setup", (req, res) => {
+  app.post("/api/auth/admin/2fa/setup", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
-    const row = db.prepare(`SELECT email FROM identity.super_admins WHERE id = ?`).get(p.sub);
+    const row = await dbGet(`SELECT email FROM identity.super_admins WHERE id = $1`, [p.sub]);
     const label = row?.email ? `Iraniu Admin (${row.email})` : "Iraniu Admin";
     const sec = totpGenerateSecret(label);
-    db.prepare(`UPDATE identity.super_admins SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(sec.base32, p.sub);
+    await dbRun(`UPDATE identity.super_admins SET totp_secret = $1, totp_enabled = 0 WHERE id = $2`, [sec.base32, p.sub]);
     res.json({
       secret: sec.base32,
       otpauth_url: sec.otpauth_url,
     });
-  });
+  }));
 
-  app.post("/api/auth/admin/2fa/enable", (req, res) => {
+  app.post("/api/auth/admin/2fa/enable", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
     const token = String((req.body && req.body.token) || "").trim();
-    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
+    const a = await dbGet(`SELECT * FROM identity.super_admins WHERE id = $1`, [p.sub]);
     if (!a?.totp_secret) return res.status(400).json({ error: "setup_first" });
     if (!totpVerify(a.totp_secret, token)) {
       return res.status(400).json({ error: "invalid_totp" });
     }
-    db.prepare(`UPDATE identity.super_admins SET totp_enabled = 1, totp_setup_required = 0 WHERE id = ?`).run(p.sub);
+    await dbRun(`UPDATE identity.super_admins SET totp_enabled = 1, totp_setup_required = 0 WHERE id = $1`, [p.sub]);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "admin_2fa_enabled",
@@ -497,17 +506,17 @@ export function registerAuthRoutes(app) {
       message: "Super admin enabled 2FA",
     });
     res.json({ ok: true, totp_enabled: true });
-  });
+  }));
 
-  app.post("/api/auth/admin/2fa/disable", (req, res) => {
+  app.post("/api/auth/admin/2fa/disable", asyncHandler(async (req, res) => {
     const p = parseAuthHeader(req);
     if (!p || p.typ !== "adm") return res.status(401).json({ error: "unauthorized" });
     const password = String((req.body && req.body.password) || "");
-    const a = db.prepare(`SELECT * FROM identity.super_admins WHERE id = ?`).get(p.sub);
+    const a = await dbGet(`SELECT * FROM identity.super_admins WHERE id = $1`, [p.sub]);
     if (!a || !verifyPassword(password, a.password_hash)) {
       return res.status(401).json({ error: "invalid_password" });
     }
-    db.prepare(`UPDATE identity.super_admins SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(p.sub);
+    await dbRun(`UPDATE identity.super_admins SET totp_secret = NULL, totp_enabled = 0 WHERE id = $1`, [p.sub]);
     writeSystemLog({
       ...actorFromAuth(p),
       action: "admin_2fa_disabled",
@@ -516,19 +525,19 @@ export function registerAuthRoutes(app) {
       message: "Super admin disabled 2FA",
     });
     res.json({ ok: true, totp_enabled: false });
-  });
+  }));
 
-  app.get("/api/admin/telegram-status", requireSuperAdmin, (_req, res) => {
-    res.json(getTelegramConfigForAdmin());
-  });
+  app.get("/api/admin/telegram-status", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getTelegramConfigForAdmin());
+  }));
 
-  app.get("/api/admin/telegram-config", requireSuperAdmin, (_req, res) => {
-    res.json(getTelegramConfigForAdmin());
-  });
+  app.get("/api/admin/telegram-config", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getTelegramConfigForAdmin());
+  }));
 
-  app.patch("/api/admin/telegram-config", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/telegram-config", requireSuperAdmin, asyncHandler(async (req, res) => {
     try {
-      const next = applyTelegramConfigPatch(req.body || {});
+      const next = await applyTelegramConfigPatch(req.body || {});
       writeSystemLog({
         ...actorFromAuth(req.auth),
         action: "admin_telegram_config_updated",
@@ -541,19 +550,19 @@ export function registerAuthRoutes(app) {
       console.error("telegram-config patch", e);
       res.status(500).json({ error: "server_error" });
     }
-  });
+  }));
 
-  app.get("/api/admin/twilio-module", requireSuperAdmin, (_req, res) => {
-    res.json(getTwilioModuleForAdmin());
-  });
+  app.get("/api/admin/twilio-module", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getTwilioModuleForAdmin());
+  }));
 
-  app.patch("/api/admin/twilio-module", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/twilio-module", requireSuperAdmin, asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     if (!("enabled" in b)) {
       return res.status(400).json({ error: "missing_enabled", hint: "enabled: true|false" });
     }
     const enabled = b.enabled === true || b.enabled === 1 || b.enabled === "1" || b.enabled === "true";
-    const next = setTwilioModuleEnabled(enabled);
+    const next = await setTwilioModuleEnabled(enabled);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_twilio_module_toggled",
@@ -562,15 +571,15 @@ export function registerAuthRoutes(app) {
       message: `Twilio module ${enabled ? "enabled" : "disabled"}`,
     });
     res.json(next);
-  });
+  }));
 
-  app.get("/api/admin/smtp-settings", requireSuperAdmin, (_req, res) => {
-    res.json(getSmtpSettingsForAdmin());
-  });
+  app.get("/api/admin/smtp-settings", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getSmtpSettingsForAdmin());
+  }));
 
-  app.patch("/api/admin/smtp-settings", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/smtp-settings", requireSuperAdmin, asyncHandler(async (req, res) => {
     try {
-      const next = applySmtpSettingsPatch(req.body || {});
+      const next = await applySmtpSettingsPatch(req.body || {});
       writeSystemLog({
         ...actorFromAuth(req.auth),
         action: "admin_smtp_settings_updated",
@@ -583,14 +592,14 @@ export function registerAuthRoutes(app) {
       console.error("smtp-settings patch", e);
       res.status(500).json({ error: "server_error" });
     }
-  });
+  }));
 
-  app.post("/api/admin/smtp-test", requireSuperAdmin, async (req, res) => {
+  app.post("/api/admin/smtp-test", requireSuperAdmin, asyncHandler(async (req, res) => {
     const to = String((req.body && req.body.to) || "").trim().toLowerCase();
     if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       return res.status(400).json({ error: "invalid_to", hint: "ایمیل گیرنده را وارد کنید" });
     }
-    const html = wrapBrandedEmail({
+    const html = await wrapBrandedEmail({
       headerIcon: "✉️",
       title: "SMTP connection test",
       subtitle: "Iraniu — system email",
@@ -615,9 +624,9 @@ export function registerAuthRoutes(app) {
       });
     }
     res.json({ ok: true });
-  });
+  }));
 
-  app.post("/api/admin/email/broadcast", requireSuperAdmin, async (req, res) => {
+  app.post("/api/admin/email/broadcast", requireSuperAdmin, asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const subject = String(b.subject || "").trim();
     const body_html = String(b.body_html || "");
@@ -637,11 +646,11 @@ export function registerAuthRoutes(app) {
       message: `Broadcast sent=${out.sent_count} failed=${out.failed_count} claimed_only=${claimed_only}`,
     });
     res.json(out);
-  });
+  }));
 
   /** تلگرام: دکمهٔ Kick out — باید webhook با setWebhook ثبت شود */
-  app.post("/api/telegram/webhook", async (req, res) => {
-    const secret = getEffectiveTelegramConfig().webhookSecret;
+  app.post("/api/telegram/webhook", asyncHandler(async (req, res) => {
+    const secret = (await getEffectiveTelegramConfig()).webhookSecret;
     if (secret) {
       const got = req.headers["x-telegram-bot-api-secret-token"];
       if (got !== secret) {
@@ -657,9 +666,9 @@ export function registerAuthRoutes(app) {
       console.error("[telegram] webhook", e);
     }
     res.sendStatus(200);
-  });
+  }));
 
-  app.post("/api/admin/telegram-test", requireSuperAdmin, async (_req, res) => {
+  app.post("/api/admin/telegram-test", requireSuperAdmin, asyncHandler(async (_req, res) => {
     const r = await sendTelegramTestMessage();
     if (r.skipped) {
       return res.status(400).json({
@@ -674,20 +683,20 @@ export function registerAuthRoutes(app) {
       });
     }
     res.json({ ok: true });
-  });
+  }));
 
   /** سوپرادمین: تعیین/تغییر رمز مدیر */
-  app.patch("/api/admin/managers/:id/password", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/managers/:id/password", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     const password = String((req.body && req.body.password) || "").trim();
     if (password.length < 8) {
       return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
     }
-    const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
+    const m = await dbGet(`SELECT id FROM identity.managers WHERE id = $1`, [id]);
     if (!m) return res.status(404).json({ error: "not_found" });
     const hash = hashPassword(password);
-    db.prepare(`UPDATE identity.managers SET password_hash = ? WHERE id = ?`).run(hash, id);
+    await dbRun(`UPDATE identity.managers SET password_hash = $1 WHERE id = $2`, [hash, id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "manager_password_reset",
@@ -696,20 +705,18 @@ export function registerAuthRoutes(app) {
       message: `Manager password reset for manager #${id}`,
     });
     res.json({ ok: true });
-  });
+  }));
 
   /** سوپرادمین‌ها: فهرست، ایجاد، حذف (حذفِ خود یا آخرین حساب مجاز نیست) */
-  app.get("/api/admin/super-admins", requireSuperAdmin, (_req, res) => {
-    const rows = db
-      .prepare(
-        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url
+  app.get("/api/admin/super-admins", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    const rows = await dbAll(
+      `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url
          FROM identity.super_admins ORDER BY id ASC`
-      )
-      .all();
+    );
     res.json(rows);
-  });
+  }));
 
-  app.post("/api/admin/super-admins", requireSuperAdmin, (req, res) => {
+  app.post("/api/admin/super-admins", requireSuperAdmin, asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const email = String(b.email || "")
       .trim()
@@ -727,21 +734,19 @@ export function registerAuthRoutes(app) {
     if (password.length < 8) {
       return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
     }
-    if (db.prepare(`SELECT id FROM identity.super_admins WHERE email = ?`).get(email)) {
+    if (await dbGet(`SELECT id FROM identity.super_admins WHERE email = $1`, [email])) {
       return res.status(409).json({ error: "email_taken" });
     }
     const hash = hashPassword(password);
-    const ins = db
-      .prepare(
-        `INSERT INTO identity.super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
-         VALUES (?, ?, ?, ?, 0)`
-      )
-      .run(email, hash, name, totpSetupRequired);
-    const row = db
-      .prepare(
-        `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url FROM identity.super_admins WHERE id = ?`
-      )
-      .get(ins.lastInsertRowid);
+    const ins = await dbRun(
+      `INSERT INTO identity.super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
+         VALUES ($1, $2, $3, $4, 0) RETURNING id`,
+      [email, hash, name, totpSetupRequired]
+    );
+    const row = await dbGet(
+      `SELECT id, email, name, totp_enabled, totp_setup_required, created_at, avatar_url FROM identity.super_admins WHERE id = $1`,
+      [ins.rows[0].id]
+    );
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "super_admin_created",
@@ -751,20 +756,20 @@ export function registerAuthRoutes(app) {
       meta: { totp_setup_required: totpSetupRequired },
     });
     res.status(201).json(row);
-  });
+  }));
 
-  app.delete("/api/admin/super-admins/:id", requireSuperAdmin, (req, res) => {
+  app.delete("/api/admin/super-admins/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     if (id === Number(req.auth.sub)) {
       return res.status(400).json({ error: "cannot_delete_self", hint: "نمی‌توانید حساب خود را حذف کنید" });
     }
-    const total = db.prepare(`SELECT COUNT(*) AS c FROM identity.super_admins`).get().c;
+    const total = (await dbGet(`SELECT COUNT(*)::int AS c FROM identity.super_admins`)).c;
     if (total <= 1) {
       return res.status(400).json({ error: "last_admin", hint: "حداقل یک سوپرادمین باید بماند" });
     }
-    const info = db.prepare(`DELETE FROM identity.super_admins WHERE id = ?`).run(id);
-    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    const info = await dbRun(`DELETE FROM identity.super_admins WHERE id = $1`, [id]);
+    if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "super_admin_deleted",
@@ -773,21 +778,20 @@ export function registerAuthRoutes(app) {
       message: `Super admin #${id} deleted`,
     });
     res.json({ ok: true });
-  });
+  }));
 
-  app.get("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
+  app.get("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-    const m = db
-      .prepare(
-        `SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number
-         FROM identity.managers WHERE id = ?`
-      )
-      .get(id);
+    const m = await dbGet(
+      `SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number
+         FROM identity.managers WHERE id = $1`,
+      [id]
+    );
     if (!m) return res.status(404).json({ error: "not_found" });
     res.json({
       id: m.id,
-      module_enabled: isTwilioModuleEnabled(),
+      module_enabled: await isTwilioModuleEnabled(),
       twilio_account_sid: m.twilio_account_sid || "",
       twilio_phone_number: m.twilio_phone_number || "",
       twilio_auth_token_set: !!m.twilio_auth_token,
@@ -798,15 +802,15 @@ export function registerAuthRoutes(app) {
           ? "••••"
           : null,
     });
-  });
+  }));
 
-  app.patch("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, (req, res) => {
-    if (!isTwilioModuleEnabled()) {
+  app.patch("/api/admin/managers/:id/twilio-settings", requireSuperAdmin, asyncHandler(async (req, res) => {
+    if (!(await isTwilioModuleEnabled())) {
       return res.status(403).json({ error: "twilio_module_disabled", hint: "Twilio module is off in super admin settings" });
     }
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-    const exists = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
+    const exists = await dbGet(`SELECT id FROM identity.managers WHERE id = $1`, [id]);
     if (!exists) return res.status(404).json({ error: "not_found" });
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const updates = {};
@@ -815,8 +819,9 @@ export function registerAuthRoutes(app) {
     if ("twilio_auth_token" in b) updates.twilio_auth_token = String(b.twilio_auth_token || "").trim() || null;
     const keys = Object.keys(updates);
     if (!keys.length) return res.status(400).json({ error: "no_fields" });
-    const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-    db.prepare(`UPDATE identity.managers SET ${setClause} WHERE id = @id`).run({ ...updates, id });
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+    const values = keys.map((k) => updates[k]);
+    await dbRun(`UPDATE identity.managers SET ${setClause} WHERE id = $${keys.length + 1}`, [...values, id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_manager_twilio_updated",
@@ -825,9 +830,10 @@ export function registerAuthRoutes(app) {
       message: `Super admin updated manager #${id} Twilio settings`,
       meta: { fields: keys.filter((k) => k !== "twilio_auth_token") },
     });
-    const m = db
-      .prepare(`SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number FROM identity.managers WHERE id = ?`)
-      .get(id);
+    const m = await dbGet(
+      `SELECT id, twilio_account_sid, twilio_auth_token, twilio_phone_number FROM identity.managers WHERE id = $1`,
+      [id]
+    );
     res.json({
       id: m.id,
       twilio_account_sid: m.twilio_account_sid || "",
@@ -840,36 +846,38 @@ export function registerAuthRoutes(app) {
           ? "••••"
           : null,
     });
-  });
+  }));
 
   /** یادداشت و کارهای داخلی سوپرادمین (در API عمومی نیست) */
-  app.get("/api/admin/workspace-brief", requireSuperAdmin, (_req, res) => {
-    const open_tasks_count = db.prepare(`SELECT COUNT(*) AS c FROM admin_tasks WHERE done = 0`).get().c;
-    const recent_notes = db
-      .prepare(
-        `SELECT id, body, updated_at FROM admin_internal_notes ORDER BY datetime(updated_at) DESC, id DESC LIMIT 5`
+  app.get("/api/admin/workspace-brief", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    const open_tasks_count = (await dbGet(`SELECT COUNT(*)::int AS c FROM admin_tasks WHERE done = 0`)).c;
+    const recent_notes = (
+      await dbAll(
+        `SELECT id, body, updated_at FROM admin_internal_notes ORDER BY updated_at DESC, id DESC LIMIT 5`
       )
-      .all()
-      .map((row) => {
-        const raw = String(row.body || "");
-        const preview = raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
-        return { id: row.id, updated_at: row.updated_at, preview };
-      });
+    ).map((row) => {
+      const raw = String(row.body || "");
+      const preview = raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+      return { id: row.id, updated_at: row.updated_at, preview };
+    });
     res.json({ open_tasks_count, recent_notes });
-  });
+  }));
 
-  app.get("/api/admin/internal-notes", requireSuperAdmin, (_req, res) => {
-    const rows = db
-      .prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes ORDER BY datetime(updated_at) DESC, id DESC`)
-      .all();
+  app.get("/api/admin/internal-notes", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    const rows = await dbAll(
+      `SELECT id, body, created_at, updated_at FROM admin_internal_notes ORDER BY updated_at DESC, id DESC`
+    );
     res.json(rows);
-  });
+  }));
 
-  app.post("/api/admin/internal-notes", requireSuperAdmin, (req, res) => {
+  app.post("/api/admin/internal-notes", requireSuperAdmin, asyncHandler(async (req, res) => {
     const body = String((req.body && req.body.body) || "").trim();
     if (!body) return res.status(400).json({ error: "missing_body" });
-    const ins = db.prepare(`INSERT INTO admin_internal_notes (body) VALUES (?)`).run(body);
-    const r = db.prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = ?`).get(ins.lastInsertRowid);
+    const ins = await dbRun(`INSERT INTO admin_internal_notes (body) VALUES ($1) RETURNING id`, [body]);
+    const r = await dbGet(
+      `SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = $1`,
+      [ins.rows[0].id]
+    );
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_internal_note_created",
@@ -878,16 +886,16 @@ export function registerAuthRoutes(app) {
       message: "Internal note created",
     });
     res.status(201).json(r);
-  });
+  }));
 
-  app.patch("/api/admin/internal-notes/:id", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/internal-notes/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     const body = String((req.body && req.body.body) || "").trim();
     if (!body) return res.status(400).json({ error: "missing_body" });
-    const info = db.prepare(`UPDATE admin_internal_notes SET body = ?, updated_at = datetime('now') WHERE id = ?`).run(body, id);
-    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
-    const row = db.prepare(`SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = ?`).get(id);
+    const info = await dbRun(`UPDATE admin_internal_notes SET body = $1, updated_at = NOW()::TEXT WHERE id = $2`, [body, id]);
+    if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
+    const row = await dbGet(`SELECT id, body, created_at, updated_at FROM admin_internal_notes WHERE id = $1`, [id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_internal_note_updated",
@@ -896,13 +904,13 @@ export function registerAuthRoutes(app) {
       message: "Internal note updated",
     });
     res.json(row);
-  });
+  }));
 
-  app.delete("/api/admin/internal-notes/:id", requireSuperAdmin, (req, res) => {
+  app.delete("/api/admin/internal-notes/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-    const info = db.prepare(`DELETE FROM admin_internal_notes WHERE id = ?`).run(id);
-    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    const info = await dbRun(`DELETE FROM admin_internal_notes WHERE id = $1`, [id]);
+    if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_internal_note_deleted",
@@ -911,31 +919,30 @@ export function registerAuthRoutes(app) {
       message: "Internal note deleted",
     });
     res.json({ ok: true });
-  });
+  }));
 
-  app.get("/api/admin/tasks", requireSuperAdmin, (_req, res) => {
-    const rows = db
-      .prepare(
-        `SELECT id, title, body, done, sort_order, due_at, created_at, updated_at
+  app.get("/api/admin/tasks", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    const rows = await dbAll(
+      `SELECT id, title, body, done, sort_order, due_at, created_at, updated_at
          FROM admin_tasks
          ORDER BY done ASC, sort_order DESC, id DESC`
-      )
-      .all();
+    );
     res.json(rows);
-  });
+  }));
 
-  app.post("/api/admin/tasks", requireSuperAdmin, (req, res) => {
+  app.post("/api/admin/tasks", requireSuperAdmin, asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const title = String(b.title || "").trim();
     if (!title) return res.status(400).json({ error: "missing_title" });
     const bodyText = String(b.body || "").trim() || null;
     const dueRaw = b.due_at != null && b.due_at !== "" ? String(b.due_at).trim() : null;
-    const maxRow = db.prepare(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM admin_tasks`).get();
+    const maxRow = await dbGet(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM admin_tasks`);
     const sort_order = Number(maxRow.m) + 1;
-    const ins = db
-      .prepare(`INSERT INTO admin_tasks (title, body, due_at, sort_order) VALUES (?, ?, ?, ?)`)
-      .run(title, bodyText, dueRaw, sort_order);
-    const r = db.prepare(`SELECT * FROM admin_tasks WHERE id = ?`).get(ins.lastInsertRowid);
+    const ins = await dbRun(
+      `INSERT INTO admin_tasks (title, body, due_at, sort_order) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [title, bodyText, dueRaw, sort_order]
+    );
+    const r = await dbGet(`SELECT * FROM admin_tasks WHERE id = $1`, [ins.rows[0].id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_task_created",
@@ -944,9 +951,9 @@ export function registerAuthRoutes(app) {
       message: "Internal task created",
     });
     res.status(201).json(r);
-  });
+  }));
 
-  app.patch("/api/admin/tasks/:id", requireSuperAdmin, (req, res) => {
+  app.patch("/api/admin/tasks/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     const b = req.body && typeof req.body === "object" ? req.body : {};
@@ -965,12 +972,14 @@ export function registerAuthRoutes(app) {
     const keys = Object.keys(updates);
     if (!keys.length) return res.status(400).json({ error: "no_fields" });
     if (updates.title === null) return res.status(400).json({ error: "invalid_title" });
-    const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-    const info = db
-      .prepare(`UPDATE admin_tasks SET ${setClause}, updated_at = datetime('now') WHERE id = @id`)
-      .run({ ...updates, id });
-    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
-    const row = db.prepare(`SELECT * FROM admin_tasks WHERE id = ?`).get(id);
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+    const values = keys.map((k) => updates[k]);
+    const info = await dbRun(
+      `UPDATE admin_tasks SET ${setClause}, updated_at = NOW()::TEXT WHERE id = $${keys.length + 1}`,
+      [...values, id]
+    );
+    if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
+    const row = await dbGet(`SELECT * FROM admin_tasks WHERE id = $1`, [id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_task_updated",
@@ -980,13 +989,13 @@ export function registerAuthRoutes(app) {
       meta: { fields: keys },
     });
     res.json(row);
-  });
+  }));
 
-  app.delete("/api/admin/tasks/:id", requireSuperAdmin, (req, res) => {
+  app.delete("/api/admin/tasks/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-    const info = db.prepare(`DELETE FROM admin_tasks WHERE id = ?`).run(id);
-    if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+    const info = await dbRun(`DELETE FROM admin_tasks WHERE id = $1`, [id]);
+    if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "admin_task_deleted",
@@ -995,5 +1004,5 @@ export function registerAuthRoutes(app) {
       message: "Internal task deleted",
     });
     res.json({ ok: true });
-  });
+  }));
 }

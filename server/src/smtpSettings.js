@@ -4,7 +4,7 @@
  */
 
 import nodemailer from "nodemailer";
-import { db } from "./db.js";
+import { dbGet, dbRun } from "./db.js";
 
 export const META_KEY_SMTP = "smtp_email_settings_v1";
 
@@ -31,8 +31,8 @@ const DEFAULTS = {
 let cachedTransport = null;
 let cachedTransportKey = "";
 
-function parseStored() {
-  const row = db.prepare(`SELECT value FROM app_meta WHERE key = ?`).get(META_KEY_SMTP);
+async function parseStored() {
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = $1`, [META_KEY_SMTP]);
   if (!row || row.value == null || String(row.value).trim() === "") return {};
   try {
     const o = JSON.parse(String(row.value));
@@ -42,14 +42,18 @@ function parseStored() {
   }
 }
 
-function saveStored(obj) {
+async function saveStored(obj) {
   const s = JSON.stringify(obj);
-  db.prepare(`INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)`).run(META_KEY_SMTP, s);
+  await dbRun(
+    `INSERT INTO app_meta (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [META_KEY_SMTP, s]
+  );
 }
 
 /** تنظیمات نهایی برای nodemailer و قالب‌ها */
-export function getEffectiveSmtpSettings() {
-  const stored = parseStored();
+export async function getEffectiveSmtpSettings() {
+  const stored = await parseStored();
   const envHost = process.env.SMTP_HOST?.trim();
   const envPort = Number(process.env.SMTP_PORT || 0);
   const envSecure = process.env.SMTP_SECURE === "1" || process.env.SMTP_SECURE === "true";
@@ -123,8 +127,8 @@ export function invalidateMailTransporter() {
   cachedTransportKey = "";
 }
 
-export function getMailTransporter() {
-  const cfg = getEffectiveSmtpSettings();
+export async function getMailTransporter() {
+  const cfg = await getEffectiveSmtpSettings();
   if (!cfg.host || !cfg.user || !cfg.password) return null;
   const k = transportKey(cfg);
   if (cachedTransport && k === cachedTransportKey) return cachedTransport;
@@ -139,9 +143,9 @@ export function getMailTransporter() {
 }
 
 /** پاسخ امن برای پنل — رمز SMTP نمایش داده نمی‌شود */
-export function getSmtpSettingsForAdmin() {
-  const raw = parseStored();
-  const eff = getEffectiveSmtpSettings();
+export async function getSmtpSettingsForAdmin() {
+  const raw = await parseStored();
+  const eff = await getEffectiveSmtpSettings();
   const hasDbPassword = !!(raw && String(raw.password || "").trim());
   const hasEnvPassword = !!process.env.SMTP_PASS?.trim();
   return {
@@ -170,9 +174,9 @@ export function getSmtpSettingsForAdmin() {
 /**
  * PATCH — رمز خالی یعنی «تغییر نده» اگر قبلاً ذخیره شده؛ برای پاک کردن DB باید کلید خاص ارسال شود.
  */
-export function applySmtpSettingsPatch(body) {
+export async function applySmtpSettingsPatch(body) {
   const b = body && typeof body === "object" ? body : {};
-  const cur = { ...DEFAULTS, ...parseStored() };
+  const cur = { ...DEFAULTS, ...(await parseStored()) };
 
   if ("host" in b) cur.host = String(b.host ?? "").trim() || DEFAULTS.host;
   if ("port" in b) {
@@ -208,13 +212,13 @@ export function applySmtpSettingsPatch(body) {
   }
   if ("notify_emails" in b) cur.notifyEmails = String(b.notify_emails ?? "").trim();
 
-  saveStored(cur);
+  await saveStored(cur);
   invalidateMailTransporter();
   return getSmtpSettingsForAdmin();
 }
 
-export function buildFromAddress() {
-  const c = getEffectiveSmtpSettings();
+export async function buildFromAddress() {
+  const c = await getEffectiveSmtpSettings();
   const email = c.fromEmail || c.user;
   if (!email) return null;
   const name = c.fromName || "Iraniu";
@@ -222,13 +226,13 @@ export function buildFromAddress() {
 }
 
 export async function sendMailViaSettings({ to, subject, html, text, replyTo }) {
-  const tx = getMailTransporter();
+  const tx = await getMailTransporter();
   if (!tx) return { skipped: true, reason: "smtp_not_configured" };
   const toAddr = String(to || "").trim().toLowerCase();
   if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) return { skipped: true, reason: "no_valid_email" };
-  const from = buildFromAddress();
+  const from = await buildFromAddress();
   if (!from) return { skipped: true, reason: "no_from" };
-  const cfg = getEffectiveSmtpSettings();
+  const cfg = await getEffectiveSmtpSettings();
   const r = cfg.replyTo || replyTo;
   await tx.sendMail({
     from,

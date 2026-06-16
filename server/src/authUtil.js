@@ -1,7 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import speakeasy from "speakeasy";
-import { db } from "./db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "iraniu-dev-jwt-secret-change-me";
 

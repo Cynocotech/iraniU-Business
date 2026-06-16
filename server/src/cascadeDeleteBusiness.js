@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { dbGet, dbTransaction } from "./db.js";
 
 /** جداولی که به business_slug وابسته‌اند (هم‌تراز با db.js migrate slug) */
 const SLUG_TABLES = [
@@ -14,18 +14,17 @@ const SLUG_TABLES = [
 /**
  * حذف یک آگهی و ردیف‌های وابسته. برگشت: { deleted: boolean, reason?: string }
  */
-export function cascadeDeleteBusinessBySlug(rawSlug) {
+export async function cascadeDeleteBusinessBySlug(rawSlug) {
   const slug = String(rawSlug || "").trim();
   if (!slug) return { deleted: false, reason: "empty" };
-  const exists = db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(slug);
+  const exists = await dbGet(`SELECT 1 FROM businesses WHERE slug = $1`, [slug]);
   if (!exists) return { deleted: false, reason: "not_found" };
 
-  const tx = db.transaction(() => {
+  await dbTransaction(async (client) => {
     for (const t of SLUG_TABLES) {
-      db.prepare(`DELETE FROM ${t} WHERE business_slug = ?`).run(slug);
+      await client.query(`DELETE FROM ${t} WHERE business_slug = $1`, [slug]);
     }
-    db.prepare(`DELETE FROM businesses WHERE slug = ?`).run(slug);
+    await client.query(`DELETE FROM businesses WHERE slug = $1`, [slug]);
   });
-  tx();
   return { deleted: true };
 }

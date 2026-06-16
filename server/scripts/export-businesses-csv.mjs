@@ -22,7 +22,7 @@ function parseArgs() {
 }
 
 const { out: outArg } = parseArgs();
-const { csvText, rowCount } = exportIraniuBusinessesCsv();
+const { csvText, rowCount } = await exportIraniuBusinessesCsv();
 const outPath =
   outArg ||
   path.join(
@@ -34,3 +34,4 @@ const outPath =
 
 fs.writeFileSync(outPath, csvText, "utf8");
 console.log(`Wrote ${rowCount} rows → ${outPath}`);
+process.exit(0);

@@ -12,12 +12,12 @@ export async function notifyAdminsNewPendingListing(row) {
     console.error("[telegram] pending listing notify", e);
   }
 
-  const s = getEffectiveSmtpSettings();
+  const s = await getEffectiveSmtpSettings();
   if (!s.notifyOnNewListing) return { skipped: true, reason: "disabled" };
   const emails = parseNotifyEmailList(s.notifyEmails);
   if (!emails.length) return { skipped: true, reason: "no_notify_emails" };
 
-  const html = htmlNewListingInternalNotify({
+  const html = await htmlNewListingInternalNotify({
     nameFa: row.name_fa,
     slug: row.slug,
     city: row.city,

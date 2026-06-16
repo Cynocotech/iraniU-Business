@@ -1,17 +1,17 @@
-import { db } from "./db.js";
+import { dbAll } from "./db.js";
 import { sendMailViaSettings } from "./smtpSettings.js";
 import { htmlBroadcastBranded, stripDangerousHtml } from "./emailBranding.js";
 
-export function getBroadcastRecipientEmails(claimedOnly) {
+export async function getBroadcastRecipientEmails(claimedOnly) {
   const only =
     claimedOnly === true || claimedOnly === 1 || String(claimedOnly || "").toLowerCase() === "true";
   const sql = only
     ? `SELECT DISTINCT listing_contact_email AS em FROM businesses
        WHERE listing_contact_email IS NOT NULL AND trim(listing_contact_email) != ''
-       AND (claimed = 1 OR claimed = '1')`
+       AND claimed = 1`
     : `SELECT DISTINCT listing_contact_email AS em FROM businesses
        WHERE listing_contact_email IS NOT NULL AND trim(listing_contact_email) != ''`;
-  const rows = db.prepare(sql).all();
+  const rows = await dbAll(sql);
   const set = new Set();
   for (const r of rows) {
     const e = String(r.em || "")
@@ -30,9 +30,9 @@ export async function sendBroadcastToBusinesses(opts) {
   if (!subject) return { error: "missing_subject" };
   const inner = stripDangerousHtml(opts.body_html || "");
   if (!inner.trim()) return { error: "missing_body" };
-  const html = htmlBroadcastBranded({ innerHtml: inner });
+  const html = await htmlBroadcastBranded({ innerHtml: inner });
   const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  const recipients = getBroadcastRecipientEmails(opts.claimed_only);
+  const recipients = await getBroadcastRecipientEmails(opts.claimed_only);
   const sent = [];
   const failed = [];
   for (const to of recipients) {

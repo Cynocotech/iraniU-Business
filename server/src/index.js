@@ -4,7 +4,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { db, dbPath, ensureRestaurantSafraDemo } from "./db.js";
+import { dbGet, dbAll, dbRun, dbTransaction, ensureRestaurantSafraDemo, bootstrapDb } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword, validatePasswordComplexity } from "./authUtil.js";
 import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
@@ -19,7 +19,6 @@ import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
 import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
 import { analyzeDuplicateNames, executeDedupeByName } from "./dedupeBusinessesByName.js";
-import { validateIraniuSqliteFile } from "./sqliteDbPending.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -77,19 +76,6 @@ const uploadCsv = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-const uploadSqlite = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const ok = /\.db$/i.test(String(file.originalname || ""));
-    if (!ok) {
-      cb(new Error("فقط فایل با پسوند .db مجاز است"));
-      return;
-    }
-    cb(null, true);
-  },
-});
-
 const uploadExchangeBanner = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -108,6 +94,11 @@ const looseReviewRedirect =
   process.env.ALLOW_ANY_REVIEW_REDIRECT === "1" || process.env.ALLOW_ANY_REVIEW_REDIRECT === "true" || !isProd;
 const PORT = Number(process.env.PORT) || 3001;
 
+/** Wrap an async Express handler so rejected promises reach the error middleware. */
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
 const app = express();
 if (process.env.TRUST_PROXY === "1") {
   app.set("trust proxy", 1);
@@ -121,7 +112,6 @@ const exchangeBannerDir = path.join(uploadsDir, "exchange-banners");
 if (!fs.existsSync(exchangeBannerDir)) fs.mkdirSync(exchangeBannerDir, { recursive: true });
 app.use("/uploads", express.static(uploadsDir));
 
-ensureSuperAdminFromEnv();
 registerAuthRoutes(app);
 
 app.get("/api/health", (_req, res) => {
@@ -201,14 +191,13 @@ function normalizeBannerDailyUserCap(v) {
   return Math.max(1, Math.min(50, n));
 }
 
-app.get("/api/businesses", (req, res) => {
+app.get("/api/businesses", asyncHandler(async (req, res) => {
   const auth = parseAuthHeader(req);
   const isAdmin = auth && auth.typ === "adm";
   const rows = isAdmin
-    ? db.prepare(`SELECT * FROM businesses ORDER BY name_fa`).all()
-    : db
-        .prepare(
-          `SELECT * FROM businesses WHERE (
+    ? await dbAll(`SELECT * FROM businesses ORDER BY name_fa`)
+    : await dbAll(
+        `SELECT * FROM businesses WHERE (
              listing_approval = 'approved'
              OR listing_approval IS NULL
              OR listing_approval = ''
@@ -216,81 +205,74 @@ app.get("/api/businesses", (req, res) => {
                listing_approval = 'pending'
                AND (
                  exchange_manager_id IS NOT NULL
-                 OR IFNULL(category, '') LIKE '%صراف%'
-                 OR lower(IFNULL(category, '')) LIKE '%exchange%'
+                 OR COALESCE(category, '') LIKE '%صراف%'
+                 OR lower(COALESCE(category, '')) LIKE '%exchange%'
                )
              )
            )
            AND (status IS NULL OR status = '' OR status = 'active')
            ORDER BY name_fa`
-        )
-        .all();
+      );
   res.json(rows);
-});
+}));
 
 /** بنرهای تبلیغی صرافی — عمومی */
-app.get("/api/exchange-banners", (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
+app.get("/api/exchange-banners", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
        FROM exchange_banners
        WHERE is_active = 1 AND page_scope = 'exchange'
-         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= datetime('now'))
-         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= datetime('now'))
-       ORDER BY placement = 'top' DESC, sort_order ASC, id DESC`
-    )
-    .all();
+         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= NOW()::TEXT)
+         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= NOW()::TEXT)
+       ORDER BY (placement = 'top') DESC, sort_order ASC, id DESC`
+  );
   res.json(rows);
-});
+}));
 
 /** بنرهای تبلیغی دایرکتوری — عمومی */
-app.get("/api/directory-banners", (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
+app.get("/api/directory-banners", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
        FROM exchange_banners
        WHERE is_active = 1 AND page_scope = 'directory'
-         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= datetime('now'))
-         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= datetime('now'))
-       ORDER BY placement = 'top' DESC, sort_order ASC, id DESC`
-    )
-    .all();
+         AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= NOW()::TEXT)
+         AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= NOW()::TEXT)
+       ORDER BY (placement = 'top') DESC, sort_order ASC, id DESC`
+  );
   res.json(rows);
-});
+}));
 
 /** ثبت کلیک بنر تبلیغاتی (عمومی) */
-app.post("/api/banner-clicks", (req, res) => {
+app.post("/api/banner-clicks", asyncHandler(async (req, res) => {
   try {
     const bannerId = Number.parseInt(String(req.body?.banner_id || "0"), 10);
     if (!Number.isFinite(bannerId) || bannerId <= 0) {
       return res.status(400).json({ error: "bad_banner_id" });
     }
-    const row = db.prepare(`SELECT id, page_scope FROM exchange_banners WHERE id = ?`).get(bannerId);
+    const row = await dbGet(`SELECT id, page_scope FROM exchange_banners WHERE id = $1`, [bannerId]);
     if (!row) return res.status(404).json({ error: "not_found" });
     const scope = row.page_scope === "directory" ? "directory" : "exchange";
-    db.prepare(`INSERT INTO exchange_banner_clicks (banner_id, page_scope) VALUES (?, ?)`).run(bannerId, scope);
+    await dbRun(`INSERT INTO exchange_banner_clicks (banner_id, page_scope) VALUES ($1, $2)`, [bannerId, scope]);
     return res.json({ ok: true });
   } catch (e) {
     console.error("banner-clicks create", e);
     return res.status(500).json({ error: "click_log_failed", hint: String(e.message || e) });
   }
-});
+}));
 
 /** بنرهای تبلیغی صرافی — ادمین */
-app.get("/api/admin/exchange-banners", requireSuperAdmin, (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+app.get("/api/admin/exchange-banners", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
               COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
        FROM exchange_banners
        ORDER BY sort_order ASC, id DESC`
-    )
-    .all();
+  );
   res.json(rows);
-});
+}));
 
 app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
-  uploadExchangeBanner.single("image")(req, res, (err) => {
+  uploadExchangeBanner.single("image")(req, res, async (err) => {
     if (err) {
       if (String(err.message || "").includes("bad_file_type")) {
         return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif مجاز است." });
@@ -328,24 +310,23 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
       const sortOrderNum = Number.parseInt(String(req.body?.sort_order || "0"), 10);
       const sortOrder = Number.isFinite(sortOrderNum) ? sortOrderNum : 0;
       const isActive = String(req.body?.is_active || "1") === "0" ? 0 : 1;
-      const info = db
-        .prepare(
-          `INSERT INTO exchange_banners (title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(title, imageUrl, linkUrl, pageScope, placement, dailyUserCap, startAt, endAt, sortOrder, isActive);
-      const row = db
-        .prepare(
-          `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+      const info = await dbRun(
+        `INSERT INTO exchange_banners (title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [title, imageUrl, linkUrl, pageScope, placement, dailyUserCap, startAt, endAt, sortOrder, isActive]
+      );
+      const newId = info.rows[0].id;
+      const row = await dbGet(
+        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                   COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
-           FROM exchange_banners WHERE id = ?`
-        )
-        .get(info.lastInsertRowid);
+           FROM exchange_banners WHERE id = $1`,
+        [newId]
+      );
       writeSystemLog({
         ...actorFromAuth(req.auth),
         action: "exchange_banner_created",
         targetType: "exchange_banner",
-        targetId: String(info.lastInsertRowid),
+        targetId: String(newId),
         message: "Exchange banner uploaded",
       });
       return res.json(row);
@@ -357,7 +338,7 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
 });
 
 app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) => {
-  uploadExchangeBanner.single("image")(req, res, (err) => {
+  uploadExchangeBanner.single("image")(req, res, async (err) => {
     if (err) {
       if (String(err.message || "").includes("bad_file_type")) {
         return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif مجاز است." });
@@ -370,7 +351,7 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
     try {
       const id = Number.parseInt(String(req.params.id || "0"), 10);
       if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
-      const prev = db.prepare(`SELECT id, image_url FROM exchange_banners WHERE id = ?`).get(id);
+      const prev = await dbGet(`SELECT id, image_url FROM exchange_banners WHERE id = $1`, [id]);
       if (!prev) return res.status(404).json({ error: "not_found" });
       if (!req.file?.buffer?.length) {
         return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است." });
@@ -381,7 +362,7 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
       const absPath = path.join(exchangeBannerDir, filename);
       fs.writeFileSync(absPath, req.file.buffer);
       const imageUrl = `/uploads/exchange-banners/${filename}`;
-      db.prepare(`UPDATE exchange_banners SET image_url = ? WHERE id = ?`).run(imageUrl, id);
+      await dbRun(`UPDATE exchange_banners SET image_url = $1 WHERE id = $2`, [imageUrl, id]);
 
       const prevRel = String(prev.image_url || "");
       if (prevRel.startsWith("/uploads/exchange-banners/")) {
@@ -391,13 +372,12 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
         } catch {}
       }
 
-      const row = db
-        .prepare(
-          `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+      const row = await dbGet(
+        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                   COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
-           FROM exchange_banners WHERE id = ?`
-        )
-        .get(id);
+           FROM exchange_banners WHERE id = $1`,
+        [id]
+      );
       writeSystemLog({
         ...actorFromAuth(req.auth),
         action: "exchange_banner_image_updated",
@@ -413,13 +393,13 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
   });
 });
 
-app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
+app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const id = Number.parseInt(String(req.params.id || "0"), 10);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ error: "bad_id" });
     }
-    const prev = db.prepare(`SELECT * FROM exchange_banners WHERE id = ?`).get(id);
+    const prev = await dbGet(`SELECT * FROM exchange_banners WHERE id = $1`, [id]);
     if (!prev) return res.status(404).json({ error: "not_found" });
     const nextImage =
       req.body?.image_url == null ? String(prev.image_url || "") : parseExchangeBannerImageSource(req.body.image_url);
@@ -441,26 +421,26 @@ app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
     const nextSort =
       rawSort == null ? prev.sort_order : Number.isFinite(Number.parseInt(String(rawSort), 10)) ? Number.parseInt(String(rawSort), 10) : prev.sort_order;
     const nextActive = req.body?.is_active == null ? prev.is_active : req.body.is_active ? 1 : 0;
-    db.prepare(
+    await dbRun(
       `UPDATE exchange_banners
-       SET title = ?, image_url = ?, link_url = ?, page_scope = ?, placement = ?, daily_user_cap = ?, start_at = ?, end_at = ?, sort_order = ?, is_active = ?
-       WHERE id = ?`
-    ).run(nextTitle, nextImage, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id);
-    const row = db
-      .prepare(
-        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+       SET title = $1, image_url = $2, link_url = $3, page_scope = $4, placement = $5, daily_user_cap = $6, start_at = $7, end_at = $8, sort_order = $9, is_active = $10
+       WHERE id = $11`,
+      [nextTitle, nextImage, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id]
+    );
+    const row = await dbGet(
+      `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                 COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
-         FROM exchange_banners WHERE id = ?`
-      )
-      .get(id);
+         FROM exchange_banners WHERE id = $1`,
+      [id]
+    );
     res.json(row);
   } catch (e) {
     console.error("admin exchange-banners patch", e);
     res.status(500).json({ error: "update_failed", hint: String(e.message || e) });
   }
-});
+}));
 
-app.post("/api/admin/exchange-banners/reorder", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/exchange-banners/reorder", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     if (!items.length) return res.status(400).json({ error: "missing_items" });
@@ -476,35 +456,33 @@ app.post("/api/admin/exchange-banners/reorder", requireSuperAdmin, (req, res) =>
       cleaned.push({ id, sort_order });
     }
     if (!cleaned.length) return res.status(400).json({ error: "bad_items" });
-    const tx = db.transaction((list) => {
-      const upd = db.prepare(`UPDATE exchange_banners SET sort_order = ? WHERE id = ?`);
-      for (const r of list) upd.run(r.sort_order, r.id);
+    await dbTransaction(async (client) => {
+      for (const r of cleaned) {
+        await client.query(`UPDATE exchange_banners SET sort_order = $1 WHERE id = $2`, [r.sort_order, r.id]);
+      }
     });
-    tx(cleaned);
-    const rows = db
-      .prepare(
-        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+    const rows = await dbAll(
+      `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                 COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
          FROM exchange_banners
          ORDER BY sort_order ASC, id DESC`
-      )
-      .all();
+    );
     res.json({ ok: true, items: rows });
   } catch (e) {
     console.error("admin exchange-banners reorder", e);
     res.status(500).json({ error: "reorder_failed", hint: String(e.message || e) });
   }
-});
+}));
 
-app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
+app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const id = Number.parseInt(String(req.params.id || "0"), 10);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ error: "bad_id" });
     }
-    const row = db.prepare(`SELECT id, image_url FROM exchange_banners WHERE id = ?`).get(id);
+    const row = await dbGet(`SELECT id, image_url FROM exchange_banners WHERE id = $1`, [id]);
     if (!row) return res.status(404).json({ error: "not_found" });
-    db.prepare(`DELETE FROM exchange_banners WHERE id = ?`).run(id);
+    await dbRun(`DELETE FROM exchange_banners WHERE id = $1`, [id]);
     const rel = String(row.image_url || "");
     if (rel.startsWith("/uploads/exchange-banners/")) {
       const abs = path.join(uploadsDir, rel.replace(/^\/uploads\//, ""));
@@ -524,7 +502,7 @@ app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, (req, res) => {
     console.error("admin exchange-banners delete", e);
     res.status(500).json({ error: "delete_failed", hint: String(e.message || e) });
   }
-});
+}));
 
 function adminBusinessMatchesSearchTokens(row, tokens) {
   if (!tokens.length) return true;
@@ -555,7 +533,7 @@ const ADMIN_BUSINESSES_PAGE_SIZE_MAX = 500;
 const ADMIN_BULK_DELETE_MAX = 500;
 
 /** جستجوی Ajax برای پنل سوپرادمین — همهٔ آگهی‌ها با فیلتر اختیاری + صفحه‌بندی */
-app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
+app.get("/api/admin/businesses-search", requireSuperAdmin, asyncHandler(async (req, res) => {
   const raw = String(req.query.q || "").trim();
   let page = parseInt(String(req.query.page || "1"), 10);
   if (!Number.isFinite(page) || page < 1) page = 1;
@@ -563,11 +541,9 @@ app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
   if (!Number.isFinite(limit) || limit < 1) limit = ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT;
   limit = Math.min(ADMIN_BUSINESSES_PAGE_SIZE_MAX, limit);
 
-  const all = db
-    .prepare(
-      `SELECT * FROM businesses ORDER BY CASE WHEN listing_approval = 'pending' THEN 0 ELSE 1 END, name_fa`
-    )
-    .all();
+  const all = await dbAll(
+    `SELECT * FROM businesses ORDER BY CASE WHEN listing_approval = 'pending' THEN 0 ELSE 1 END, name_fa`
+  );
   const tokens = raw ? raw.toLowerCase().split(/\s+/).filter(Boolean) : [];
   const filtered = tokens.length ? all.filter((row) => adminBusinessMatchesSearchTokens(row, tokens)) : all;
   const total = filtered.length;
@@ -576,10 +552,10 @@ app.get("/api/admin/businesses-search", requireSuperAdmin, (req, res) => {
   const offset = (page - 1) * limit;
   const items = filtered.slice(offset, offset + limit);
   res.json({ items, total, page, pageSize: limit, totalPages });
-});
+}));
 
 /** حذف دسته‌ای آگهی — فقط سوپرادمین؛ حداکثر ADMIN_BULK_DELETE_MAX نامک */
-app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const raw = req.body?.slugs;
     if (!Array.isArray(raw)) {
@@ -600,7 +576,7 @@ app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, (req, res) => {
     const failed = [];
     for (const slug of slugs) {
       try {
-        const r = cascadeDeleteBusinessBySlug(slug);
+        const r = await cascadeDeleteBusinessBySlug(slug);
         if (r.deleted) deleted.push(slug);
         else if (r.reason === "not_found") not_found.push(slug);
         else failed.push({ slug, error: r.reason || "unknown" });
@@ -621,12 +597,12 @@ app.post("/api/admin/businesses/bulk-delete", requireSuperAdmin, (req, res) => {
     console.error("bulk-delete", e);
     res.status(500).json({ error: "bulk_delete_failed", hint: String(e.message || e) });
   }
-});
+}));
 
 /** پیش‌نمایش آگهی‌های با نام تکراری (پس از یکسان‌سازی فاصله و حروف لاتین) */
-app.get("/api/admin/businesses/duplicate-names", requireSuperAdmin, (_req, res) => {
+app.get("/api/admin/businesses/duplicate-names", requireSuperAdmin, asyncHandler(async (_req, res) => {
   try {
-    const { groups, total_remove } = analyzeDuplicateNames();
+    const { groups, total_remove } = await analyzeDuplicateNames();
     res.json({
       ok: true,
       groups: groups.map((g) => ({
@@ -641,19 +617,19 @@ app.get("/api/admin/businesses/duplicate-names", requireSuperAdmin, (_req, res) 
     console.error("duplicate-names", e);
     res.status(500).json({ error: "duplicate_names_failed", hint: String(e.message || e) });
   }
-});
+}));
 
 /**
  * حذف آگهی‌های تکراری با همان نام؛ نسخه با id کم‌تر (قدیمی‌تر) نگه داشته می‌شود.
  * وابستگی‌ها با cascadeDeleteBusinessBySlug پاک می‌شوند.
  */
-app.post("/api/admin/businesses/dedupe-by-name", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/businesses/dedupe-by-name", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const maxRemovals = Math.min(
       50000,
       Math.max(1, Number(req.body?.max_removals) || 5000)
     );
-    const result = executeDedupeByName({ maxRemovals });
+    const result = await executeDedupeByName({ maxRemovals });
     if (result.error === "too_many") {
       return res.status(400).json({
         error: "too_many_duplicates",
@@ -679,22 +655,20 @@ app.post("/api/admin/businesses/dedupe-by-name", requireSuperAdmin, (req, res) =
     console.error("dedupe-by-name", e);
     res.status(500).json({ error: "dedupe_failed", hint: String(e.message || e) });
   }
-});
+}));
 
-app.get("/api/categories", (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, name, sort_order, is_active
+app.get("/api/categories", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, name, sort_order, is_active
        FROM business_categories
        WHERE is_active = 1
        ORDER BY sort_order ASC, name ASC`
-    )
-    .all();
+  );
   res.json(rows);
-});
+}));
 
-app.get("/api/businesses/:slug", (req, res) => {
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(req.params.slug);
+app.get("/api/businesses/:slug", asyncHandler(async (req, res) => {
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [req.params.slug]);
   if (!row) return res.status(404).json({ error: "not_found", slug: req.params.slug });
   const auth = parseAuthHeader(req);
   const publiclyVisible = isBusinessVisibleToPublic(row);
@@ -711,17 +685,17 @@ app.get("/api/businesses/:slug", (req, res) => {
         Number(row.exchange_manager_id) === Number(auth.sub));
     if (!canSee) return res.status(404).json({ error: "not_found", slug: req.params.slug });
   }
-  const twilioOn = isTwilioModuleEnabled();
+  const twilioOn = await isTwilioModuleEnabled();
   res.json({ ...row, twilio_module_enabled: twilioOn });
-});
+}));
 
 app.get("/api/business-report-reasons", (_req, res) => {
   res.json({ reasons: BUSINESS_REPORT_REASONS });
 });
 
-app.post("/api/businesses/:slug/report", (req, res) => {
+app.post("/api/businesses/:slug/report", asyncHandler(async (req, res) => {
   const business_slug = String(req.params.slug || "").trim();
-  const biz = db.prepare(`SELECT slug, listing_approval, status FROM businesses WHERE slug = ?`).get(business_slug);
+  const biz = await dbGet(`SELECT slug, listing_approval, status FROM businesses WHERE slug = $1`, [business_slug]);
   if (!biz) return res.status(404).json({ error: "not_found" });
   if (!isBusinessVisibleToPublic(biz)) return res.status(404).json({ error: "not_found" });
   const b = req.body && typeof req.body === "object" ? req.body : {};
@@ -736,14 +710,13 @@ app.post("/api/businesses/:slug/report", (req, res) => {
     return res.status(400).json({ error: "invalid_email", hint: "ایمیل نامعتبر است" });
   }
   if (!reporter_email) reporter_email = null;
-  const info = db
-    .prepare(
-      `INSERT INTO business_reports (business_slug, reason_key, details, reporter_email) VALUES (?, ?, ?, ?)`
-    )
-    .run(business_slug, reason_key, details || null, reporter_email);
-  const row = db.prepare(`SELECT * FROM business_reports WHERE id = ?`).get(info.lastInsertRowid);
+  const info = await dbRun(
+    `INSERT INTO business_reports (business_slug, reason_key, details, reporter_email) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [business_slug, reason_key, details || null, reporter_email]
+  );
+  const row = await dbGet(`SELECT * FROM business_reports WHERE id = $1`, [info.rows[0].id]);
   res.status(201).json(row);
-});
+}));
 
 const DEFAULT_JSON_HOURS = "[]";
 const DEFAULT_JSON_GALLERY = JSON.stringify(["", "", "", ""]);
@@ -759,8 +732,8 @@ const DEFAULT_BIOLINK_JSON = JSON.stringify({
   socialLinks: [],
 });
 
-app.post("/api/businesses", async (req, res) => {
-  ensureRestaurantSafraDemo();
+app.post("/api/businesses", asyncHandler(async (req, res) => {
+  await ensureRestaurantSafraDemo();
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const slug = String(b.slug || "")
     .trim()
@@ -770,7 +743,7 @@ app.post("/api/businesses", async (req, res) => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     return res.status(400).json({ error: "invalid_slug", hint: "فقط حروف انگلیسی، اعداد و خط تیره" });
   }
-  if (db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(slug)) {
+  if (await dbGet(`SELECT 1 FROM businesses WHERE slug = $1`, [slug])) {
     return res.status(409).json({ error: "slug_taken" });
   }
   let hours_json = typeof b.hours_json === "string" ? b.hours_json : DEFAULT_JSON_HOURS;
@@ -848,46 +821,47 @@ app.post("/api/businesses", async (req, res) => {
     });
   }
 
-  db.prepare(
+  await dbRun(
     `INSERT INTO businesses (
       slug, name_fa, description, category, phone, address, google_review_url, claimed, package,
       subtitle, hours_json, promo_title, promo_description, cover_image_url, gallery_json,
       listing_title, city, price_range, rating, cta, status, manager_id, biolink_json, listing_approval,
       listing_terms_accepted_at, listing_terms_version, listing_contact_email
     ) VALUES (
-      @slug, @name_fa, @description, @category, @phone, @address, @google_review_url, 0, 'basic',
-      @subtitle, @hours_json, @promo_title, @promo_description, @cover_image_url, @gallery_json,
-      @listing_title, @city, @price_range, @rating, @cta, @status, NULL, @biolink_json, @listing_approval,
-      @listing_terms_accepted_at, @listing_terms_version, @listing_contact_email
-    )`
-  ).run({
-    slug,
-    name_fa,
-    description,
-    category,
-    phone,
-    address,
-    google_review_url,
-    subtitle: String(b.subtitle ?? ""),
-    hours_json,
-    promo_title: String(b.promo_title ?? ""),
-    promo_description: String(b.promo_description ?? ""),
-    cover_image_url: String(b.cover_image_url ?? ""),
-    gallery_json,
-    listing_title,
-    city,
-    price_range,
-    rating,
-    cta,
-    status: String(b.status || "active") || "active",
-    biolink_json,
-    listing_approval,
-    listing_terms_accepted_at,
-    listing_terms_version,
-    listing_contact_email,
-  });
+      $1, $2, $3, $4, $5, $6, $7, 0, 'basic',
+      $8, $9, $10, $11, $12, $13,
+      $14, $15, $16, $17, $18, $19, NULL, $20, $21,
+      $22, $23, $24
+    )`,
+    [
+      slug,
+      name_fa,
+      description,
+      category,
+      phone,
+      address,
+      google_review_url,
+      String(b.subtitle ?? ""),
+      hours_json,
+      String(b.promo_title ?? ""),
+      String(b.promo_description ?? ""),
+      String(b.cover_image_url ?? ""),
+      gallery_json,
+      listing_title,
+      city,
+      price_range,
+      rating,
+      cta,
+      String(b.status || "active") || "active",
+      biolink_json,
+      listing_approval,
+      listing_terms_accepted_at,
+      listing_terms_version,
+      listing_contact_email,
+    ]
+  );
 
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   if (listing_approval === "pending") {
     try {
       await notifyAdminsNewPendingListing(row);
@@ -896,9 +870,9 @@ app.post("/api/businesses", async (req, res) => {
     }
   }
   res.status(201).json(row);
-});
+}));
 
-app.post("/api/claim-requests", (req, res) => {
+app.post("/api/claim-requests", asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const business_slug = String(b.business_slug || "").trim();
   const applicant_name = String(b.applicant_name || "").trim();
@@ -908,7 +882,7 @@ app.post("/api/claim-requests", (req, res) => {
   if (!business_slug || !applicant_name || !email || !phone || !message) {
     return res.status(400).json({ error: "missing_fields" });
   }
-  const biz = db.prepare(`SELECT slug, claimed, listing_approval, status FROM businesses WHERE slug = ?`).get(business_slug);
+  const biz = await dbGet(`SELECT slug, claimed, listing_approval, status FROM businesses WHERE slug = $1`, [business_slug]);
   if (!biz) return res.status(404).json({ error: "business_not_found" });
   if (!isBusinessVisibleToPublic(biz)) {
     return res.status(400).json({
@@ -917,48 +891,42 @@ app.post("/api/claim-requests", (req, res) => {
     });
   }
   if (biz.claimed) return res.status(400).json({ error: "already_claimed" });
-  const dup = db
-    .prepare(
-      `SELECT id FROM claim_requests WHERE business_slug = ? AND email = ? AND status = 'pending'`
-    )
-    .get(business_slug, email);
+  const dup = await dbGet(
+    `SELECT id FROM claim_requests WHERE business_slug = $1 AND email = $2 AND status = 'pending'`,
+    [business_slug, email]
+  );
   if (dup) return res.status(409).json({ error: "duplicate_pending" });
-  const info = db
-    .prepare(
-      `INSERT INTO claim_requests (business_slug, applicant_name, email, phone, message, status)
-       VALUES (?, ?, ?, ?, ?, 'pending')`
-    )
-    .run(business_slug, applicant_name, email, phone || null, message || null);
-  const row = db.prepare(`SELECT * FROM claim_requests WHERE id = ?`).get(info.lastInsertRowid);
+  const info = await dbRun(
+    `INSERT INTO claim_requests (business_slug, applicant_name, email, phone, message, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`,
+    [business_slug, applicant_name, email, phone || null, message || null]
+  );
+  const row = await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [info.rows[0].id]);
   res.status(201).json(row);
-});
+}));
 
-app.get("/api/admin/claim-requests", requireSuperAdmin, (req, res) => {
+app.get("/api/admin/claim-requests", requireSuperAdmin, asyncHandler(async (req, res) => {
   const status = req.query.status ? String(req.query.status) : null;
   let rows;
   if (status && ["pending", "approved", "rejected"].includes(status)) {
-    rows = db
-      .prepare(`SELECT * FROM claim_requests WHERE status = ? ORDER BY created_at DESC`)
-      .all(status);
+    rows = await dbAll(`SELECT * FROM claim_requests WHERE status = $1 ORDER BY created_at DESC`, [status]);
   } else {
-    rows = db.prepare(`SELECT * FROM claim_requests ORDER BY created_at DESC`).all();
+    rows = await dbAll(`SELECT * FROM claim_requests ORDER BY created_at DESC`);
   }
   res.json(rows);
-});
+}));
 
-app.get("/api/admin/business-reports", requireSuperAdmin, (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT r.id, r.business_slug, r.reason_key, r.details, r.reporter_email, r.created_at,
+app.get("/api/admin/business-reports", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT r.id, r.business_slug, r.reason_key, r.details, r.reporter_email, r.created_at,
               b.name_fa AS business_name_fa, b.id AS business_id
        FROM business_reports r
        LEFT JOIN businesses b ON b.slug = r.business_slug
        ORDER BY r.created_at DESC`
-    )
-    .all();
+  );
   const labelByKey = Object.fromEntries(BUSINESS_REPORT_REASONS.map((x) => [x.key, x.label]));
   res.json(rows.map((r) => ({ ...r, reason_label: labelByKey[r.reason_key] || r.reason_key })));
-});
+}));
 
 /** الگوی CSV — یک خط هدر؛ preset=london مطابق London_Bussines_List، preset=iraniu مطابق جدول businesses */
 app.get("/api/admin/businesses/csv-template", requireSuperAdmin, (req, res) => {
@@ -1026,7 +994,7 @@ app.get("/api/admin/businesses/csv-template", requireSuperAdmin, (req, res) => {
 });
 
 /** خروجی CSV همهٔ آگهی‌ها — همان فرمت iraniu برای ورود مجدد / بک‌آپ */
-app.get("/api/admin/businesses/export-csv", requireSuperAdmin, (req, res) => {
+app.get("/api/admin/businesses/export-csv", requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
     const preset = String(req.query.preset || "iraniu").toLowerCase();
     if (preset !== "iraniu") {
@@ -1035,7 +1003,7 @@ app.get("/api/admin/businesses/export-csv", requireSuperAdmin, (req, res) => {
         hint: "فعلاً فقط preset=iraniu پشتیبانی می‌شود (خروجی مطابق جدول businesses)",
       });
     }
-    const { csvText, rowCount } = exportIraniuBusinessesCsv();
+    const { csvText, rowCount } = await exportIraniuBusinessesCsv();
     const date = new Date().toISOString().slice(0, 10);
     const filename = `businesses-export-iraniu-${date}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -1053,83 +1021,21 @@ app.get("/api/admin/businesses/export-csv", requireSuperAdmin, (req, res) => {
     console.error("export-csv", e);
     return res.status(500).json({ error: "export_failed", hint: String(e.message || e) });
   }
+}));
+
+/**
+ * Legacy SQLite database export/import endpoints removed in the PostgreSQL migration.
+ * Use CSV export/import (`/api/admin/businesses/export-csv` and `import-csv`) or
+ * `pg_dump`/`pg_restore` on the Postgres database instead.
+ */
+app.all("/api/admin/database/sqlite", requireSuperAdmin, (_req, res) => {
+  res.status(410).json({
+    error: "sqlite_disabled",
+    hint: "این سرویس به PostgreSQL مهاجرت کرده است. از خروجی/ورودی CSV یا pg_dump استفاده کنید.",
+  });
 });
 
-/** دانلود فایل کامل SQLite (iraniu.db) — پس از checkpoint وال */
-app.get("/api/admin/database/sqlite", requireSuperAdmin, (req, res) => {
-  try {
-    db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
-    const buf = fs.readFileSync(dbPath);
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader("Content-Disposition", 'attachment; filename="iraniu.db"');
-    writeSystemLog({
-      ...actorFromAuth(req.auth),
-      action: "sqlite_db_export",
-      targetType: "business",
-      targetId: null,
-      message: "SQLite iraniu.db export",
-      meta: { bytes: buf.length },
-    });
-    return res.send(buf);
-  } catch (e) {
-    console.error("sqlite-db-export", e);
-    return res.status(500).json({ error: "export_failed", hint: String(e.message || e) });
-  }
-});
-
-/** آپلود فایل SQLite — در کنار دیتابیس ذخیره می‌شود و با ری‌استارت بعدی اعمال می‌شود */
-app.post(
-  "/api/admin/database/sqlite",
-  requireSuperAdmin,
-  (req, res, next) => {
-    uploadSqlite.single("db")(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({ error: "upload_error", hint: String(err.message || err) });
-      }
-      next();
-    });
-  },
-  (req, res) => {
-    try {
-      if (!req.file?.buffer?.length) {
-        return res.status(400).json({ error: "missing_file", hint: "فیلد db با فایل .db را بفرستید" });
-      }
-      const pending = path.join(path.dirname(dbPath), "iraniu.db.uploaded");
-      fs.writeFileSync(pending, req.file.buffer);
-      const v = validateIraniuSqliteFile(pending);
-      if (!v.ok) {
-        try {
-          fs.unlinkSync(pending);
-        } catch {
-          /* ignore */
-        }
-        return res.status(400).json({
-          error: "invalid_sqlite",
-          hint: v.error || "فایل باید SQLite معتبر با جدول businesses باشد",
-        });
-      }
-      writeSystemLog({
-        ...actorFromAuth(req.auth),
-        action: "sqlite_db_upload_pending",
-        targetType: "business",
-        targetId: null,
-        message: "SQLite upload pending until restart",
-        meta: { bytes: req.file.buffer.length },
-      });
-      return res.json({
-        ok: true,
-        restart_required: true,
-        hint:
-          "فایل ذخیره شد. یک بار سرویس را ری‌استارت کنید تا جایگزین شود. نسخهٔ قبلی به iraniu.db.bak.<زمان> تغییر نام می‌یابد.",
-      });
-    } catch (e) {
-      console.error("sqlite-db-upload", e);
-      return res.status(500).json({ error: "upload_failed", hint: String(e.message || e) });
-    }
-  }
-);
-
-app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single("csv"), (req, res) => {
+app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single("csv"), asyncHandler(async (req, res) => {
   try {
     const preset = String(req.body?.preset || "london").toLowerCase();
     if (preset !== "iraniu" && preset !== "london") {
@@ -1182,7 +1088,7 @@ app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single
       });
     }
 
-    const { inserted, skipped, failed } = runBulkInsert(rows, { onDuplicate: "skip" });
+    const { inserted, skipped, failed } = await runBulkInsert(rows, { onDuplicate: "skip" });
 
     writeSystemLog({
       ...actorFromAuth(req.auth),
@@ -1206,15 +1112,15 @@ app.post("/api/admin/businesses/import-csv", requireSuperAdmin, uploadCsv.single
     console.error("import-csv", e);
     res.status(500).json({ error: "import_failed", hint: String(e.message || e) });
   }
-});
+}));
 
-app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, async (req, res) => {
+app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
   if (!slug) return res.status(400).json({ error: "missing_slug" });
-  const rowBefore = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const rowBefore = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   if (!rowBefore) return res.status(404).json({ error: "not_found" });
-  const info = db.prepare(`UPDATE businesses SET listing_approval = 'approved', listing_rejection_reason = NULL WHERE slug = ?`).run(slug);
-  if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+  const info = await dbRun(`UPDATE businesses SET listing_approval = 'approved', listing_rejection_reason = NULL WHERE slug = $1`, [slug]);
+  if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "listing_approved",
@@ -1222,7 +1128,7 @@ app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, async (req, r
     targetId: slug,
     message: `Listing approved: ${slug}`,
   });
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   try {
     await sendListingApprovedEmail({
       to: row.listing_contact_email,
@@ -1233,19 +1139,20 @@ app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, async (req, r
     console.error("listing approve email", e);
   }
   res.json(row);
-});
+}));
 
-app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, async (req, res) => {
+app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
   if (!slug) return res.status(400).json({ error: "missing_slug" });
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const reason = String(body.reason ?? "").trim();
-  const rowBefore = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const rowBefore = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   if (!rowBefore) return res.status(404).json({ error: "not_found" });
-  const info = db
-    .prepare(`UPDATE businesses SET listing_approval = 'rejected', listing_rejection_reason = ? WHERE slug = ?`)
-    .run(reason || null, slug);
-  if (info.changes === 0) return res.status(404).json({ error: "not_found" });
+  const info = await dbRun(
+    `UPDATE businesses SET listing_approval = 'rejected', listing_rejection_reason = $1 WHERE slug = $2`,
+    [reason || null, slug]
+  );
+  if (info.rowCount === 0) return res.status(404).json({ error: "not_found" });
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "listing_rejected",
@@ -1253,7 +1160,7 @@ app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, async (req, re
     targetId: slug,
     message: `Listing rejected: ${slug}`,
   });
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   try {
     await sendListingRejectedEmail({
       to: row.listing_contact_email,
@@ -1265,49 +1172,48 @@ app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, async (req, re
     console.error("listing reject email", e);
   }
   res.json(row);
-});
+}));
 
-app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
   const action = String((req.body && req.body.action) || "").toLowerCase();
   if (action !== "approve" && action !== "reject") {
     return res.status(400).json({ error: "bad_action" });
   }
-  const row = db.prepare(`SELECT * FROM claim_requests WHERE id = ?`).get(id);
+  const row = await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [id]);
   if (!row) return res.status(404).json({ error: "not_found" });
   if (row.status !== "pending") return res.status(400).json({ error: "already_decided" });
   const now = new Date().toISOString();
   if (action === "reject") {
-    db.prepare(`UPDATE claim_requests SET status = 'rejected', decided_at = ? WHERE id = ?`).run(now, id);
-    return res.json(db.prepare(`SELECT * FROM claim_requests WHERE id = ?`).get(id));
+    await dbRun(`UPDATE claim_requests SET status = 'rejected', decided_at = $1 WHERE id = $2`, [now, id]);
+    return res.json(await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [id]));
   }
-  const biz = db.prepare(`SELECT claimed FROM businesses WHERE slug = ?`).get(row.business_slug);
+  const biz = await dbGet(`SELECT claimed FROM businesses WHERE slug = $1`, [row.business_slug]);
   if (!biz) return res.status(404).json({ error: "business_missing" });
   if (biz.claimed) {
-    db.prepare(`UPDATE claim_requests SET status = 'rejected', decided_at = ? WHERE id = ?`).run(now, id);
+    await dbRun(`UPDATE claim_requests SET status = 'rejected', decided_at = $1 WHERE id = $2`, [now, id]);
     return res.status(409).json({ error: "business_already_claimed" });
   }
-  db.prepare(`UPDATE claim_requests SET status = 'approved', decided_at = ? WHERE id = ?`).run(now, id);
-  db.prepare(`UPDATE businesses SET claimed = 1 WHERE slug = ?`).run(row.business_slug);
-  res.json(db.prepare(`SELECT * FROM claim_requests WHERE id = ?`).get(id));
-});
+  await dbRun(`UPDATE claim_requests SET status = 'approved', decided_at = $1 WHERE id = $2`, [now, id]);
+  await dbRun(`UPDATE businesses SET claimed = 1 WHERE slug = $1`, [row.business_slug]);
+  res.json(await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [id]));
+}));
 
-function attachLinkedBusinesses(managerRow, kind = "directory") {
+async function attachLinkedBusinesses(managerRow, kind = "directory") {
   const managerColumn = kind === "exchange" ? "exchange_manager_id" : "manager_id";
   const categoryWhere =
     kind === "exchange"
-      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
-      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
-  const linked_businesses = db
-    .prepare(
-      `SELECT id, slug, name_fa, category, status, claimed, package, city
+      ? `AND COALESCE(TRIM(category), '') = 'صرافی'`
+      : `AND COALESCE(TRIM(category), '') <> 'صرافی'`;
+  const linked_businesses = await dbAll(
+    `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE ${managerColumn} = ?
+       WHERE ${managerColumn} = $1
        ${categoryWhere}
-       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
-    )
-    .all(managerRow.id);
+       ORDER BY CASE WHEN COALESCE(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`,
+    [managerRow.id]
+  );
   return {
     ...stripManagerRow(managerRow),
     linked_businesses,
@@ -1317,42 +1223,41 @@ function attachLinkedBusinesses(managerRow, kind = "directory") {
   };
 }
 
-app.get("/api/managers", requireSuperAdmin, (_req, res) => {
-  const rows = db.prepare(`SELECT * FROM identity.managers ORDER BY created_at DESC`).all();
-  res.json(rows.map((m) => attachLinkedBusinesses(m)));
-});
+app.get("/api/managers", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT * FROM identity.managers ORDER BY created_at DESC`);
+  res.json(await Promise.all(rows.map((m) => attachLinkedBusinesses(m))));
+}));
 
-app.get("/api/managers/:id", requireSuperAdmin, (req, res) => {
+app.get("/api/managers/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const m = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(id);
+  const m = await dbGet(`SELECT * FROM identity.managers WHERE id = $1`, [id]);
   if (!m) return res.status(404).json({ error: "not_found" });
-  res.json(attachLinkedBusinesses(m));
-});
+  res.json(await attachLinkedBusinesses(m));
+}));
 
-app.get("/api/exchange-managers", requireSuperAdmin, (_req, res) => {
-  const rows = db.prepare(`SELECT * FROM identity.exchange_managers ORDER BY created_at DESC`).all();
-  res.json(rows.map((m) => attachLinkedBusinesses(m, "exchange")));
-});
+app.get("/api/exchange-managers", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT * FROM identity.exchange_managers ORDER BY created_at DESC`);
+  res.json(await Promise.all(rows.map((m) => attachLinkedBusinesses(m, "exchange"))));
+}));
 
-app.get("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
+app.get("/api/exchange-managers/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const m = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(id);
+  const m = await dbGet(`SELECT * FROM identity.exchange_managers WHERE id = $1`, [id]);
   if (!m) return res.status(404).json({ error: "not_found" });
-  res.json(attachLinkedBusinesses(m, "exchange"));
-});
+  res.json(await attachLinkedBusinesses(m, "exchange"));
+}));
 
-app.delete("/api/managers/:id", requireSuperAdmin, (req, res) => {
+app.delete("/api/managers/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
-  const existing = db.prepare(`SELECT id, email FROM identity.managers WHERE id = ?`).get(id);
+  const existing = await dbGet(`SELECT id, email FROM identity.managers WHERE id = $1`, [id]);
   if (!existing) return res.status(404).json({ error: "not_found" });
-  const tx = db.transaction(() => {
-    db.prepare(`UPDATE businesses SET manager_id = NULL WHERE manager_id = ?`).run(id);
-    db.prepare(`DELETE FROM identity.managers WHERE id = ?`).run(id);
+  await dbTransaction(async (client) => {
+    await client.query(`UPDATE businesses SET manager_id = NULL WHERE manager_id = $1`, [id]);
+    await client.query(`DELETE FROM identity.managers WHERE id = $1`, [id]);
   });
-  tx();
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "manager_deleted",
@@ -1361,18 +1266,17 @@ app.delete("/api/managers/:id", requireSuperAdmin, (req, res) => {
     message: `Manager deleted: #${id} (${existing.email})`,
   });
   res.json({ ok: true, id });
-});
+}));
 
-app.delete("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
+app.delete("/api/exchange-managers/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "bad_id" });
-  const existing = db.prepare(`SELECT id, email FROM identity.exchange_managers WHERE id = ?`).get(id);
+  const existing = await dbGet(`SELECT id, email FROM identity.exchange_managers WHERE id = $1`, [id]);
   if (!existing) return res.status(404).json({ error: "not_found" });
-  const tx = db.transaction(() => {
-    db.prepare(`UPDATE businesses SET exchange_manager_id = NULL WHERE exchange_manager_id = ?`).run(id);
-    db.prepare(`DELETE FROM identity.exchange_managers WHERE id = ?`).run(id);
+  await dbTransaction(async (client) => {
+    await client.query(`UPDATE businesses SET exchange_manager_id = NULL WHERE exchange_manager_id = $1`, [id]);
+    await client.query(`DELETE FROM identity.exchange_managers WHERE id = $1`, [id]);
   });
-  tx();
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "exchange_manager_deleted",
@@ -1381,11 +1285,11 @@ app.delete("/api/exchange-managers/:id", requireSuperAdmin, (req, res) => {
     message: `Exchange manager deleted: #${id} (${existing.email})`,
   });
   res.json({ ok: true, id });
-});
+}));
 
 const MANAGER_LOGIN_USERNAME_RE = /^[a-z0-9_]{3,32}$/;
 
-app.post("/api/managers", requireSuperAdmin, (req, res) => {
+app.post("/api/managers", requireSuperAdmin, asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const email = String(b.email || "").trim().toLowerCase();
   const name = String(b.name || "").trim();
@@ -1408,20 +1312,19 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
       hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
     });
   }
-  if (db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)) {
+  if (await dbGet(`SELECT id FROM identity.managers WHERE email = $1`, [email])) {
     return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً برای یک مدیر ثبت شده" });
   }
-  if (db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)) {
+  if (await dbGet(`SELECT id FROM identity.managers WHERE login_username = $1`, [login_username])) {
     return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
   }
   try {
     const ph = hashPassword(password);
-    const info = db
-      .prepare(
-        `INSERT INTO identity.managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
-      )
-      .run(email, name, phone, ph, login_username);
-    const row = db.prepare(`SELECT * FROM identity.managers WHERE id = ?`).get(info.lastInsertRowid);
+    const info = await dbRun(
+      `INSERT INTO identity.managers (email, name, phone, password_hash, login_username) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [email, name, phone, ph, login_username]
+    );
+    const row = await dbGet(`SELECT * FROM identity.managers WHERE id = $1`, [info.rows[0].id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "manager_created",
@@ -1429,9 +1332,9 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
       targetId: row.id,
       message: `Manager created: ${row.email}`,
     });
-    res.status(201).json(attachLinkedBusinesses(row));
+    res.status(201).json(await attachLinkedBusinesses(row));
   } catch (e) {
-    if (String(e.message || "").includes("UNIQUE")) {
+    if (e && (e.code === "23505" || String(e.message || "").includes("UNIQUE"))) {
       return res.status(409).json({
         error: "email_or_username_taken",
         hint: "ایمیل یا نام کاربری تکراری است",
@@ -1439,9 +1342,9 @@ app.post("/api/managers", requireSuperAdmin, (req, res) => {
     }
     throw e;
   }
-});
+}));
 
-app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
+app.post("/api/exchange-managers", requireSuperAdmin, asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const email = String(b.email || "").trim().toLowerCase();
   let name = String(b.name || "").trim();
@@ -1480,25 +1383,24 @@ app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
     });
   }
   if (
-    db.prepare(`SELECT id FROM identity.exchange_managers WHERE email = ?`).get(email) ||
-    db.prepare(`SELECT id FROM identity.managers WHERE email = ?`).get(email)
+    (await dbGet(`SELECT id FROM identity.exchange_managers WHERE email = $1`, [email])) ||
+    (await dbGet(`SELECT id FROM identity.managers WHERE email = $1`, [email]))
   ) {
     return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً برای یک مدیر ثبت شده" });
   }
   if (
-    db.prepare(`SELECT id FROM identity.exchange_managers WHERE login_username = ?`).get(login_username) ||
-    db.prepare(`SELECT id FROM identity.managers WHERE login_username = ?`).get(login_username)
+    (await dbGet(`SELECT id FROM identity.exchange_managers WHERE login_username = $1`, [login_username])) ||
+    (await dbGet(`SELECT id FROM identity.managers WHERE login_username = $1`, [login_username]))
   ) {
     return res.status(409).json({ error: "username_taken", hint: "این نام کاربری گرفته شده" });
   }
   try {
     const ph = hashPassword(password);
-    const info = db
-      .prepare(
-        `INSERT INTO identity.exchange_managers (email, name, phone, password_hash, login_username) VALUES (?, ?, ?, ?, ?)`
-      )
-      .run(email, name, phone || null, ph, login_username);
-    const row = db.prepare(`SELECT * FROM identity.exchange_managers WHERE id = ?`).get(info.lastInsertRowid);
+    const info = await dbRun(
+      `INSERT INTO identity.exchange_managers (email, name, phone, password_hash, login_username) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [email, name, phone || null, ph, login_username]
+    );
+    const row = await dbGet(`SELECT * FROM identity.exchange_managers WHERE id = $1`, [info.rows[0].id]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "exchange_manager_created",
@@ -1506,9 +1408,9 @@ app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
       targetId: row.id,
       message: `Exchange manager created: ${row.email}`,
     });
-    res.status(201).json(attachLinkedBusinesses(row, "exchange"));
+    res.status(201).json(await attachLinkedBusinesses(row, "exchange"));
   } catch (e) {
-    if (String(e.message || "").includes("UNIQUE")) {
+    if (e && (e.code === "23505" || String(e.message || "").includes("UNIQUE"))) {
       return res.status(409).json({
         error: "email_or_username_taken",
         hint: "ایمیل یا نام کاربری تکراری است",
@@ -1516,11 +1418,11 @@ app.post("/api/exchange-managers", requireSuperAdmin, (req, res) => {
     }
     throw e;
   }
-});
+}));
 
-app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) => {
+app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
-  const exists = db.prepare(`SELECT slug, category FROM businesses WHERE slug = ?`).get(slug);
+  const exists = await dbGet(`SELECT slug, category FROM businesses WHERE slug = $1`, [slug]);
   if (!exists) return res.status(404).json({ error: "not_found" });
   const cat = String(exists.category || "").trim();
   if (cat.includes("صراف") || cat.toLowerCase().includes("exchange")) {
@@ -1540,7 +1442,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
     .toLowerCase();
 
   if (midLooksEmpty && !managerIdentifier) {
-    db.prepare(`UPDATE businesses SET manager_id = NULL WHERE slug = ?`).run(slug);
+    await dbRun(`UPDATE businesses SET manager_id = NULL WHERE slug = $1`, [slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "business_manager_unlinked",
@@ -1556,7 +1458,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       const parsed = parseInt(midRaw, 10);
       if (Number.isFinite(parsed)) {
         id = parsed;
-        managerRow = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(id);
+        managerRow = await dbGet(`SELECT id FROM identity.managers WHERE id = $1`, [id]);
       } else if (!managerIdentifier) {
         return res.status(400).json({ error: "bad_manager_id" });
       } else {
@@ -1564,9 +1466,10 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       }
     } else if (managerIdentifier) {
       source = "email_or_username";
-      const mByIdent = db
-        .prepare(`SELECT id FROM identity.managers WHERE lower(email) = ? OR lower(login_username) = ?`)
-        .get(managerIdentifier, managerIdentifier);
+      const mByIdent = await dbGet(
+        `SELECT id FROM identity.managers WHERE lower(email) = $1 OR lower(login_username) = $1`,
+        [managerIdentifier]
+      );
       if (!mByIdent) {
         return res.status(400).json({ error: "invalid_manager_identifier", hint: "ایمیل یا نام‌کاربری مدیر پیدا نشد" });
       }
@@ -1576,9 +1479,10 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
     // If ID was sent but no longer valid, fallback to email/login when provided.
     if (!managerRow && managerIdentifier) {
       source = "email_or_username_fallback";
-      const mByIdent = db
-        .prepare(`SELECT id FROM identity.managers WHERE lower(email) = ? OR lower(login_username) = ?`)
-        .get(managerIdentifier, managerIdentifier);
+      const mByIdent = await dbGet(
+        `SELECT id FROM identity.managers WHERE lower(email) = $1 OR lower(login_username) = $1`,
+        [managerIdentifier]
+      );
       if (mByIdent) {
         id = Number(mByIdent.id);
         managerRow = mByIdent;
@@ -1591,7 +1495,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       }
       return res.status(400).json({ error: "invalid_manager_id" });
     }
-    db.prepare(`UPDATE businesses SET manager_id = ? WHERE slug = ?`).run(id, slug);
+    await dbRun(`UPDATE businesses SET manager_id = $1 WHERE slug = $2`, [id, slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "business_manager_linked",
@@ -1600,17 +1504,17 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, (req, res) =
       message: `Manager #${id} linked to business ${slug} (${source})`,
     });
   }
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   const manager =
     row?.manager_id != null
-      ? db.prepare(`SELECT id, name, email, login_username FROM identity.managers WHERE id = ?`).get(row.manager_id)
+      ? await dbGet(`SELECT id, name, email, login_username FROM identity.managers WHERE id = $1`, [row.manager_id])
       : null;
   res.json({ ...row, manager });
-});
+}));
 
-app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (req, res) => {
+app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
-  const exists = db.prepare(`SELECT slug, category FROM businesses WHERE slug = ?`).get(slug);
+  const exists = await dbGet(`SELECT slug, category FROM businesses WHERE slug = $1`, [slug]);
   if (!exists) return res.status(404).json({ error: "not_found" });
   // Super admin can pre-link exchange managers even before category is persisted as "exchange".
   const b = req.body && typeof req.body === "object" ? req.body : {};
@@ -1624,7 +1528,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
     .trim()
     .toLowerCase();
   if (midLooksEmpty && !managerIdentifier) {
-    db.prepare(`UPDATE businesses SET exchange_manager_id = NULL WHERE slug = ?`).run(slug);
+    await dbRun(`UPDATE businesses SET exchange_manager_id = NULL WHERE slug = $1`, [slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "exchange_business_manager_unlinked",
@@ -1640,7 +1544,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
       const parsed = parseInt(midRaw, 10);
       if (Number.isFinite(parsed)) {
         id = parsed;
-        managerRow = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(id);
+        managerRow = await dbGet(`SELECT id FROM identity.exchange_managers WHERE id = $1`, [id]);
       } else if (!managerIdentifier) {
         return res.status(400).json({ error: "bad_manager_id" });
       } else {
@@ -1648,17 +1552,19 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
       }
     } else if (managerIdentifier) {
       source = "email_or_username";
-      managerRow = db
-        .prepare(`SELECT id FROM identity.exchange_managers WHERE lower(email) = ? OR lower(login_username) = ?`)
-        .get(managerIdentifier, managerIdentifier);
+      managerRow = await dbGet(
+        `SELECT id FROM identity.exchange_managers WHERE lower(email) = $1 OR lower(login_username) = $1`,
+        [managerIdentifier]
+      );
       if (managerRow) id = Number(managerRow.id);
     }
     // If ID was sent but no longer valid, fallback to email/login when provided.
     if (!managerRow && managerIdentifier) {
       source = "email_or_username_fallback";
-      const mByIdent = db
-        .prepare(`SELECT id FROM identity.exchange_managers WHERE lower(email) = ? OR lower(login_username) = ?`)
-        .get(managerIdentifier, managerIdentifier);
+      const mByIdent = await dbGet(
+        `SELECT id FROM identity.exchange_managers WHERE lower(email) = $1 OR lower(login_username) = $1`,
+        [managerIdentifier]
+      );
       if (mByIdent) {
         id = Number(mByIdent.id);
         managerRow = mByIdent;
@@ -1671,7 +1577,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
       }
       return res.status(400).json({ error: "invalid_exchange_manager_id" });
     }
-    db.prepare(`UPDATE businesses SET exchange_manager_id = ? WHERE slug = ?`).run(id, slug);
+    await dbRun(`UPDATE businesses SET exchange_manager_id = $1 WHERE slug = $2`, [id, slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "exchange_business_manager_linked",
@@ -1680,13 +1586,13 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, (re
       message: `Exchange manager #${id} linked to business ${slug} (${source})`,
     });
   }
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   const manager =
     row?.exchange_manager_id != null
-      ? db.prepare(`SELECT id, name, email, login_username FROM identity.exchange_managers WHERE id = ?`).get(row.exchange_manager_id)
+      ? await dbGet(`SELECT id, name, email, login_username FROM identity.exchange_managers WHERE id = $1`, [row.exchange_manager_id])
       : null;
   res.json({ ...row, manager });
-});
+}));
 
 app.post("/api/admin/businesses/:slug/send-to-telegram-channel", requireSuperAdmin, async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
@@ -1735,26 +1641,28 @@ app.post("/api/admin/businesses/:slug/send-to-telegram-channel", requireSuperAdm
   }
 });
 
-app.get("/api/admin/categories", requireSuperAdmin, (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, name, sort_order, is_active, created_at
+app.get("/api/admin/categories", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, name, sort_order, is_active, created_at
        FROM business_categories
        ORDER BY sort_order ASC, name ASC`
-    )
-    .all();
+  );
   res.json(rows);
-});
+}));
 
-app.post("/api/admin/categories", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/categories", requireSuperAdmin, asyncHandler(async (req, res) => {
   const name = String((req.body && req.body.name) || "").trim();
   if (!name) return res.status(400).json({ error: "missing_name" });
-  const nextOrder = db.prepare(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM business_categories`).get().n;
+  const nextOrder = (await dbGet(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM business_categories`)).n;
   try {
-    const info = db
-      .prepare(`INSERT INTO business_categories (name, sort_order, is_active) VALUES (?, ?, 1)`)
-      .run(name, nextOrder);
-    const row = db.prepare(`SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = ?`).get(info.lastInsertRowid);
+    const info = await dbRun(
+      `INSERT INTO business_categories (name, sort_order, is_active) VALUES ($1, $2, 1) RETURNING id`,
+      [name, nextOrder]
+    );
+    const row = await dbGet(
+      `SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = $1`,
+      [info.rows[0].id]
+    );
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "category_created",
@@ -1764,15 +1672,15 @@ app.post("/api/admin/categories", requireSuperAdmin, (req, res) => {
     });
     res.status(201).json(row);
   } catch (e) {
-    if (String(e.message || "").includes("UNIQUE")) return res.status(409).json({ error: "name_taken" });
+    if (e && (e.code === "23505" || String(e.message || "").includes("UNIQUE"))) return res.status(409).json({ error: "name_taken" });
     throw e;
   }
-});
+}));
 
-app.patch("/api/admin/categories/:id", requireSuperAdmin, (req, res) => {
+app.patch("/api/admin/categories/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id || ""), 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
-  const old = db.prepare(`SELECT id FROM business_categories WHERE id = ?`).get(id);
+  const old = await dbGet(`SELECT id FROM business_categories WHERE id = $1`, [id]);
   if (!old) return res.status(404).json({ error: "not_found" });
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const updates = {};
@@ -1789,9 +1697,10 @@ app.patch("/api/admin/categories/:id", requireSuperAdmin, (req, res) => {
   if ("is_active" in b) updates.is_active = b.is_active ? 1 : 0;
   const keys = Object.keys(updates);
   if (!keys.length) return res.status(400).json({ error: "no_fields" });
-  const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-  db.prepare(`UPDATE business_categories SET ${setClause} WHERE id = @id`).run({ ...updates, id });
-  const row = db.prepare(`SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = ?`).get(id);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+  const values = keys.map((k) => updates[k]);
+  await dbRun(`UPDATE business_categories SET ${setClause} WHERE id = $${keys.length + 1}`, [...values, id]);
+  const row = await dbGet(`SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = $1`, [id]);
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "category_updated",
@@ -1801,33 +1710,32 @@ app.patch("/api/admin/categories/:id", requireSuperAdmin, (req, res) => {
     meta: { fields: keys },
   });
   res.json(row);
-});
+}));
 
-app.get("/api/admin/billing", requireSuperAdmin, (_req, res) => {
-  const rows = db.prepare(`SELECT * FROM billing_records ORDER BY created_at DESC`).all();
+app.get("/api/admin/billing", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT * FROM billing_records ORDER BY created_at DESC`);
   res.json(rows);
-});
+}));
 
-app.post("/api/admin/billing", requireSuperAdmin, (req, res) => {
+app.post("/api/admin/billing", requireSuperAdmin, asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const business_slug = String(b.business_slug || "").trim();
   const title = String(b.title || "").trim();
   if (!business_slug || !title) return res.status(400).json({ error: "missing_fields" });
-  if (!db.prepare(`SELECT 1 FROM businesses WHERE slug = ?`).get(business_slug)) {
+  if (!(await dbGet(`SELECT 1 FROM businesses WHERE slug = $1`, [business_slug]))) {
     return res.status(404).json({ error: "business_not_found" });
   }
-  const info = db
-    .prepare(
-      `INSERT INTO billing_records (business_slug, title, amount, status, note) VALUES (?, ?, ?, ?, ?)`
-    )
-    .run(
+  const info = await dbRun(
+    `INSERT INTO billing_records (business_slug, title, amount, status, note) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [
       business_slug,
       title,
       String(b.amount ?? ""),
       String(b.status || "pending") || "pending",
-      String(b.note ?? "")
-    );
-  const row = db.prepare(`SELECT * FROM billing_records WHERE id = ?`).get(info.lastInsertRowid);
+      String(b.note ?? ""),
+    ]
+  );
+  const row = await dbGet(`SELECT * FROM billing_records WHERE id = $1`, [info.rows[0].id]);
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "billing_created",
@@ -1837,30 +1745,29 @@ app.post("/api/admin/billing", requireSuperAdmin, (req, res) => {
     meta: { status: row.status, amount: row.amount || null },
   });
   res.status(201).json(row);
-});
+}));
 
-app.post("/api/site-chat", (req, res) => {
+app.post("/api/site-chat", asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const message = String(b.message || "").trim();
   if (!message) return res.status(400).json({ error: "empty_message" });
   const name = String(b.name || b.visitor_name || "").trim() || null;
   const pathVal = String(b.path || "").trim() || null;
-  const info = db
-    .prepare(`INSERT INTO site_chat_messages (visitor_name, message, path) VALUES (?, ?, ?)`)
-    .run(name, message, pathVal);
-  const row = db.prepare(`SELECT * FROM site_chat_messages WHERE id = ?`).get(info.lastInsertRowid);
+  const info = await dbRun(
+    `INSERT INTO site_chat_messages (visitor_name, message, path) VALUES ($1, $2, $3) RETURNING id`,
+    [name, message, pathVal]
+  );
+  const row = await dbGet(`SELECT * FROM site_chat_messages WHERE id = $1`, [info.rows[0].id]);
   res.status(201).json(row);
-});
+}));
 
-app.get("/api/admin/site-chat", requireSuperAdmin, (req, res) => {
+app.get("/api/admin/site-chat", requireSuperAdmin, asyncHandler(async (req, res) => {
   const limit = Math.min(500, Math.max(1, parseInt(String(req.query.limit || "100"), 10) || 100));
-  const rows = db
-    .prepare(`SELECT * FROM site_chat_messages ORDER BY created_at DESC LIMIT ?`)
-    .all(limit);
+  const rows = await dbAll(`SELECT * FROM site_chat_messages ORDER BY created_at DESC LIMIT $1`, [limit]);
   res.json(rows);
-});
+}));
 
-app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
+app.get("/api/admin/system-logs", requireSuperAdmin, asyncHandler(async (req, res) => {
   const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit || "200"), 10) || 200));
   const level = String(req.query.level || "").trim().toLowerCase();
   const actor = String(req.query.actor_type || "").trim().toLowerCase();
@@ -1876,7 +1783,10 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
     where.push("sl.actor_type = ?");
     params.push(actor);
   }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  // Build positional placeholders ($1, $2, ...) for the dynamic WHERE.
+  const whereClauses = where.map((clause, i) => clause.replace("?", `$${i + 1}`));
+  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  const limitParamIndex = params.length + 1;
   const q = `
     SELECT sl.*,
       COALESCE(sa.name, mg.name, xmg.name) AS actor_name
@@ -1894,25 +1804,26 @@ app.get("/api/admin/system-logs", requireSuperAdmin, (req, res) => {
       AND sl.actor_id IS NOT NULL AND TRIM(sl.actor_id) != ''
       AND xmg.id = CAST(sl.actor_id AS INTEGER)
     ${whereSql}
-    ORDER BY datetime(sl.created_at) DESC, sl.id DESC
-    LIMIT ?
+    ORDER BY sl.created_at DESC, sl.id DESC
+    LIMIT $${limitParamIndex}
   `;
-  const rows = db.prepare(q).all(...params, limit);
+  const rows = await dbAll(q, [...params, limit]);
   res.json(rows);
-});
+}));
 
 
-function updateBusinessBySlug(req, res) {
-  ensureRestaurantSafraDemo();
+async function updateBusinessBySlug(req, res) {
+  await ensureRestaurantSafraDemo();
   const slug = decodeURIComponent(
     String((req.params && req.params.slug) || (req.body && req.body.slug) || "").trim()
   );
   if (!slug) {
     return res.status(400).json({ error: "missing_slug" });
   }
-  const exists = db
-    .prepare(`SELECT slug, manager_id, exchange_manager_id FROM businesses WHERE slug = ?`)
-    .get(slug);
+  const exists = await dbGet(
+    `SELECT slug, manager_id, exchange_manager_id FROM businesses WHERE slug = $1`,
+    [slug]
+  );
   if (!exists) {
     return res.status(404).json({ error: "not_found", slug, hint: "GET /api/businesses برای فهرست نامک‌ها" });
   }
@@ -1972,7 +1883,7 @@ function updateBusinessBySlug(req, res) {
       } else {
         const mid = parseInt(String(val), 10);
         if (!Number.isFinite(mid)) continue;
-        const m = db.prepare(`SELECT id FROM identity.managers WHERE id = ?`).get(mid);
+        const m = await dbGet(`SELECT id FROM identity.managers WHERE id = $1`, [mid]);
         if (!m) return res.status(400).json({ error: "invalid_manager_id" });
         updates[key] = mid;
       }
@@ -1984,7 +1895,7 @@ function updateBusinessBySlug(req, res) {
       } else {
         const mid = parseInt(String(val), 10);
         if (!Number.isFinite(mid)) continue;
-        const m = db.prepare(`SELECT id FROM identity.exchange_managers WHERE id = ?`).get(mid);
+        const m = await dbGet(`SELECT id FROM identity.exchange_managers WHERE id = $1`, [mid]);
         if (!m) return res.status(400).json({ error: "invalid_exchange_manager_id" });
         updates[key] = mid;
       }
@@ -2038,7 +1949,7 @@ function updateBusinessBySlug(req, res) {
     delete updates.claimed;
     delete updates.package;
     delete updates.exchange_company_verified;
-    if (!isTwilioModuleEnabled()) {
+    if (!(await isTwilioModuleEnabled())) {
       delete updates.call_tracking_enabled;
       delete updates.call_tracking_number;
       delete updates.call_forward_number;
@@ -2060,9 +1971,9 @@ function updateBusinessBySlug(req, res) {
   }
 
   const keys = Object.keys(updates);
-  const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-  const params = { ...updates, where_slug: slug };
-  db.prepare(`UPDATE businesses SET ${setClause} WHERE slug = @where_slug`).run(params);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+  const values = keys.map((k) => updates[k]);
+  await dbRun(`UPDATE businesses SET ${setClause} WHERE slug = $${keys.length + 1}`, [...values, slug]);
   writeSystemLog({
     ...actorFromAuth(auth),
     action: "business_profile_updated",
@@ -2071,40 +1982,38 @@ function updateBusinessBySlug(req, res) {
     message: `Business profile updated: ${slug}`,
     meta: { fields: keys },
   });
-  const row = db.prepare(`SELECT * FROM businesses WHERE slug = ?`).get(slug);
+  const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   res.json(row);
 }
 
 /** مسیر تخت — بدون بخش /slug/save که روی بعضی سرورها ۴۰۴ می‌شود */
-app.post("/api/businesses/update", updateBusinessBySlug);
+app.post("/api/businesses/update", asyncHandler(updateBusinessBySlug));
 
 /** PUT / PATCH / POST — پشتیبان */
-app.put("/api/businesses/:slug", updateBusinessBySlug);
-app.patch("/api/businesses/:slug", updateBusinessBySlug);
-app.post("/api/businesses/:slug/save", updateBusinessBySlug);
+app.put("/api/businesses/:slug", asyncHandler(updateBusinessBySlug));
+app.patch("/api/businesses/:slug", asyncHandler(updateBusinessBySlug));
+app.post("/api/businesses/:slug/save", asyncHandler(updateBusinessBySlug));
 
 /** آمار تجمیعی برای داشبورد سوپرادمین */
-app.get("/api/admin/stats", requireSuperAdmin, (_req, res) => {
+app.get("/api/admin/stats", requireSuperAdmin, asyncHandler(async (_req, res) => {
   try {
-    const total_businesses = db.prepare(`SELECT COUNT(*) AS c FROM businesses`).get().c;
-    const active_businesses = db
-      .prepare(
-        `SELECT COUNT(*) AS c FROM businesses WHERE status IS NULL OR status = '' OR status = 'active'`
-      )
-      .get().c;
-    const inactive_businesses = db
-      .prepare(`SELECT COUNT(*) AS c FROM businesses WHERE status = 'inactive'`)
-      .get().c;
-    const featured_businesses = db
-      .prepare(`SELECT COUNT(*) AS c FROM businesses WHERE package = 'featured'`)
-      .get().c;
-    const pending_listing_approvals = db
-      .prepare(`SELECT COUNT(*) AS c FROM businesses WHERE listing_approval = 'pending'`)
-      .get().c;
-    const total_qr_scans = db.prepare(`SELECT COUNT(*) AS c FROM qr_scans`).get().c;
-    const qr_scans_7d = db
-      .prepare(`SELECT COUNT(*) AS c FROM qr_scans WHERE scanned_at >= datetime('now', '-7 days')`)
-      .get().c;
+    const total_businesses = (await dbGet(`SELECT COUNT(*)::int AS c FROM businesses`)).c;
+    const active_businesses = (
+      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE status IS NULL OR status = '' OR status = 'active'`)
+    ).c;
+    const inactive_businesses = (
+      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE status = 'inactive'`)
+    ).c;
+    const featured_businesses = (
+      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE package = 'featured'`)
+    ).c;
+    const pending_listing_approvals = (
+      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE listing_approval = 'pending'`)
+    ).c;
+    const total_qr_scans = (await dbGet(`SELECT COUNT(*)::int AS c FROM qr_scans`)).c;
+    const qr_scans_7d = (
+      await dbGet(`SELECT COUNT(*)::int AS c FROM qr_scans WHERE scanned_at >= (NOW() - INTERVAL '7 days')::TEXT`)
+    ).c;
     res.json({
       total_businesses,
       active_businesses,
@@ -2118,42 +2027,40 @@ app.get("/api/admin/stats", requireSuperAdmin, (_req, res) => {
     console.error(e);
     res.status(500).json({ error: "stats_failed" });
   }
-});
+}));
 
-app.get("/api/qr/stats/:bid", (req, res) => {
+app.get("/api/qr/stats/:bid", asyncHandler(async (req, res) => {
   const bid = sanitizeBid(req.params.bid);
   const key = "qr_" + bid.slice(0, 80);
-  const row = db
-    .prepare(`SELECT COUNT(*) AS c FROM qr_scans WHERE business_slug = ?`)
-    .get(key);
+  const row = await dbGet(`SELECT COUNT(*)::int AS c FROM qr_scans WHERE business_slug = $1`, [key]);
   res.json({ count: row.c, bid: key });
-});
+}));
 
 /** تعداد کلیک روی شمارهٔ تماس در صفحهٔ عمومی آگهی */
-app.get("/api/phone/stats/:slug", (req, res) => {
+app.get("/api/phone/stats/:slug", asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim()).toLowerCase();
   if (!slug) return res.status(400).json({ error: "missing_slug" });
-  const row = db.prepare(`SELECT COUNT(*) AS c FROM phone_clicks WHERE business_slug = ?`).get(slug);
+  const row = await dbGet(`SELECT COUNT(*)::int AS c FROM phone_clicks WHERE business_slug = $1`, [slug]);
   res.json({ count: row ? row.c : 0, slug });
-});
+}));
 
-app.post("/api/phone-click", (req, res) => {
+app.post("/api/phone-click", asyncHandler(async (req, res) => {
   const b = req.body && typeof req.body === "object" ? req.body : {};
   const slug = String(b.slug || "")
     .trim()
     .toLowerCase();
   if (!slug) return res.status(400).json({ error: "missing_slug" });
-  const bizPhone = db.prepare(`SELECT slug, listing_approval, status FROM businesses WHERE slug = ?`).get(slug);
+  const bizPhone = await dbGet(`SELECT slug, listing_approval, status FROM businesses WHERE slug = $1`, [slug]);
   if (!bizPhone || !isBusinessVisibleToPublic(bizPhone)) {
     return res.status(404).json({ error: "not_found" });
   }
   try {
-    db.prepare(`INSERT INTO phone_clicks (business_slug) VALUES (?)`).run(slug);
+    await dbRun(`INSERT INTO phone_clicks (business_slug) VALUES ($1)`, [slug]);
   } catch (e) {
     console.error("phone_clicks insert", e);
   }
   res.status(201).json({ ok: true });
-});
+}));
 
 function normalizePhone(raw) {
   return String(raw || "").trim().replace(/\s+/g, "");
@@ -2174,22 +2081,21 @@ function twimlDial(to, slug) {
 </Response>`;
 }
 
-app.post("/api/twilio/voice/incoming", (req, res) => {
-  if (!isTwilioModuleEnabled()) {
+app.post("/api/twilio/voice/incoming", asyncHandler(async (req, res) => {
+  if (!(await isTwilioModuleEnabled())) {
     return res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>`);
   }
   const toNumber = normalizePhone(req.body?.To);
   if (!toNumber) return res.status(400).send("missing to");
-  const biz = db
-    .prepare(
-      `SELECT b.slug, b.call_forward_number, b.phone, b.call_tracking_enabled, b.call_tracking_number,
+  const biz = await dbGet(
+    `SELECT b.slug, b.call_forward_number, b.phone, b.call_tracking_enabled, b.call_tracking_number,
               m.twilio_phone_number
        FROM businesses b
        LEFT JOIN identity.managers m ON m.id = b.manager_id
-       WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
-       LIMIT 1`
-    )
-    .get(toNumber);
+       WHERE replace(COALESCE(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = $1
+       LIMIT 1`,
+    [toNumber]
+  );
   if (!biz || !biz.call_tracking_enabled) {
     return res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>`);
   }
@@ -2200,24 +2106,25 @@ app.post("/api/twilio/voice/incoming", (req, res) => {
       .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>No destination configured.</Say><Hangup/></Response>`);
   }
   res.type("text/xml").send(twimlDial(forwardTo, biz.slug));
-});
+}));
 
-app.post("/api/twilio/voice/status", (req, res) => {
-  if (!isTwilioModuleEnabled()) {
+app.post("/api/twilio/voice/status", asyncHandler(async (req, res) => {
+  if (!(await isTwilioModuleEnabled())) {
     return res.json({ ok: true, skipped: true });
   }
   const slugQ = String(req.query.slug || "").trim().toLowerCase();
   const toNumber = normalizePhone(req.body?.To);
   const slugByTo = toNumber
-    ? db
-        .prepare(
+    ? (
+        await dbGet(
           `SELECT b.slug
            FROM businesses b
            LEFT JOIN identity.managers m ON m.id = b.manager_id
-           WHERE replace(ifnull(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = ?
-           LIMIT 1`
+           WHERE replace(COALESCE(b.call_tracking_number, m.twilio_phone_number, ''), ' ', '') = $1
+           LIMIT 1`,
+          [toNumber]
         )
-        .get(toNumber)?.slug
+      )?.slug
     : null;
   const businessSlug = slugQ || slugByTo || null;
   const callSid = String(req.body?.CallSid || "").trim() || null;
@@ -2234,66 +2141,73 @@ app.post("/api/twilio/voice/status", (req, res) => {
     duration_seconds: duration,
     recording_url: String(req.body?.RecordingUrl || "").trim() || null,
   };
-  db.prepare(
+  await dbRun(
     `INSERT INTO call_logs
       (business_slug, call_sid, from_number, to_number, direction, status, duration_seconds, recording_url)
      VALUES
-      (@business_slug, @call_sid, @from_number, @to_number, @direction, @status, @duration_seconds, @recording_url)
-     ON CONFLICT(call_sid) DO UPDATE SET
-      business_slug=excluded.business_slug,
-      from_number=excluded.from_number,
-      to_number=excluded.to_number,
-      direction=excluded.direction,
-      status=excluded.status,
-      duration_seconds=excluded.duration_seconds,
-      recording_url=excluded.recording_url`
-  ).run(payload);
+      ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (call_sid) DO UPDATE SET
+      business_slug=EXCLUDED.business_slug,
+      from_number=EXCLUDED.from_number,
+      to_number=EXCLUDED.to_number,
+      direction=EXCLUDED.direction,
+      status=EXCLUDED.status,
+      duration_seconds=EXCLUDED.duration_seconds,
+      recording_url=EXCLUDED.recording_url`,
+    [
+      payload.business_slug,
+      payload.call_sid,
+      payload.from_number,
+      payload.to_number,
+      payload.direction,
+      payload.status,
+      payload.duration_seconds,
+      payload.recording_url,
+    ]
+  );
   res.json({ ok: true });
-});
+}));
 
-app.get("/api/manager/call-logs", requireManager, (req, res) => {
-  if (!isTwilioModuleEnabled()) {
+app.get("/api/manager/call-logs", requireManager, asyncHandler(async (req, res) => {
+  if (!(await isTwilioModuleEnabled())) {
     return res.status(403).json({ error: "twilio_module_disabled" });
   }
   const limit = Math.min(300, Math.max(1, parseInt(String(req.query.limit || "100"), 10) || 100));
-  const rows = db
-    .prepare(
-      `SELECT c.*, b.name_fa AS business_name
+  const rows = await dbAll(
+    `SELECT c.*, b.name_fa AS business_name
        FROM call_logs c
        JOIN businesses b ON b.slug = c.business_slug
-       WHERE b.manager_id = ?
-       ORDER BY datetime(c.created_at) DESC, c.id DESC
-       LIMIT ?`
-    )
-    .all(req.auth.sub, limit);
+       WHERE b.manager_id = $1
+       ORDER BY c.created_at DESC, c.id DESC
+       LIMIT $2`,
+    [req.auth.sub, limit]
+  );
   res.json(rows);
-});
+}));
 
-app.get("/api/manager/linked-businesses", requireManager, (req, res) => {
+app.get("/api/manager/linked-businesses", requireManager, asyncHandler(async (req, res) => {
   const managerColumn = req.auth.typ === "mgrx" ? "exchange_manager_id" : "manager_id";
   const categoryWhere =
     req.auth.typ === "mgrx"
-      ? `AND IFNULL(TRIM(category), '') = 'صرافی'`
-      : `AND IFNULL(TRIM(category), '') <> 'صرافی'`;
-  const rows = db
-    .prepare(
-      `SELECT id, slug, name_fa, category, status, claimed, package, city
+      ? `AND COALESCE(TRIM(category), '') = 'صرافی'`
+      : `AND COALESCE(TRIM(category), '') <> 'صرافی'`;
+  const rows = await dbAll(
+    `SELECT id, slug, name_fa, category, status, claimed, package, city
        FROM businesses
-       WHERE ${managerColumn} = ?
+       WHERE ${managerColumn} = $1
        ${categoryWhere}
-       ORDER BY CASE WHEN IFNULL(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`
-    )
-    .all(req.auth.sub);
+       ORDER BY CASE WHEN COALESCE(TRIM(category), '') = 'صرافی' THEN 0 ELSE 1 END, id DESC`,
+    [req.auth.sub]
+  );
   res.json({ linked_businesses: rows });
-});
+}));
 
-app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
-  const m = db
-    .prepare(
-      `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
-       FROM identity.managers WHERE id = ?`
-    )
-    .get(req.auth.sub);
+app.get("/api/manager/twilio-settings", requireManager, asyncHandler(async (req, res) => {
+  const m = await dbGet(
+    `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
+       FROM identity.managers WHERE id = $1`,
+    [req.auth.sub]
+  );
   if (!m) return res.status(404).json({ error: "not_found" });
   const masked =
     m.twilio_auth_token && String(m.twilio_auth_token).length > 4
@@ -2302,16 +2216,16 @@ app.get("/api/manager/twilio-settings", requireManager, (req, res) => {
       ? "••••"
       : null;
   res.json({
-    module_enabled: isTwilioModuleEnabled(),
+    module_enabled: await isTwilioModuleEnabled(),
     twilio_account_sid: m.twilio_account_sid || "",
     twilio_phone_number: m.twilio_phone_number || "",
     twilio_auth_token_set: !!m.twilio_auth_token,
     twilio_auth_token_masked: masked,
   });
-});
+}));
 
-app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
-  if (!isTwilioModuleEnabled()) {
+app.patch("/api/manager/twilio-settings", requireManager, asyncHandler(async (req, res) => {
+  if (!(await isTwilioModuleEnabled())) {
     return res.status(403).json({ error: "twilio_module_disabled", hint: "Twilio module is off in super admin settings" });
   }
   const b = req.body && typeof req.body === "object" ? req.body : {};
@@ -2321,8 +2235,9 @@ app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
   if ("twilio_auth_token" in b) updates.twilio_auth_token = String(b.twilio_auth_token || "").trim() || null;
   const keys = Object.keys(updates);
   if (!keys.length) return res.status(400).json({ error: "no_fields" });
-  const setClause = keys.map((k) => `${k} = @${k}`).join(", ");
-  db.prepare(`UPDATE identity.managers SET ${setClause} WHERE id = @id`).run({ ...updates, id: req.auth.sub });
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+  const values = keys.map((k) => updates[k]);
+  await dbRun(`UPDATE identity.managers SET ${setClause} WHERE id = $${keys.length + 1}`, [...values, req.auth.sub]);
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "manager_twilio_settings_updated",
@@ -2331,12 +2246,11 @@ app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
     message: "Manager updated Twilio settings",
     meta: { fields: keys.filter((k) => k !== "twilio_auth_token") },
   });
-  const m = db
-    .prepare(
-      `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
-       FROM identity.managers WHERE id = ?`
-    )
-    .get(req.auth.sub);
+  const m = await dbGet(
+    `SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number
+       FROM identity.managers WHERE id = $1`,
+    [req.auth.sub]
+  );
   res.json({
     twilio_account_sid: m?.twilio_account_sid || "",
     twilio_phone_number: m?.twilio_phone_number || "",
@@ -2348,10 +2262,10 @@ app.patch("/api/manager/twilio-settings", requireManager, (req, res) => {
         ? "••••"
         : null,
   });
-});
+}));
 
-/** Google review redirect: increment SQLite then 302 */
-app.get("/go", (req, res) => {
+/** Google review redirect: increment scan counter then 302 */
+app.get("/go", asyncHandler(async (req, res) => {
   const t = req.query.t;
   const bidRaw = req.query.bid || "default";
   const bid = sanitizeBid(bidRaw);
@@ -2368,13 +2282,13 @@ app.get("/go", (req, res) => {
   }
 
   try {
-    db.prepare(`INSERT INTO qr_scans (business_slug) VALUES (?)`).run(key);
+    await dbRun(`INSERT INTO qr_scans (business_slug) VALUES ($1)`, [key]);
   } catch (e) {
     console.error("qr_scans insert", e);
   }
 
   res.redirect(302, target);
-});
+}));
 
 const clientDist = path.join(__dirname, "..", "..", "client", "dist");
 
@@ -2397,6 +2311,9 @@ function mountProdStatic() {
 }
 
 async function main() {
+  await bootstrapDb();
+  await ensureSuperAdminFromEnv();
+
   if (isProd) {
     mountProdStatic();
   } else {

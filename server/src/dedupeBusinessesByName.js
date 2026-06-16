@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { dbAll } from "./db.js";
 import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
 
 /** یکسان‌سازی برای تشخیص نام تکراری: trim، فاصله‌های پیاپی، حروف کوچک لاتین */
@@ -13,8 +13,8 @@ export function normalizeListingName(name) {
  * گروه‌بندی آگهی‌ها با نام یکسان (پس از normalize).
  * در هر گروه نگه‌داشتن ردیف با کم‌ترین id (قدیمی‌تر).
  */
-export function analyzeDuplicateNames() {
-  const rows = db.prepare(`SELECT id, slug, name_fa FROM businesses`).all();
+export async function analyzeDuplicateNames() {
+  const rows = await dbAll(`SELECT id, slug, name_fa FROM businesses`);
   const byKey = new Map();
   for (const r of rows) {
     const key = normalizeListingName(r.name_fa);
@@ -44,8 +44,8 @@ export function analyzeDuplicateNames() {
 /**
  * حذف آگهی‌های تکراری؛ در هر گروه فقط id کم‌تر باقی می‌ماند.
  */
-export function executeDedupeByName({ maxRemovals = 5000 } = {}) {
-  const { groups, total_remove } = analyzeDuplicateNames();
+export async function executeDedupeByName({ maxRemovals = 5000 } = {}) {
+  const { groups, total_remove } = await analyzeDuplicateNames();
   if (total_remove === 0) {
     return { deleted: [], kept_groups: 0, removed_count: 0, failed: [] };
   }
@@ -56,7 +56,7 @@ export function executeDedupeByName({ maxRemovals = 5000 } = {}) {
   const failed = [];
   for (const g of groups) {
     for (const r of g.remove) {
-      const res = cascadeDeleteBusinessBySlug(r.slug);
+      const res = await cascadeDeleteBusinessBySlug(r.slug);
       if (res.deleted) deleted.push(r.slug);
       else failed.push({ slug: r.slug, reason: res.reason || "unknown" });
     }

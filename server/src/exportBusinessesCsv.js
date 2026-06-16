@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { dbAll } from "./db.js";
 
 /** Columns aligned with GET csv-template?preset=iraniu and mapIraniuRow import. */
 export const IRANIU_EXPORT_COLUMNS = [
@@ -39,10 +39,8 @@ export function buildIraniuCsvFromRows(rows) {
  * Full export string for all businesses (iraniu preset).
  * @returns {{ csvText: string, rowCount: number }}
  */
-export function exportIraniuBusinessesCsv() {
-  const rows = db
-    .prepare(`SELECT ${IRANIU_EXPORT_COLUMNS.join(", ")} FROM businesses ORDER BY id ASC`)
-    .all();
+export async function exportIraniuBusinessesCsv() {
+  const rows = await dbAll(`SELECT ${IRANIU_EXPORT_COLUMNS.join(", ")} FROM businesses ORDER BY id ASC`);
   return {
     csvText: buildIraniuCsvFromRows(rows),
     rowCount: rows.length,

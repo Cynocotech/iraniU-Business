@@ -22,8 +22,8 @@ export function escapeHtml(s) {
  *   footerNote?: string;
  * }} opts
  */
-export function wrapBrandedEmail(opts) {
-  const s = getEffectiveSmtpSettings();
+export async function wrapBrandedEmail(opts) {
+  const s = await getEffectiveSmtpSettings();
   const primary = s.primaryColor || "#3a0b47";
   const mid = s.primaryMid || "#5c1f6e";
   const base = (s.siteUrl || "").replace(/\/$/, "");
@@ -68,8 +68,8 @@ export function wrapBrandedEmail(opts) {
 </html>`;
 }
 
-export function htmlListingApprovedBranded({ nameFa, slug }) {
-  const s = getEffectiveSmtpSettings();
+export async function htmlListingApprovedBranded({ nameFa, slug }) {
+  const s = await getEffectiveSmtpSettings();
   const base = (s.siteUrl || "").replace(/\/$/, "");
   const link = base ? `${base}/business?slug=${encodeURIComponent(slug)}` : "";
   const green = s.accentSuccess || "#15803d";
@@ -90,8 +90,8 @@ export function htmlListingApprovedBranded({ nameFa, slug }) {
   });
 }
 
-export function htmlListingRejectedBranded({ nameFa, slug, reason }) {
-  const s = getEffectiveSmtpSettings();
+export async function htmlListingRejectedBranded({ nameFa, slug, reason }) {
+  const s = await getEffectiveSmtpSettings();
   const base = (s.siteUrl || "").replace(/\/$/, "");
   const listings = base ? `${base}/listings` : "";
   const red = s.accentDanger || "#b91c1c";
@@ -117,8 +117,8 @@ export function htmlListingRejectedBranded({ nameFa, slug, reason }) {
   });
 }
 
-export function htmlNewListingInternalNotify({ nameFa, slug, city, listingContactEmail }) {
-  const s = getEffectiveSmtpSettings();
+export async function htmlNewListingInternalNotify({ nameFa, slug, city, listingContactEmail }) {
+  const s = await getEffectiveSmtpSettings();
   const base = (s.siteUrl || "").replace(/\/$/, "");
   const adminLink = base ? `${base}/admin` : "";
   const body = `
@@ -142,7 +142,7 @@ export function htmlNewListingInternalNotify({ nameFa, slug, city, listingContac
   });
 }
 
-export function htmlBroadcastBranded({ innerHtml }) {
+export async function htmlBroadcastBranded({ innerHtml }) {
   return wrapBrandedEmail({
     headerIcon: "✉️",
     title: "Message from Iraniu",

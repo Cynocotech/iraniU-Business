@@ -1,23 +1,12 @@
 /**
  * Creates or resets named super-admin accounts with totp_setup_required=1.
+ * Requires DATABASE_URL.
  * Run: node server/scripts/seed-named-super-admins.js
- * (from repo root, or from server/ with node scripts/seed-named-super-admins.js)
  */
+import "../src/env.js";
 import crypto from "crypto";
-import path from "path";
-import { fileURLToPath } from "url";
-import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, "..", "data");
-
-function escapeSqlitePath(p) {
-  return String(p).replace(/'/g, "''");
-}
-
-const directoryPath = process.env.SQLITE_DIRECTORY_PATH || path.join(dataDir, "iraniu-directory.db");
-const identityPath = process.env.SQLITE_IDENTITY_PATH || path.join(dataDir, "iraniu-identity.db");
+import { pool, initDb, dbGet, dbRun } from "../src/db.js";
 
 function randomPassword() {
   const a = crypto.randomBytes(18).toString("base64url");
@@ -34,33 +23,39 @@ const accounts = [
   { email: "reza@iraniu.uk", name: "Reza" },
 ];
 
-const db = new Database(directoryPath);
-db.exec(`ATTACH DATABASE '${escapeSqlitePath(identityPath)}' AS identity`);
-
-try {
-  db.exec(`ALTER TABLE identity.super_admins ADD COLUMN totp_setup_required INTEGER NOT NULL DEFAULT 0`);
-} catch {
-  /* exists */
-}
-
-const out = [];
-for (const { email, name } of accounts) {
-  const em = email.trim().toLowerCase();
-  const password = randomPassword();
-  const hash = hashPassword(password);
-  const row = db.prepare(`SELECT id FROM identity.super_admins WHERE email = ?`).get(em);
-  if (row) {
-    db.prepare(
-      `UPDATE identity.super_admins SET password_hash = @hash, name = @name, totp_setup_required = 1, totp_enabled = 0, totp_secret = NULL WHERE email = @email`
-    ).run({ hash, name, email: em });
-  } else {
-    db.prepare(
-      `INSERT INTO identity.super_admins (email, password_hash, name, totp_setup_required, totp_enabled) VALUES (?, ?, ?, 1, 0)`
-    ).run(em, hash, name);
+async function main() {
+  await initDb();
+  const out = [];
+  for (const { email, name } of accounts) {
+    const em = email.trim().toLowerCase();
+    const password = randomPassword();
+    const hash = hashPassword(password);
+    const row = await dbGet(`SELECT id FROM identity.super_admins WHERE email = $1`, [em]);
+    if (row) {
+      await dbRun(
+        `UPDATE identity.super_admins
+           SET password_hash = $1, name = $2, totp_setup_required = 1, totp_enabled = 0, totp_secret = NULL
+         WHERE email = $3`,
+        [hash, name, em]
+      );
+    } else {
+      await dbRun(
+        `INSERT INTO identity.super_admins (email, password_hash, name, totp_setup_required, totp_enabled)
+         VALUES ($1, $2, $3, 1, 0)`,
+        [em, hash, name]
+      );
+    }
+    out.push({ email: em, password, name });
   }
-  out.push({ email: em, password, name });
+  console.log(JSON.stringify({ ok: true, accounts: out }, null, 2));
 }
 
-db.close();
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e.message || e);
+    process.exit(1);
+  });
 
-console.log(JSON.stringify({ ok: true, directoryPath, identityPath, accounts: out }, null, 2));
+// keep pool referenced for clarity
+void pool;

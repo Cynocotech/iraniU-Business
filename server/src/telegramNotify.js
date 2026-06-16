@@ -6,7 +6,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "./db.js";
+import { dbRun } from "./db.js";
 import { getEffectiveTelegramConfig } from "./telegramSettings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +39,7 @@ export function clientIp(req) {
 }
 
 async function telegramApi(method, jsonBody) {
-  const token = getEffectiveTelegramConfig().botToken;
+  const token = (await getEffectiveTelegramConfig()).botToken;
   if (!token) return { ok: false, error: "no_token" };
   const url = `https://api.telegram.org/bot${token}/${method}`;
   const r = await fetch(url, {
@@ -118,7 +118,7 @@ function kickOutReplyMarkup(adminId) {
 }
 
 async function deliverTelegram(caption, replyMarkup) {
-  const { botToken: token, chatId: chatIdRaw } = getEffectiveTelegramConfig();
+  const { botToken: token, chatId: chatIdRaw } = await getEffectiveTelegramConfig();
   if (!token || !chatIdRaw) {
     return { ok: false, skipped: true, reason: "missing_env" };
   }
@@ -157,7 +157,7 @@ export async function notifyTelegramSuperAdminLogin({ email, ip, userAgent, admi
   if (ip) lines.push(`🌐 IP: ${ip}`);
   if (userAgent) lines.push(`💻 مرورگر: ${String(userAgent).slice(0, 200)}`);
 
-  const hasWebhook = !!getEffectiveTelegramConfig().webhookSecret;
+  const hasWebhook = !!(await getEffectiveTelegramConfig()).webhookSecret;
   const replyMarkup = hasWebhook ? kickOutReplyMarkup(adminId) : undefined;
   await deliverTelegram(lines.join("\n"), replyMarkup);
 }
@@ -172,8 +172,9 @@ export async function sendTelegramTestMessage() {
  * Uses the same bot + TELEGRAM_CHAT_ID as super-admin login alerts. Text-only (no photo).
  */
 export async function notifyTelegramNewPendingListing(row) {
-  const token = getEffectiveTelegramConfig().botToken;
-  const chatIdRaw = getEffectiveTelegramConfig().chatId;
+  const cfg = await getEffectiveTelegramConfig();
+  const token = cfg.botToken;
+  const chatIdRaw = cfg.chatId;
   if (!token || !chatIdRaw) {
     return { skipped: true, reason: "telegram_not_configured" };
   }
@@ -182,7 +183,7 @@ export async function notifyTelegramNewPendingListing(row) {
     return { skipped: true, reason: "invalid_chat_id" };
   }
   const base = String(
-    getEffectiveTelegramConfig().publicSiteUrl || process.env.PUBLIC_SITE_URL || process.env.SITE_BASE_URL || ""
+    cfg.publicSiteUrl || process.env.PUBLIC_SITE_URL || process.env.SITE_BASE_URL || ""
   ).replace(/\/$/, "");
   const adminUrl = base ? `${base}/admin` : "";
   const name = String(row?.name_fa || "").trim() || "—";
@@ -225,7 +226,7 @@ export async function processTelegramWebhook(body) {
   }
 
   const msgChatId = cq.message?.chat?.id;
-  const expectedRaw = getEffectiveTelegramConfig().chatId;
+  const expectedRaw = (await getEffectiveTelegramConfig()).chatId;
   if (msgChatId == null || !expectedRaw) {
     await telegramApi("answerCallbackQuery", {
       callback_query_id: cq.id,
@@ -246,8 +247,8 @@ export async function processTelegramWebhook(body) {
     return { handled: true };
   }
 
-  const info = db.prepare(`UPDATE identity.super_admins SET token_version = token_version + 1 WHERE id = ?`).run(adminId);
-  if (info.changes === 0) {
+  const info = await dbRun(`UPDATE identity.super_admins SET token_version = token_version + 1 WHERE id = $1`, [adminId]);
+  if (info.rowCount === 0) {
     await telegramApi("answerCallbackQuery", {
       callback_query_id: cq.id,
       text: "Admin not found",

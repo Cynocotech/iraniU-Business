@@ -1,6 +1,6 @@
 import { parse } from "csv-parse/sync";
 import crypto from "crypto";
-import { db } from "./db.js";
+import { dbGet, dbRun } from "./db.js";
 
 const DEFAULT_BIOLINK_JSON = JSON.stringify({
   headline: "",
@@ -293,40 +293,46 @@ const INSERT_SQL = `
     listing_title, city, price_range, rating, cta, status, manager_id, biolink_json, listing_approval,
     listing_terms_accepted_at, listing_terms_version, listing_contact_email
   ) VALUES (
-    @slug, @name_fa, @description, @category, @phone, @address, @google_review_url, @claimed, @package,
-    @subtitle, @hours_json, @promo_title, @promo_description, @cover_image_url, @gallery_json,
-    @listing_title, @city, @price_range, @rating, @cta, @status, @manager_id, @biolink_json, @listing_approval,
-    @listing_terms_accepted_at, @listing_terms_version, @listing_contact_email
+    $1, $2, $3, $4, $5, $6, $7, $8, $9,
+    $10, $11, $12, $13, $14, $15,
+    $16, $17, $18, $19, $20, $21, $22, $23, $24,
+    $25, $26, $27
   )
 `;
 
-export function runBulkInsert(rows, { onDuplicate = "skip" } = {}) {
-  const insert = db.prepare(INSERT_SQL);
+function insertParams(r) {
+  return [
+    r.slug, r.name_fa, r.description, r.category, r.phone, r.address, r.google_review_url, r.claimed, r.package,
+    r.subtitle, r.hours_json, r.promo_title, r.promo_description, r.cover_image_url, r.gallery_json,
+    r.listing_title, r.city, r.price_range, r.rating, r.cta, r.status, r.manager_id, r.biolink_json, r.listing_approval,
+    r.listing_terms_accepted_at, r.listing_terms_version, r.listing_contact_email,
+  ];
+}
+
+export async function runBulkInsert(rows, { onDuplicate = "skip" } = {}) {
   const inserted = [];
   const skipped = [];
   const failed = [];
 
-  const work = db.transaction((items) => {
-    for (const r of items) {
-      const exists = db.prepare(`SELECT slug FROM businesses WHERE slug = ?`).get(r.slug);
-      if (exists) {
-        if (onDuplicate === "skip") {
-          skipped.push({ slug: r.slug, reason: "duplicate_slug" });
-          continue;
-        }
-        failed.push({ slug: r.slug, error: "duplicate_slug" });
+  // Per-row (not a single transaction) so one bad row doesn't abort the whole batch,
+  // matching the previous SQLite behaviour of resilience-per-row.
+  for (const r of rows) {
+    const exists = await dbGet(`SELECT slug FROM businesses WHERE slug = $1`, [r.slug]);
+    if (exists) {
+      if (onDuplicate === "skip") {
+        skipped.push({ slug: r.slug, reason: "duplicate_slug" });
         continue;
       }
-      try {
-        insert.run(r);
-        inserted.push(r.slug);
-      } catch (e) {
-        failed.push({ slug: r.slug, error: String(e.message || e) });
-      }
+      failed.push({ slug: r.slug, error: "duplicate_slug" });
+      continue;
     }
-  });
-
-  work(rows);
+    try {
+      await dbRun(INSERT_SQL, insertParams(r));
+      inserted.push(r.slug);
+    } catch (e) {
+      failed.push({ slug: r.slug, error: String(e.message || e) });
+    }
+  }
 
   return { inserted, skipped, failed };
 }

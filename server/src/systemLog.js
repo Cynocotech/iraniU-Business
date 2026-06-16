@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { dbRun } from "./db.js";
 
 function safeJson(value) {
   if (!value || typeof value !== "object") return null;
@@ -9,7 +9,11 @@ function safeJson(value) {
   }
 }
 
-export function writeSystemLog({
+/**
+ * Insert a system log row. Errors are swallowed (logging must never break a request).
+ * Returns a promise; callers may await it or fire-and-forget.
+ */
+export async function writeSystemLog({
   level = "info",
   actorType = "system",
   actorId = null,
@@ -20,21 +24,22 @@ export function writeSystemLog({
   meta = null,
 }) {
   try {
-    db.prepare(
+    await dbRun(
       `INSERT INTO system_logs
         (level, actor_type, actor_id, action, target_type, target_id, message, meta_json)
        VALUES
-        (@level, @actor_type, @actor_id, @action, @target_type, @target_id, @message, @meta_json)`
-    ).run({
-      level: String(level || "info"),
-      actor_type: String(actorType || "system"),
-      actor_id: actorId == null ? null : String(actorId),
-      action: String(action || "event"),
-      target_type: targetType == null ? null : String(targetType),
-      target_id: targetId == null ? null : String(targetId),
-      message: String(message || ""),
-      meta_json: safeJson(meta),
-    });
+        ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        String(level || "info"),
+        String(actorType || "system"),
+        actorId == null ? null : String(actorId),
+        String(action || "event"),
+        targetType == null ? null : String(targetType),
+        targetId == null ? null : String(targetId),
+        String(message || ""),
+        safeJson(meta),
+      ]
+    );
   } catch (e) {
     console.error("system log insert failed", e?.message || e);
   }

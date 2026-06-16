@@ -16,13 +16,13 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.6.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
+    "pg": "^8.21.0",
     "speakeasy": "^2.0.0"
   }
 }
