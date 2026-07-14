@@ -79,13 +79,31 @@ async function openaiEmbed(text) {
   return embedding;
 }
 
+const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
+            category, city, address, postcode, rating, price_range,
+            phone, reservation_link, cover_image_url, promo_title,
+            careers_title, exchange_manager_id`;
+
+async function retrieveByName(nameKeyword, { city, isExchange, isJob }) {
+  const { rows } = await pool.query(
+    `SELECT ${BUSINESS_COLS}
+       FROM public.businesses
+      WHERE listing_approval = 'approved'
+        AND name_fa ILIKE '%' || $1 || '%'
+        AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
+        AND (NOT $3 OR exchange_manager_id IS NOT NULL)
+        AND (NOT $4 OR careers_title IS NOT NULL)
+      ORDER BY rating DESC NULLS LAST
+      LIMIT 20`,
+    [nameKeyword, city || null, !!isExchange, !!isJob]
+  );
+  return rows;
+}
+
 async function retrieveCandidates(queryVec, { city, isExchange, isJob }) {
   const vecStr = `[${queryVec.join(",")}]`;
   const { rows } = await pool.query(
-    `SELECT id, slug, name_fa, listing_title, subtitle, description,
-            category, city, address, postcode, rating, price_range,
-            phone, reservation_link, cover_image_url, promo_title,
-            careers_title, exchange_manager_id
+    `SELECT ${BUSINESS_COLS}
        FROM public.businesses
       WHERE listing_approval = 'approved'
         AND embedding IS NOT NULL
@@ -143,10 +161,13 @@ router.post("/", async (req, res) => {
     parsed = await openaiChat([
       {
         role: "system",
-        content: `شما یک دستیار تجزیه‌گر جستجو هستید. کاربر یک عبارت جستجو می‌فرستد که ممکن است فارسی یا انگلیسی باشد. خروجی باید JSON با این کلیدها باشد:
-{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean}
-فقط مقادیری را پر کنید که به‌صراحت در عبارت جستجو وجود دارند. is_exchange_query را true کنید اگر کاربر صرافی یا تبادل ارز می‌خواهد. is_job_query را true کنید اگر دنبال کار یا استخدام است.
-مهم: مقدار city را همیشه به انگلیسی بنویسید (مثلاً London نه لندن، Manchester نه منچستر).`,
+        content: `شما یک دستیار تجزیه‌گر جستجو برای دایرکتوری کسب‌وکارهای ایرانی در بریتانیا هستید. خروجی باید JSON با این کلیدها باشد:
+{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean}
+- is_off_topic را true کنید اگر سوال کاربر اصلاً مربوط به پیدا کردن کسب‌وکار، خدمات یا محصول نیست (مثلاً سوالات عمومی، اخبار، دستور غذا، سیاست و غیره).
+- is_exchange_query را true کنید اگر کاربر صرافی یا تبادل ارز می‌خواهد.
+- is_job_query را true کنید اگر دنبال کار یا استخدام است.
+- name_contains را پر کنید اگر کاربر به دنبال کسب‌وکارهایی است که کلمه‌ای خاص در نامشان دارند (مثلاً «نامشان ایران دارد» → name_contains: «ایران»).
+- city را همیشه به انگلیسی بنویسید (مثلاً London نه لندن، Manchester نه منچستر).`,
       },
       { role: "user", content: q },
     ]);
@@ -158,29 +179,41 @@ router.post("/", async (req, res) => {
     });
   }
 
+  if (parsed.is_off_topic) {
+    return res.json({
+      answer_fa: "این دستیار فقط برای جستجوی کسب‌وکارهای ایرانی در بریتانیا طراحی شده است. لطفاً نام یک کسب‌وکار، خدمت یا محصول را جستجو کنید — مثلاً «رستوران در لندن» یا «وکیل مهاجرت».",
+      businesses: [],
+    });
+  }
+
   const city = typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : null;
   const isExchange = !!parsed.is_exchange_query;
   const isJob = !!parsed.is_job_query;
-
-  // Embed query
-  let queryVec;
-  try {
-    queryVec = await openaiEmbed(q);
-  } catch (e) {
-    console.error("[ai-search] embed step failed:", e.message);
-    return res.status(503).json({
-      error: "ai_error",
-      answer_fa: "سرویس هوش مصنوعی موقتاً در دسترس نیست. لطفاً دوباره امتحان کنید.",
-    });
-  }
+  const nameContains = typeof parsed.name_contains === "string" && parsed.name_contains.trim()
+    ? parsed.name_contains.trim() : null;
 
   // Retrieve candidates
   let candidates;
   try {
-    candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
-    if (candidates.length < 3 && city) {
-      // Too few results with city filter — retry without to get better coverage
-      candidates = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+    if (nameContains) {
+      // Name-keyword query: search directly by business name
+      candidates = await retrieveByName(nameContains, { city, isExchange, isJob });
+    } else {
+      // Semantic query: embed then vector search
+      let queryVec;
+      try {
+        queryVec = await openaiEmbed(q);
+      } catch (e) {
+        console.error("[ai-search] embed step failed:", e.message);
+        return res.status(503).json({
+          error: "ai_error",
+          answer_fa: "سرویس هوش مصنوعی موقتاً در دسترس نیست. لطفاً دوباره امتحان کنید.",
+        });
+      }
+      candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
+      if (candidates.length < 3 && city) {
+        candidates = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+      }
     }
   } catch (e) {
     console.error("[ai-search] retrieval failed:", e.message);
