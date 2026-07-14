@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout.jsx";
+import DemoLayout from "./layouts/DemoLayout.jsx";
 import DashboardShellLayout from "./layouts/DashboardShellLayout.jsx";
 import AdminShellLayout from "./layouts/AdminShellLayout.jsx";
 import AdminExchangeHubLayout from "./layouts/AdminExchangeHubLayout.jsx";
 import HomePage from "./pages/HomePage.jsx";
+import BusinessPageDemo from "./pages/BusinessPageDemo.jsx";
+import HomePageDemo from "./pages/HomePageDemo.jsx";
 import ListingsPage from "./pages/ListingsPage.jsx";
 import ExchangesListingsPage from "./pages/ExchangesListingsPage.jsx";
 import ExchangeBestRatesPage from "./pages/ExchangeBestRatesPage.jsx";
@@ -30,23 +33,37 @@ import AdminBusinessesPage from "./pages/admin/AdminBusinessesPage.jsx";
 import AdminExchangesPage from "./pages/admin/AdminExchangesPage.jsx";
 import AdminExchangeManagersPage from "./pages/admin/AdminExchangeManagersPage.jsx";
 import AdminExchangeBannersPage from "./pages/admin/AdminExchangeBannersPage.jsx";
+import AdminExchangeBannerEditPage from "./pages/admin/AdminExchangeBannerEditPage.jsx";
 import AdminEditBusinessPage from "./pages/admin/AdminEditBusinessPage.jsx";
 import AdminAddBusinessPage from "./pages/admin/AdminAddBusinessPage.jsx";
 import AdminAddExchangePage from "./pages/admin/AdminAddExchangePage.jsx";
 import AdminBulkImportPage from "./pages/admin/AdminBulkImportPage.jsx";
 import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage.jsx";
+import AdminCityImagesPage from "./pages/admin/AdminCityImagesPage.jsx";
 import AdminQrExportPage from "./pages/admin/AdminQrExportPage.jsx";
 import AdminClaimsPage from "./pages/admin/AdminClaimsPage.jsx";
 import AdminBusinessReportsPage from "./pages/admin/AdminBusinessReportsPage.jsx";
 import AdminLinkPage from "./pages/admin/AdminLinkPage.jsx";
-import AdminBillingPage from "./pages/admin/AdminBillingPage.jsx";
 import AdminManagersPage from "./pages/admin/AdminManagersPage.jsx";
 import AdminChatLogPage from "./pages/admin/AdminChatLogPage.jsx";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage.jsx";
 import AdminNotesTasksPage from "./pages/admin/AdminNotesTasksPage.jsx";
+import AdminTokensPage from "./pages/admin/AdminTokensPage.jsx";
+import DashboardWalletPage from "./pages/dashboard/DashboardWalletPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ManagerLoginPage from "./pages/ManagerLoginPage.jsx";
 import AdminLoginPage from "./pages/AdminLoginPage.jsx";
+import VerifyBusinessEmailPage from "./pages/VerifyBusinessEmailPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import ChangePasswordFirstLoginPage from "./pages/ChangePasswordFirstLoginPage.jsx";
+import BoostPlansPage from "./pages/BoostPlansPage.jsx";
+import BlogPage from "./pages/BlogPage.jsx";
+import BlogPostPage from "./pages/BlogPostPage.jsx";
+import AdminBlogPage from "./pages/admin/AdminBlogPage.jsx";
+import AdminBlogEditPage from "./pages/admin/AdminBlogEditPage.jsx";
+import TflPage from "./pages/TflPage.jsx";
+import AiSearchPage from "./pages/AiSearchPage.jsx";
 import { RequireManager, RequireSuperAdmin } from "./components/RequireAuth.jsx";
 import DesktopGate from "./components/DesktopGate.jsx";
 
@@ -79,18 +96,29 @@ export default function App() {
     <>
       <DesktopGate />
       <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<HomePageDemo />} />
+      <Route path="/demo-home" element={<Navigate to="/" replace />} />
+      <Route path="/demo-business" element={<BusinessPageDemo />} />
+      <Route element={<DemoLayout />}>
+        <Route path="/home-alt" element={<HomePage />} />
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/exchanges" element={<ExchangesListingsPage />} />
         <Route path="/exchanges/calculator" element={<ExchangeCalculatorPage />} />
         <Route path="/exchanges/best-rates" element={<ExchangeBestRatesPage />} />
         <Route path="/business" element={<BusinessPage />} />
         <Route path="/business-claimed" element={<BusinessClaimedPage />} />
+        <Route path="/boost-plans" element={<BoostPlansPage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/tfl" element={<TflPage />} />
+        <Route path="/ai-search" element={<AiSearchPage />} />
+        <Route path="/onboarding" element={<BusinessOnboardingPage />} />
+      </Route>
+      <Route element={<MainLayout />}>
+        <Route path="/business-legacy" element={<BusinessPage />} />
         <Route path="/map" element={<Navigate to="/listings" replace />} />
         <Route path="/advertise" element={<Navigate to="/" replace />} />
         <Route path="/claim" element={<ClaimPage />} />
-        <Route path="/onboarding" element={<BusinessOnboardingPage />} />
         <Route path="/manager-signup" element={<ManagerSignupPage />} />
       </Route>
 
@@ -98,6 +126,10 @@ export default function App() {
       <Route path="/login" element={<ManagerLoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/onboarding/exchange" element={<ExchangeOnboardingPage />} />
+      <Route path="/verify-business-email" element={<VerifyBusinessEmailPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/change-password" element={<ChangePasswordFirstLoginPage />} />
 
       {/* صفحهٔ لینک‌تک (Biolink) بدون هدر سایت — تمام‌قد و قابل اشتراک روی دسکتاپ */}
       <Route path="/l/:slug" element={<BiolinkPublicPage />} />
@@ -119,6 +151,7 @@ export default function App() {
         <Route path="calls" element={<DashboardCallsPage />} />
         <Route path="qr" element={<DashboardQrPage />} />
         <Route path="biolink" element={<DashboardBiolinkPage />} />
+        <Route path="wallet" element={<DashboardWalletPage />} />
       </Route>
 
       <Route
@@ -136,19 +169,23 @@ export default function App() {
           <Route path="add" element={<AdminAddExchangePage />} />
           <Route path="managers" element={<AdminExchangeManagersPage />} />
           <Route path="banners" element={<AdminExchangeBannersPage />} />
+          <Route path="banners/:id" element={<AdminExchangeBannerEditPage />} />
         </Route>
         <Route path="/admin-exchanges" element={<Navigate to="/admin/exchanges" replace />} />
         <Route path="/admin-add" element={<AdminAddBusinessPage />} />
         <Route path="/admin-import" element={<AdminBulkImportPage />} />
         <Route path="/admin-categories" element={<AdminCategoriesPage />} />
+        <Route path="/admin-city-images" element={<AdminCityImagesPage />} />
         <Route path="/admin-qr-export" element={<AdminQrExportPage />} />
         <Route path="/admin-edit" element={<AdminEditBusinessPage />} />
         <Route path="/admin-claims" element={<AdminClaimsPage />} />
         <Route path="/admin-business-reports" element={<AdminBusinessReportsPage />} />
         <Route path="/admin-link" element={<AdminLinkPage />} />
-        <Route path="/admin-billing" element={<AdminBillingPage />} />
+        <Route path="/admin-tokens" element={<AdminTokensPage />} />
         <Route path="/admin-managers" element={<AdminManagersPage />} />
         <Route path="/admin-chat-log" element={<AdminChatLogPage />} />
+        <Route path="/admin-blog" element={<AdminBlogPage />} />
+        <Route path="/admin-blog/:id" element={<AdminBlogEditPage />} />
         <Route path="/admin-settings" element={<AdminSettingsPage />} />
         <Route path="/admin-system-logs" element={<Navigate to="/admin-settings#logs" replace />} />
         <Route path="/admin-security" element={<Navigate to="/admin-settings#security" replace />} />

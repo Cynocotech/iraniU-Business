@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ListingCard from "../components/ListingCard.jsx";
-import AiSearch from "../components/AiSearch.jsx";
 import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
@@ -263,6 +262,7 @@ export default function ListingsPage() {
           <div className="listings-hero__actions">
             <Link to="/exchanges" className="demo-btn demo-btn--outline">صرافی‌ها</Link>
             <Link to="/onboarding" className="demo-btn demo-btn--accent">ثبت کسب‌وکار رایگان</Link>
+            <Link to="/ai-search" className="demo-btn demo-btn--outline">✨ جستجوی هوشمند</Link>
           </div>
         </div>
       </div>
@@ -350,8 +350,6 @@ export default function ListingsPage() {
       )}
 
       <main className="listings-main" aria-labelledby="listings-title">
-
-      <AiSearch />
 
       <form
         key={searchParams.toString()}
