@@ -262,7 +262,6 @@ export default function ListingsPage() {
           <div className="listings-hero__actions">
             <Link to="/exchanges" className="demo-btn demo-btn--outline">صرافی‌ها</Link>
             <Link to="/onboarding" className="demo-btn demo-btn--accent">ثبت کسب‌وکار رایگان</Link>
-            <Link to="/ai-search" className="demo-btn demo-btn--outline">✨ جستجوی هوشمند</Link>
           </div>
         </div>
       </div>

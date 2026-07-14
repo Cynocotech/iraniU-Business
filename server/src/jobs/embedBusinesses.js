@@ -154,22 +154,15 @@ async function main() {
 
     console.log(`[embed] ${businesses.length} approved businesses`);
 
-    let skipped = 0;
     let embedded = 0;
     let failed = 0;
 
-    const toEmbed = [];
-    for (const b of businesses) {
+    const toEmbed = businesses.map((b) => {
       const blob = buildBlob(b);
-      const hash = sha256(blob);
-      if (b.embedding_hash === hash) {
-        skipped++;
-      } else {
-        toEmbed.push({ ...b, _blob: blob, _hash: hash });
-      }
-    }
+      return { ...b, _blob: blob, _hash: sha256(blob) };
+    });
 
-    console.log(`[embed] ${toEmbed.length} need embedding, ${skipped} unchanged`);
+    console.log(`[embed] ${toEmbed.length} businesses to embed`);
 
     for (let i = 0; i < toEmbed.length; i += BATCH_SIZE) {
       const batch = toEmbed.slice(i, i + BATCH_SIZE);
@@ -197,7 +190,7 @@ async function main() {
     }
 
     console.log(
-      `\n[embed] Summary — total: ${businesses.length}, skipped: ${skipped}, embedded: ${embedded}, failed: ${failed}`
+      `\n[embed] Summary — total: ${businesses.length}, embedded: ${embedded}, failed: ${failed}`
     );
   } finally {
     client.release();
