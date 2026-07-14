@@ -89,13 +89,31 @@ async function retrieveByName(nameKeyword, { city, isExchange, isJob }) {
     `SELECT ${BUSINESS_COLS}
        FROM public.businesses
       WHERE listing_approval = 'approved'
-        AND name_fa ILIKE '%' || $1 || '%'
+        AND (name_fa ILIKE '%' || $1 || '%'
+          OR listing_title ILIKE '%' || $1 || '%'
+          OR subtitle ILIKE '%' || $1 || '%')
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
         AND (NOT $4 OR careers_title IS NOT NULL)
       ORDER BY rating DESC NULLS LAST
       LIMIT 20`,
     [nameKeyword, city || null, !!isExchange, !!isJob]
+  );
+  return rows;
+}
+
+async function retrieveByCategory(category, { city, isExchange, isJob }) {
+  const { rows } = await pool.query(
+    `SELECT ${BUSINESS_COLS}
+       FROM public.businesses
+      WHERE listing_approval = 'approved'
+        AND category ILIKE '%' || $1 || '%'
+        AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
+        AND (NOT $3 OR exchange_manager_id IS NOT NULL)
+        AND (NOT $4 OR careers_title IS NOT NULL)
+      ORDER BY rating DESC NULLS LAST
+      LIMIT 15`,
+    [category, city || null, !!isExchange, !!isJob]
   );
   return rows;
 }
@@ -111,10 +129,16 @@ async function retrieveCandidates(queryVec, { city, isExchange, isJob }) {
         AND (NOT $2 OR exchange_manager_id IS NOT NULL)
         AND (NOT $3 OR careers_title IS NOT NULL)
       ORDER BY embedding <=> $4::vector
-      LIMIT 10`,
+      LIMIT 20`,
     [city || null, !!isExchange, !!isJob, vecStr]
   );
   return rows;
+}
+
+function mergeCandidates(primary, secondary) {
+  const seen = new Set(primary.map((r) => r.slug));
+  const extra = secondary.filter((r) => !seen.has(r.slug));
+  return [...primary, ...extra].slice(0, 25);
 }
 
 router.post("/", async (req, res) => {
@@ -162,12 +186,14 @@ router.post("/", async (req, res) => {
       {
         role: "system",
         content: `شما یک دستیار تجزیه‌گر جستجو برای دایرکتوری کسب‌وکارهای ایرانی در بریتانیا هستید. خروجی باید JSON با این کلیدها باشد:
-{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean}
-- is_off_topic را true کنید اگر سوال کاربر اصلاً مربوط به پیدا کردن کسب‌وکار، خدمات یا محصول نیست (مثلاً سوالات عمومی، اخبار، دستور غذا، سیاست و غیره).
-- is_exchange_query را true کنید اگر کاربر صرافی یا تبادل ارز می‌خواهد.
-- is_job_query را true کنید اگر دنبال کار یا استخدام است.
-- name_contains را پر کنید اگر کاربر به دنبال کسب‌وکارهایی است که کلمه‌ای خاص در نامشان دارند (مثلاً «نامشان ایران دارد» → name_contains: «ایران»).
-- city را همیشه به انگلیسی بنویسید (مثلاً London نه لندن، Manchester نه منچستر).`,
+{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean, "keywords_en": string|null}
+- is_off_topic: true اگر سوال اصلاً مربوط به پیدا کردن کسب‌وکار، خدمات یا محصول نیست (اخبار، دستور غذا، سیاست و غیره).
+- is_exchange_query: true اگر کاربر صرافی یا تبادل ارز می‌خواهد.
+- is_job_query: true اگر دنبال کار یا استخدام است.
+- name_contains: پر کنید اگر کاربر به دنبال کسب‌وکارهایی با کلمه‌ای خاص در نامشان است (مثلاً «نامشان ایران دارد» → «ایران»).
+- keywords_en: ترجمه انگلیسی کلیدواژه‌های اصلی جستجو برای بهبود جستجوی معنایی (مثلاً «رستوران وکیل پزشک» → «restaurant lawyer doctor physician»).
+- category: دسته کسب‌وکار به فارسی اگر مشخص است (مثلاً «رستوران»، «وکیل»، «صرافی»).
+- city: همیشه به انگلیسی (London نه لندن، Manchester نه منچستر).`,
       },
       { role: "user", content: q },
     ]);
@@ -191,18 +217,23 @@ router.post("/", async (req, res) => {
   const isJob = !!parsed.is_job_query;
   const nameContains = typeof parsed.name_contains === "string" && parsed.name_contains.trim()
     ? parsed.name_contains.trim() : null;
+  const category = typeof parsed.category === "string" && parsed.category.trim()
+    ? parsed.category.trim() : null;
+  const keywordsEn = typeof parsed.keywords_en === "string" && parsed.keywords_en.trim()
+    ? parsed.keywords_en.trim() : null;
 
   // Retrieve candidates
   let candidates;
   try {
     if (nameContains) {
-      // Name-keyword query: search directly by business name
+      // Name-keyword query: direct name/title/subtitle text search
       candidates = await retrieveByName(nameContains, { city, isExchange, isJob });
     } else {
-      // Semantic query: embed then vector search
+      // Semantic query: bilingual embedding + vector search + optional category hybrid
+      const embeddingInput = keywordsEn ? `${q}\n${keywordsEn}` : q;
       let queryVec;
       try {
-        queryVec = await openaiEmbed(q);
+        queryVec = await openaiEmbed(embeddingInput);
       } catch (e) {
         console.error("[ai-search] embed step failed:", e.message);
         return res.status(503).json({
@@ -212,7 +243,13 @@ router.post("/", async (req, res) => {
       }
       candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
       if (candidates.length < 3 && city) {
+        // Too few with city filter — broaden to all cities
         candidates = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+      }
+      // Hybrid: also pull direct category matches and merge
+      if (category) {
+        const catRows = await retrieveByCategory(category, { city, isExchange, isJob });
+        candidates = mergeCandidates(candidates, catRows);
       }
     }
   } catch (e) {
@@ -237,7 +274,7 @@ router.post("/", async (req, res) => {
     name: c.name_fa,
     category: c.category || "",
     city: c.city || "",
-    about: String(c.listing_title || c.subtitle || c.description || "").slice(0, 120),
+    about: [c.listing_title, c.subtitle, c.description].filter(Boolean).join(" — ").slice(0, 200),
   }));
 
   let recommendation = {};
@@ -245,9 +282,10 @@ router.post("/", async (req, res) => {
     recommendation = await openaiChat([
       {
         role: "system",
-        content: `شما یک دستیار راهنمای کسب‌وکار ایرانی در بریتانیا (ایرانیو) هستید. فقط از لیست ارائه‌شده انتخاب کنید — هیچ slug دیگری را اختراع نکنید. حداکثر ۵ کسب‌وکار. خروجی JSON:
+        content: `شما یک دستیار راهنمای کسب‌وکار ایرانی در بریتانیا (ایرانیو) هستید. فقط از لیست ارائه‌شده انتخاب کنید — هیچ slug دیگری را اختراع نکنید. حداکثر ۸ کسب‌وکار. خروجی JSON:
 {"answer_fa": string, "businesses": [{"slug": string, "reason_fa": string}]}
-اگر هیچ‌کدام واقعاً مناسب نبودند، businesses را خالی بگذارید و در answer_fa با ادب توضیح دهید و پیشنهاد دهید کاربر عبارت دیگری امتحان کند.`,
+- همه گزینه‌های مرتبط را انتخاب کنید؛ محدودیت سختگیرانه‌ای نداشته باشید.
+- اگر هیچ‌کدام واقعاً مناسب نبودند، businesses را خالی بگذارید و در answer_fa توضیح دهید.`,
       },
       {
         role: "user",
@@ -274,7 +312,7 @@ router.post("/", async (req, res) => {
   const businesses = Array.isArray(recommendation.businesses)
     ? recommendation.businesses
         .filter((r) => r?.slug && allowedSlugs.has(r.slug))
-        .slice(0, 5)
+        .slice(0, 8)
         .map((r) => {
           const c = bySlug.get(r.slug);
           return {
