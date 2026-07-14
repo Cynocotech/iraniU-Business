@@ -9,6 +9,19 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GPT_MODEL = "gpt-4o-mini";
 const EMBED_MODEL = "text-embedding-3-small";
 
+function stripHtml(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 const _rateMap = new Map();
 const RATE_LIMIT = 10;
@@ -104,7 +117,7 @@ async function openaiEmbed(text) {
 const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
             category, city, address, postcode, rating, price_range,
             phone, reservation_link, cover_image_url, promo_title,
-            careers_title, exchange_manager_id`;
+            careers_title, exchange_manager_id, ai_tags_json`;
 
 async function retrieveByName(nameKeyword, { city, isExchange, isJob, isPromo }) {
   // Search only name_fa — listing_title is auto-generated ("X ایرانی در Y لندن") and
@@ -123,6 +136,57 @@ async function retrieveByName(nameKeyword, { city, isExchange, isJob, isPromo })
     [nameKeyword, city || null, !!isExchange, !!isJob, !!isPromo]
   );
   return rows;
+}
+
+// Extract keywords from a query that should match literally in descriptions
+// (acronyms, brand names, specific terms not well-captured by vectors alone)
+function extractLiteralKeywords(query) {
+  const keywords = [];
+  // Uppercase acronyms of 2–6 chars (DSS, NHS, DWP, etc.)
+  const acronyms = query.match(/\b[A-Z]{2,6}\b/g) || [];
+  keywords.push(...acronyms);
+  // English words mixed in Farsi text
+  const enWords = query.match(/\b[A-Za-z]{3,}\b/g) || [];
+  enWords.forEach((w) => { if (!keywords.includes(w.toUpperCase())) keywords.push(w); });
+  return [...new Set(keywords)].filter((k) => k.length >= 2);
+}
+
+async function retrieveByDescriptionKeyword(keywords, { city, isExchange, isJob, isPromo }) {
+  if (!keywords.length) return [];
+  // Match keywords in description OR ai_tags_json
+  const conditions = keywords.map((_, i) =>
+    `(description ILIKE '%' || $${i + 6} || '%' OR ai_tags_json ILIKE '%' || $${i + 6} || '%')`
+  ).join(" OR ");
+  const { rows } = await pool.query(
+    `SELECT ${BUSINESS_COLS}
+       FROM public.businesses
+      WHERE listing_approval = 'approved'
+        AND ($1::text IS NULL OR city ILIKE '%' || $1 || '%' OR address ILIKE '%' || $1 || '%')
+        AND (NOT $2 OR exchange_manager_id IS NOT NULL)
+        AND (NOT $3 OR (careers_title IS NOT NULL AND careers_title != ''))
+        AND (NOT $4 OR (promo_title IS NOT NULL AND promo_title != ''))
+        AND (${conditions})
+      ORDER BY rating DESC NULLS LAST
+      LIMIT $5`,
+    [city || null, !!isExchange, !!isJob, !!isPromo, 15, ...keywords]
+  );
+  return rows;
+}
+
+// Return the most relevant 400-char excerpt from a description for a set of keywords
+function bestExcerpt(text, keywords, maxLen = 400) {
+  if (!text) return "";
+  const clean = stripHtml(text);
+  if (!keywords.length) return clean.slice(0, maxLen);
+  const lower = clean.toLowerCase();
+  let bestPos = -1;
+  for (const kw of keywords) {
+    const pos = lower.indexOf(kw.toLowerCase());
+    if (pos !== -1 && (bestPos === -1 || pos < bestPos)) bestPos = pos;
+  }
+  if (bestPos === -1) return clean.slice(0, maxLen);
+  const start = Math.max(0, bestPos - 80);
+  return (start > 0 ? "…" : "") + clean.slice(start, start + maxLen);
 }
 
 async function retrieveByCategory(category, { city, isExchange, isJob, isPromo }) {
@@ -154,7 +218,7 @@ async function retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo }
         AND (NOT $3 OR (careers_title IS NOT NULL AND careers_title != ''))
         AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
       ORDER BY embedding <=> $4::vector
-      LIMIT 20`,
+      LIMIT 30`,
     [city || null, !!isExchange, !!isJob, vecStr, !!isPromo]
   );
   return rows;
@@ -163,7 +227,7 @@ async function retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo }
 function mergeCandidates(primary, secondary) {
   const seen = new Set(primary.map((r) => r.slug));
   const extra = secondary.filter((r) => !seen.has(r.slug));
-  return [...primary, ...extra].slice(0, 25);
+  return [...primary, ...extra].slice(0, 35);
 }
 
 // ── Main search endpoint ──────────────────────────────────────────────────────
@@ -278,6 +342,9 @@ router.post("/", async (req, res) => {
   // Embedding input: prefer the expanded search_text, fall back to bilingual raw query
   const embeddingInput = searchText || (keywordsEn ? `${q}\n${keywordsEn}` : q);
 
+  // Literal keywords that should match directly in descriptions (acronyms, brand names, etc.)
+  const literalKeywords = extractLiteralKeywords(q);
+
   // Retrieve candidates
   let candidates = [];
   let cityFallback = false;
@@ -309,6 +376,12 @@ router.post("/", async (req, res) => {
       if (category) {
         const catRows = await retrieveByCategory(category, { city, isExchange, isJob, isPromo });
         candidates = mergeCandidates(candidates, catRows);
+      }
+      // Keyword leg: find businesses whose description explicitly mentions specific terms
+      // (e.g. DSS, NHS, DWP) — these often rank low in vector search but are directly relevant
+      if (literalKeywords.length) {
+        const kwRows = await retrieveByDescriptionKeyword(literalKeywords, { city, isExchange, isJob, isPromo });
+        if (kwRows.length) candidates = mergeCandidates(kwRows, candidates);
       }
     }
 
@@ -343,19 +416,30 @@ router.post("/", async (req, res) => {
   }
 
   // Build slim candidate list for the recommender
-  const slim = candidates.map((c) => ({
-    slug: c.slug,
-    name: c.name_fa,
-    category: c.category || "",
-    city: c.city || "",
-    about: [
-      c.listing_title,
-      c.subtitle,
-      c.description,
-      c.careers_title && `استخدام: ${c.careers_title}`,
-      c.promo_title && `تخفیف: ${c.promo_title}`,
-    ].filter(Boolean).join(" — ").slice(0, 300),
-  }));
+  // Keywords to anchor the description excerpt (literal terms from query + English keywords)
+  const excerptKeywords = [
+    ...literalKeywords,
+    ...(keywordsEn ? keywordsEn.split(/[\s,]+/).filter((w) => w.length >= 3) : []),
+  ];
+
+  const slim = candidates.map((c) => {
+    let tags = [];
+    try { tags = JSON.parse(c.ai_tags_json || "[]"); } catch {}
+    return {
+      slug: c.slug,
+      name: c.name_fa,
+      category: c.category || "",
+      city: c.city || "",
+      tags: tags.length ? tags.join(", ") : undefined,
+      about: [
+        c.listing_title,
+        c.subtitle,
+        bestExcerpt(c.description, excerptKeywords, 400),
+        c.careers_title && `استخدام: ${c.careers_title}`,
+        c.promo_title && `تخفیف: ${c.promo_title}`,
+      ].filter(Boolean).join(" — ").slice(0, 500),
+    };
+  });
 
   const cityFallbackNote =
     cityFallback && city
