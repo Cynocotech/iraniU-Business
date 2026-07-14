@@ -21,6 +21,66 @@ const EXCHANGE_FEATURE_LABELS = {
   fast_transfer: "انتقال سریع",
 };
 
+// English region name → Farsi equivalents (for cross-language search)
+const CITY_FARSI = {
+  "north london":      "شمال لندن",
+  "south london":      "جنوب لندن",
+  "west london":       "غرب لندن",
+  "east london":       "شرق لندن",
+  "central london":    "مرکز لندن",
+  "north west london": "شمال غرب لندن",
+  "north east london": "شمال شرق لندن",
+  "south west london": "جنوب غرب لندن",
+  "south east london": "جنوب شرق لندن",
+  "london":            "لندن",
+  "manchester":        "منچستر",
+  "birmingham":        "بیرمنگام",
+  "leeds":             "لیدز",
+  "edinburgh":         "ادینبورو",
+  "glasgow":           "گلاسکو",
+  "bristol":           "بریستول",
+};
+
+// UK postcode area → human-readable region (English + Farsi)
+const POSTCODE_AREA_REGION = {
+  N:  "North London / شمال لندن",
+  NW: "North West London / شمال غرب لندن",
+  E:  "East London / شرق لندن",
+  EC: "East Central London / شرق مرکز لندن",
+  SE: "South East London / جنوب شرق لندن",
+  SW: "South West London / جنوب غرب لندن",
+  W:  "West London / غرب لندن",
+  WC: "West Central London / غرب مرکز لندن",
+  BR: "Bromley, South East London / جنوب شرق لندن",
+  CR: "Croydon, South London / جنوب لندن",
+  EN: "Enfield, North London / شمال لندن",
+  HA: "Harrow, West London / غرب لندن",
+  IG: "Ilford, East London / شرق لندن",
+  KT: "Kingston, South West London / جنوب غرب لندن",
+  RM: "Romford, East London / شرق لندن",
+  SM: "Sutton, South London / جنوب لندن",
+  TW: "Twickenham, West London / غرب لندن",
+  UB: "Uxbridge, West London / غرب لندن",
+  WD: "Watford, North West London / شمال غرب لندن",
+  M:  "Manchester / منچستر",
+  B:  "Birmingham / بیرمنگام",
+  LS: "Leeds / لیدز",
+  EH: "Edinburgh / ادینبورو",
+  G:  "Glasgow / گلاسکو",
+  BS: "Bristol / بریستول",
+};
+
+function postcodeToRegion(postcode) {
+  if (!postcode) return null;
+  const clean = postcode.replace(/\s/g, "").toUpperCase();
+  const area2 = clean.slice(0, 2).replace(/[0-9]/g, "");
+  const area1 = clean.slice(0, 1);
+  // Try longest match first
+  if (area2.length === 2 && POSTCODE_AREA_REGION[area2]) return POSTCODE_AREA_REGION[area2];
+  if (area1 && POSTCODE_AREA_REGION[area1]) return POSTCODE_AREA_REGION[area1];
+  return null;
+}
+
 function hoursToFarsi(json, id) {
   try {
     const arr = JSON.parse(json);
@@ -65,6 +125,11 @@ function buildBlob(b) {
   const locationParts = [b.address, b.city, b.postcode].filter(Boolean);
   const location = locationParts.length ? locationParts.join("، ") : null;
 
+  // Farsi translation of city/region for cross-language search
+  const cityFarsi = b.city ? CITY_FARSI[b.city.toLowerCase().trim()] : null;
+  // Human-readable region from postcode (English + Farsi)
+  const postcodeRegion = postcodeToRegion(b.postcode);
+
   const hoursStr = b.hours_json ? hoursToFarsi(b.hours_json, b.id) : null;
   const paymentsStr = b.payment_methods_json ? paymentsToFarsi(b.payment_methods_json, b.id) : null;
   const featuresStr =
@@ -88,6 +153,8 @@ function buildBlob(b) {
     b.category && `دسته‌بندی: ${b.category}`,
     b.description && `توضیحات: ${String(b.description).slice(0, 2000)}`,
     location && `مکان: ${location}`,
+    cityFarsi && `منطقه: ${cityFarsi}`,
+    postcodeRegion && `ناحیهٔ کدپستی: ${postcodeRegion}`,
     b.price_range && `محدوده قیمت: ${b.price_range}`,
     hoursStr && `ساعات کاری: ${hoursStr}`,
     paymentsStr && `روش‌های پرداخت: ${paymentsStr}`,
