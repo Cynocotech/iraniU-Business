@@ -241,6 +241,11 @@ router.post("/", async (req, res) => {
   }
 
   if (parsed.is_off_topic) {
+    pool.query(
+      `INSERT INTO public.ai_search_logs (query, parsed_json, search_text, result_count, duration_ms)
+       VALUES ($1, $2, $3, 0, $4)`,
+      [q, JSON.stringify(parsed), null, Date.now() - t0]
+    ).catch((e) => console.warn("[ai-search] log insert failed:", e.message));
     return res.json({
       answer_fa:
         "این دستیار فقط برای جستجوی کسب‌وکارهای ایرانی در بریتانیا طراحی شده است. لطفاً نام یک کسب‌وکار، خدمت یا محصول را جستجو کنید — مثلاً «رستوران در لندن» یا «وکیل مهاجرت».",
@@ -325,6 +330,11 @@ router.post("/", async (req, res) => {
   }
 
   if (candidates.length === 0) {
+    pool.query(
+      `INSERT INTO public.ai_search_logs (query, parsed_json, search_text, result_count, duration_ms)
+       VALUES ($1, $2, $3, 0, $4)`,
+      [q, JSON.stringify(parsed), searchText || null, Date.now() - t0]
+    ).catch((e) => console.warn("[ai-search] log insert failed:", e.message));
     return res.json({
       answer_fa:
         "متأسفانه کسب‌وکاری با این مشخصات در فهرست ایرانیو پیدا نشد. عبارت دیگری امتحان کنید.",
