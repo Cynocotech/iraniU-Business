@@ -77,6 +77,7 @@ const PATCHABLE_BUSINESS = new Set([
   "exchange_features_json",
   "exchange_today_rate_enabled",
   "logo_url",
+  "ai_tags_json",
 ]);
 
 /** گزارش‌های آگهی — کلیدها باید با کلاینت هم‌خوان باشند */
@@ -832,11 +833,22 @@ app.get("/api/admin/businesses-search", requireSuperAdmin, asyncHandler(async (r
   if (!Number.isFinite(limit) || limit < 1) limit = ADMIN_BUSINESSES_PAGE_SIZE_DEFAULT;
   limit = Math.min(ADMIN_BUSINESSES_PAGE_SIZE_MAX, limit);
 
+  const filterApproval = String(req.query.approval || "").trim();
+  const filterCity     = String(req.query.city || "").trim();
+  const filterClaimed  = String(req.query.claimed || "").trim();
+  const filterCategory = String(req.query.category || "").trim();
+
   const all = await dbAll(
     `SELECT * FROM businesses ORDER BY CASE WHEN listing_approval = 'pending' THEN 0 ELSE 1 END, name_fa`
   );
   const tokens = raw ? raw.toLowerCase().split(/\s+/).filter(Boolean) : [];
-  const filtered = tokens.length ? all.filter((row) => adminBusinessMatchesSearchTokens(row, tokens)) : all;
+  let filtered = tokens.length ? all.filter((row) => adminBusinessMatchesSearchTokens(row, tokens)) : all;
+  if (filterApproval) filtered = filtered.filter((r) => (r.listing_approval || "approved") === filterApproval);
+  if (filterCity)     filtered = filtered.filter((r) => r.city === filterCity);
+  if (filterCategory) filtered = filtered.filter((r) => r.category === filterCategory);
+  if (filterClaimed === "claimed")   filtered = filtered.filter((r) => r.claimed === 1);
+  if (filterClaimed === "unclaimed") filtered = filtered.filter((r) => !r.claimed || r.claimed === 0);
+
   const total = filtered.length;
   const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
   if (page > totalPages) page = totalPages;
@@ -966,6 +978,31 @@ app.get("/api/cities", asyncHandler(async (_req, res) => {
        ORDER BY city ASC`
   );
   res.json(rows.map(r => r.city));
+}));
+
+app.get("/api/businesses/check-name-fa", asyncHandler(async (req, res) => {
+  const name = String(req.query.name || "").trim();
+  if (!name) return res.json({ available: false, reason: "empty" });
+  const taken = await dbGet(`SELECT 1 FROM businesses WHERE name_fa = $1`, [name]);
+  return res.json({ available: !taken });
+}));
+
+app.get("/api/businesses/check-email", asyncHandler(async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.json({ available: false, reason: "invalid_format" });
+  }
+  const taken = await dbGet(`SELECT 1 FROM businesses WHERE LOWER(listing_contact_email) = $1`, [email]);
+  return res.json({ available: !taken });
+}));
+
+app.get("/api/businesses/check-slug", asyncHandler(async (req, res) => {
+  const slug = String(req.query.slug || "").trim().toLowerCase();
+  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    return res.json({ available: false, reason: "invalid_format" });
+  }
+  const taken = await dbGet(`SELECT 1 FROM businesses WHERE slug = $1`, [slug]);
+  return res.json({ available: !taken });
 }));
 
 app.get("/api/businesses/:slug", asyncHandler(async (req, res) => {
