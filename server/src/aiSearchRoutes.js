@@ -338,7 +338,13 @@ router.post("/", async (req, res) => {
     name: c.name_fa,
     category: c.category || "",
     city: c.city || "",
-    about: [c.listing_title, c.subtitle, c.description].filter(Boolean).join(" — ").slice(0, 200),
+    about: [
+      c.listing_title,
+      c.subtitle,
+      c.description,
+      c.careers_title && `استخدام: ${c.careers_title}`,
+      c.promo_title && `تخفیف: ${c.promo_title}`,
+    ].filter(Boolean).join(" — ").slice(0, 300),
   }));
 
   const cityFallbackNote =
