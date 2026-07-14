@@ -145,7 +145,8 @@ router.post("/", async (req, res) => {
         role: "system",
         content: `شما یک دستیار تجزیه‌گر جستجو هستید. کاربر یک عبارت جستجو می‌فرستد که ممکن است فارسی یا انگلیسی باشد. خروجی باید JSON با این کلیدها باشد:
 {"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean}
-فقط مقادیری را پر کنید که به‌صراحت در عبارت جستجو وجود دارند. is_exchange_query را true کنید اگر کاربر صرافی یا تبادل ارز می‌خواهد. is_job_query را true کنید اگر دنبال کار یا استخدام است.`,
+فقط مقادیری را پر کنید که به‌صراحت در عبارت جستجو وجود دارند. is_exchange_query را true کنید اگر کاربر صرافی یا تبادل ارز می‌خواهد. is_job_query را true کنید اگر دنبال کار یا استخدام است.
+مهم: مقدار city را همیشه به انگلیسی بنویسید (مثلاً London نه لندن، Manchester نه منچستر).`,
       },
       { role: "user", content: q },
     ]);
@@ -177,8 +178,8 @@ router.post("/", async (req, res) => {
   let candidates;
   try {
     candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
-    if (candidates.length === 0 && city) {
-      // Retry without city filter
+    if (candidates.length < 3 && city) {
+      // Too few results with city filter — retry without to get better coverage
       candidates = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
     }
   } catch (e) {
