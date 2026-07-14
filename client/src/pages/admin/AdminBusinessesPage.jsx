@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet, apiPost } from "../../api.js";
+import { apiGet, apiPost, apiPatch } from "../../api.js";
 import { useAdminPanelSearch } from "../../context/AdminPanelSearchContext.jsx";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200, 500];
 const DEFAULT_PAGE_SIZE = 10;
+
+const CITY_OPTIONS = [
+  "North London",
+  "West London",
+  "South London",
+  "East London",
+  "Central London",
+  "London",
+];
+
+const CATEGORY_OPTIONS = [
+  "رستوران","وکیل","بازسازی خانه","آرایشگاه","سالن زیبایی","دندانپزشک",
+  "خدمات ساختمان","فروشگاه","مکانیک","پیتزا و ساندویچ","فرش","کافی شاپ",
+  "کلینیک زیبایی","سایر خدمات","شرکت های صنعتی","خدمات مالی","صرافی",
+  "دکتر","مشاور","آموزش","طراحی","بیمه","حمل و نقل","تعمیرات",
+];
 
 function sortBusinessRows(list) {
   list.sort((a, b) => {
@@ -40,12 +56,25 @@ export default function AdminBusinessesPage() {
   const [toast, setToast] = useState(null);
   const [rejectSlug, setRejectSlug] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [claimingSlug, setClaimingSlug] = useState(null);
+  const [claimModalSlug, setClaimModalSlug] = useState(null);
+  const [filterApproval, setFilterApproval] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterClaimed, setFilterClaimed] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
   const selectAllRef = useRef(null);
 
-  const fetchFromServer = useCallback(async (q, pageNum, limit) => {
-    const raw = await apiGet(
-      `/api/admin/businesses-search?q=${encodeURIComponent(q)}&page=${pageNum}&limit=${limit}`
-    );
+  const fetchFromServer = useCallback(async (q, pageNum, limit, filters = {}) => {
+    const params = new URLSearchParams({
+      q,
+      page: pageNum,
+      limit,
+      ...(filters.approval  ? { approval:  filters.approval  } : {}),
+      ...(filters.city      ? { city:      filters.city      } : {}),
+      ...(filters.claimed   ? { claimed:   filters.claimed   } : {}),
+      ...(filters.category  ? { category:  filters.category  } : {}),
+    });
+    const raw = await apiGet(`/api/admin/businesses-search?${params.toString()}`);
     const items = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : [];
     sortBusinessRows(items);
     setRows(items);
@@ -80,19 +109,22 @@ export default function AdminBusinessesPage() {
     return () => clearTimeout(t);
   }, [query]);
 
+  useEffect(() => { setPage(1); }, [filterApproval, filterCity, filterClaimed, filterCategory]);
+
   useEffect(() => {
     let cancelled = false;
     const q = debouncedQuery;
     const p = page;
+    const filters = { approval: filterApproval, city: filterCity, claimed: filterClaimed, category: filterCategory };
     (async () => {
       setErr(null);
-      if (String(q).trim()) {
+      if (String(q).trim() || filterApproval || filterCity || filterClaimed || filterCategory) {
         setSearching(true);
       } else {
         setLoading(true);
       }
       try {
-        await fetchFromServer(q, p, pageSize);
+        await fetchFromServer(q, p, pageSize, filters);
       } catch {
         if (!cancelled) setErr("بارگذاری یا جستجو ناموفق بود. سرور را بررسی کنید.");
       } finally {
@@ -105,7 +137,7 @@ export default function AdminBusinessesPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, page, pageSize, fetchFromServer]);
+  }, [debouncedQuery, page, pageSize, filterApproval, filterCity, filterClaimed, filterCategory, fetchFromServer]);
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -119,8 +151,9 @@ export default function AdminBusinessesPage() {
   const refetchAfterMutation = async () => {
     setErr(null);
     setSearching(true);
+    const filters = { approval: filterApproval, city: filterCity, claimed: filterClaimed, category: filterCategory };
     try {
-      await fetchFromServer(debouncedQuery, page, pageSize);
+      await fetchFromServer(debouncedQuery, page, pageSize, filters);
     } catch {
       setErr("بارگذاری ناموفق بود.");
     } finally {
@@ -147,6 +180,46 @@ export default function AdminBusinessesPage() {
     setRejectSlug(slug);
     setRejectReason("");
     setToast(null);
+  };
+
+  const openClaimModal = (slug) => {
+    setClaimModalSlug(slug);
+  };
+
+  const closeClaimModal = () => {
+    if (claimingSlug) return;
+    setClaimModalSlug(null);
+  };
+
+  const confirmMarkAsClaimed = async () => {
+    if (!claimModalSlug || claimingSlug) return;
+
+    setClaimingSlug(claimModalSlug);
+    try {
+      await apiPatch(`/api/businesses/${encodeURIComponent(claimModalSlug)}`, { claimed: 1 });
+      setRows(prev => prev.map(r => r.slug === claimModalSlug ? { ...r, claimed: 1 } : r));
+      setToast({ msg: `✅ ${claimModalSlug} marked as Claimed`, type: "success" });
+      setTimeout(() => setToast(null), 3000);
+      setClaimModalSlug(null);
+    } catch (err) {
+      setToast({ msg: `❌ Error: ${err.message}`, type: "error" });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setClaimingSlug(null);
+    }
+  };
+
+  const handleUnclaim = async (slug) => {
+    if (!window.confirm(`آیا مطمئن هستید؟ وضعیت "مالک‌دار" از آگهی ${slug} حذف می‌شود.`)) return;
+    try {
+      await apiPost(`/api/admin/businesses/${encodeURIComponent(slug)}/unclaim`, {});
+      setRows(prev => prev.map(r => r.slug === slug ? { ...r, claimed: 0, manager_id: null, exchange_manager_id: null } : r));
+      setToast({ type: "ok", text: `✅ وضعیت مالک‌دار از ${slug} برداشته شد.` });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      setToast({ type: "err", text: err.message || String(err) });
+      setTimeout(() => setToast(null), 5000);
+    }
   };
 
   const closeRejectModal = () => {
@@ -273,7 +346,7 @@ export default function AdminBusinessesPage() {
 
   const qTrim = query.trim();
   const dqTrim = debouncedQuery.trim();
-  const hasFilter = dqTrim.length > 0;
+  const hasFilter = dqTrim.length > 0 || !!filterApproval || !!filterCity || !!filterClaimed || !!filterCategory;
   const searchPending = qTrim !== dqTrim;
   const { total, totalPages } = listMeta;
   const displayPage = listMeta.page;
@@ -282,17 +355,21 @@ export default function AdminBusinessesPage() {
 
   return (
     <>
-      <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
-        <Link to="/admin">← داشبورد</Link>
-        {" · "}
-        <Link to="/admin-edit">ویرایش آگهی</Link>
-      </p>
-      <section className="dashboard-panel">
-        <h2>همه آگهی‌ها</h2>
-        <p className="field-hint">
-          آگهی‌های ثبت‌شده از فرم عمومی «ثبت کسب‌وکار» تا زمان تأیید شما در ستون «انتشار» در حالت «در انتظار» می‌مانند و در سایت دیده نمی‌شوند.
-          آگهی با وضعیت «غیرفعال» در سایت عمومی نمایش داده نمی‌شود. جستجو با تأخیر کوتاه (Ajax) از سرور انجام می‌شود؛ تعداد آگهی در هر صفحه را از منوی زیر انتخاب کنید (حداکثر ۵۰۰). فیلد زیر با نوار جستجوی بالای پنل یکی است.
-        </p>
+      <div className="panel-page-title">
+        <div>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>همه آگهی‌ها</h2>
+          <p style={{ fontSize: "0.85rem", color: "#64748b", margin: "0.2rem 0 0" }}>
+            <Link to="/admin">← داشبورد</Link>
+            {" · "}
+            <Link to="/admin-edit">ویرایش آگهی</Link>
+          </p>
+        </div>
+      </div>
+      <div className="panel-card">
+        <div className="panel-card__head">
+          <h3 className="panel-card__title">فهرست آگهی‌ها</h3>
+        </div>
+        <div className="panel-card__body" style={{ paddingBottom: 0 }}>
 
         <div
           className="dashboard-actions"
@@ -343,8 +420,53 @@ export default function AdminBusinessesPage() {
           </button>
         </div>
 
+        {/* ── Filters ── */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", alignItems: "flex-end", marginBottom: "var(--space-md)" }}>
+          <div className="field" style={{ margin: 0, minWidth: 140 }}>
+            <label htmlFor="filter-approval" style={{ fontSize: "0.8rem", marginBottom: "0.2rem", display: "block" }}>وضعیت تأیید</label>
+            <select id="filter-approval" value={filterApproval} onChange={(e) => setFilterApproval(e.target.value)}>
+              <option value="">همه</option>
+              <option value="approved">تأیید شده</option>
+              <option value="pending">در انتظار</option>
+              <option value="rejected">رد شده</option>
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0, minWidth: 160 }}>
+            <label htmlFor="filter-city" style={{ fontSize: "0.8rem", marginBottom: "0.2rem", display: "block" }}>منطقه</label>
+            <select id="filter-city" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
+              <option value="">همه مناطق</option>
+              {CITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0, minWidth: 140 }}>
+            <label htmlFor="filter-claimed" style={{ fontSize: "0.8rem", marginBottom: "0.2rem", display: "block" }}>مالکیت</label>
+            <select id="filter-claimed" value={filterClaimed} onChange={(e) => setFilterClaimed(e.target.value)}>
+              <option value="">همه</option>
+              <option value="claimed">مالک‌دار</option>
+              <option value="unclaimed">بدون مالک</option>
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0, minWidth: 160 }}>
+            <label htmlFor="filter-category" style={{ fontSize: "0.8rem", marginBottom: "0.2rem", display: "block" }}>دسته‌بندی</label>
+            <select id="filter-category" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <option value="">همه دسته‌ها</option>
+              {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {(filterApproval || filterCity || filterClaimed || filterCategory) && (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem", alignSelf: "flex-end" }}
+              onClick={() => { setFilterApproval(""); setFilterCity(""); setFilterClaimed(""); setFilterCategory(""); }}
+            >
+              پاک کردن فیلترها ✕
+            </button>
+          )}
+        </div>
+
         <div className="field field--block" style={{ maxWidth: "min(100%, 28rem)", marginBottom: "var(--space-md)" }}>
-          <label htmlFor="admin-businesses-ajax-search">جستجوی Ajax در آگهی‌ها</label>
+          <label htmlFor="admin-businesses-ajax-search">جستجو</label>
           <input
             id="admin-businesses-ajax-search"
             type="search"
@@ -392,7 +514,6 @@ export default function AdminBusinessesPage() {
         )}
         {!loading && !err && (
           <div
-            className="table-wrap"
             style={{ position: "relative", opacity: searching || searchPending ? 0.65 : 1, transition: "opacity 0.15s" }}
           >
             {(searching || searchPending) && (
@@ -400,168 +521,86 @@ export default function AdminBusinessesPage() {
                 در حال بارگذاری
               </span>
             )}
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col" style={{ width: "2.5rem" }}>
-                    <span className="visually-hidden">انتخاب</span>
-                    <input
-                      ref={selectAllRef}
-                      type="checkbox"
-                      checked={allOnPageSelected}
-                      onChange={toggleSelectAllOnPage}
-                      aria-label="انتخاب همه در این صفحه"
-                    />
-                  </th>
-                  <th>نام</th>
-                  <th>نامک</th>
-                  <th>دسته</th>
-                  <th>انتشار</th>
-                  <th>پذیرش قوانین</th>
-                  <th>وضعیت آگهی</th>
-                  <th>پیش‌نمایش</th>
-                  <th>کانال تلگرام</th>
-                  <th>اقدام</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.slug}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedSlugs.includes(r.slug)}
-                        onChange={() => toggleSlug(r.slug)}
-                        aria-label={`انتخاب ${r.name_fa || r.slug}`}
-                      />
-                    </td>
-                    <td>{r.name_fa}</td>
-                    <td>
-                      <span lang="en" dir="ltr">
-                        {r.slug}
-                      </span>
-                    </td>
-                    <td>{r.category}</td>
-                    <td>
-                      {r.listing_approval === "pending" ? (
-                        <span className="status-pill" style={{ background: "rgba(183, 28, 28, 0.12)", color: "#b71c1c" }}>
-                          در انتظار تأیید
-                        </span>
-                      ) : r.listing_approval === "rejected" ? (
-                        <span className="status-pill">رد شده</span>
-                      ) : (
-                        <span className="status-pill status-pill--claimed">منتشر شده</span>
-                      )}
-                    </td>
-                    <td dir="ltr" style={{ fontSize: "0.82rem", lineHeight: 1.45 }}>
-                      {r.listing_terms_accepted_at ? (
-                        <>
-                          <span style={{ fontWeight: 600 }} title={`نسخهٔ متن: ${r.listing_terms_version || "—"}`}>
-                            نسخه {r.listing_terms_version || "—"}
-                          </span>
-                          <br />
-                          <time dateTime={r.listing_terms_accepted_at}>
-                            {new Date(r.listing_terms_accepted_at).toLocaleString("fa-IR")}
-                          </time>
-                        </>
-                      ) : (
-                        <span className="field-hint">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={rowIsActive(r) ? "status-pill status-pill--claimed" : "status-pill"}>
+            <div className="panel-biz-list">
+              {rows.map((r) => (
+                <div className="panel-biz-item" key={r.slug}>
+                  <div className="panel-biz-item__avatar" style={{
+                    background: rowIsActive(r)
+                      ? "linear-gradient(135deg,#6366f1,#a78bfa)"
+                      : "linear-gradient(135deg,#94a3b8,#cbd5e1)"
+                  }}>
+                    {(r.name_fa || r.slug || "?")[0]}
+                  </div>
+                  <div className="panel-biz-item__body">
+                    <p className="panel-biz-item__name">{r.name_fa || r.slug}</p>
+                    <p className="panel-biz-item__meta" dir="ltr">
+                      {[r.slug, r.category, r.city].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <div className="panel-biz-item__badges">
+                    {r.listing_approval === "pending" && (
+                      <span className="pbadge pbadge--yellow">در انتظار</span>
+                    )}
+                    {r.listing_approval === "rejected" && (
+                      <span className="pbadge pbadge--red">رد شده</span>
+                    )}
+                    {(!r.listing_approval || r.listing_approval === "approved") ? (
+                      <span className={`pbadge ${rowIsActive(r) ? "pbadge--green" : "pbadge--red"}`}>
                         {rowIsActive(r) ? "فعال" : "غیرفعال"}
                       </span>
-                    </td>
-                    <td>
-                      <Link
-                        className="btn btn--ghost"
-                        to={`/business?slug=${encodeURIComponent(r.slug)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        پیش‌نمایش
-                      </Link>
-                    </td>
-                    <td>
+                    ) : null}
+                    {r.claimed === 1 && <span className="pbadge pbadge--purple">مالک‌دار</span>}
+                  </div>
+                  <div className="panel-biz-item__actions">
+                    {(r.listing_approval === "pending" || r.listing_approval === "rejected") && (
                       <button
                         type="button"
-                        className="btn btn--accent"
+                        className="pact-btn pact-btn--green"
                         disabled={!!sendingSlug}
-                        onClick={() => sendToTelegram(r.slug)}
-                        title="ارسال به کانال دایرکتوری ایرانیو (نیاز به تنظیم ربات و کانال در سرور)"
+                        onClick={() => setApproval(r.slug, "approve")}
                       >
-                        {sendingSlug === r.slug ? "در حال ارسال…" : "ارسال به کانال"}
+                        {sendingSlug === r.slug + "approve" ? "…" : "تأیید"}
                       </button>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
-                        {(r.listing_approval === "pending" || r.listing_approval === "rejected") && (
-                          <button
-                            type="button"
-                            className="btn btn--primary"
-                            disabled={!!sendingSlug}
-                            onClick={() => setApproval(r.slug, "approve")}
-                          >
-                            {sendingSlug === r.slug + "approve" ? "…" : "تأیید انتشار"}
-                          </button>
-                        )}
-                        {r.listing_approval === "pending" && (
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            disabled={!!sendingSlug}
-                            onClick={() => openRejectModal(r.slug)}
-                          >
-                            رد
-                          </button>
-                        )}
-                        <Link className="btn btn--primary" to={`/admin-edit?slug=${encodeURIComponent(r.slug)}`}>
-                          ویرایش
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )}
+                    {r.listing_approval === "pending" && (
+                      <button type="button" className="pact-btn pact-btn--danger" disabled={!!sendingSlug} onClick={() => openRejectModal(r.slug)}>
+                        رد
+                      </button>
+                    )}
+                    <Link className="pact-btn pact-btn--primary" to={`/admin-edit?slug=${encodeURIComponent(r.slug)}`}>
+                      ویرایش
+                    </Link>
+                    <Link className="pact-btn pact-btn--ghost" to={`/business?slug=${encodeURIComponent(r.slug)}`} target="_blank" rel="noreferrer">
+                      پیش‌نمایش
+                    </Link>
+                    <button type="button" className="pact-btn pact-btn--ghost" disabled={!!sendingSlug} onClick={() => sendToTelegram(r.slug)} title="ارسال به تلگرام">
+                      <i className="fa-brands fa-telegram" />
+                    </button>
+                    {!r.claimed && (
+                      <button type="button" className="pact-btn pact-btn--danger" disabled={!!claimingSlug} onClick={() => openClaimModal(r.slug)} title="Mark Claimed">
+                        <i className="fa-solid fa-xmark" />
+                      </button>
+                    )}
+                    {r.claimed === 1 && (
+                      <button type="button" className="pact-btn pact-btn--ghost" onClick={() => handleUnclaim(r.slug)} style={{ fontSize: "0.7rem" }}>
+                        Unclaim
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
             {totalPages > 1 && (
-              <nav
-                className="field-hint"
-                aria-label="صفحه‌بندی آگهی‌ها"
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  marginTop: "var(--space-md)",
-                  justifyContent: "flex-start",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  disabled={!canPrev || searching || searchPending}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                >
-                  صفحهٔ قبل
-                </button>
-                <span dir="ltr">
-                  {displayPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  disabled={!canNext || searching || searchPending}
-                  onClick={() => setPage((prev) => prev + 1)}
-                >
-                  صفحهٔ بعد
-                </button>
-              </nav>
+              <div className="panel-pager">
+                <button className="panel-pager__btn" onClick={() => setPage((p) => p - 1)} disabled={!canPrev}>→</button>
+                <span className="panel-pager__info">صفحه {displayPage} از {totalPages}</span>
+                <button className="panel-pager__btn" onClick={() => setPage((p) => p + 1)} disabled={!canNext}>←</button>
+              </div>
             )}
           </div>
         )}
-      </section>
+        </div>
+      </div>
 
       {rejectSlug ? (
         <div
@@ -615,6 +654,88 @@ export default function AdminBusinessesPage() {
               </button>
               <button type="button" className="btn btn--primary" onClick={confirmReject} disabled={!!sendingSlug}>
                 {sendingSlug === rejectSlug + "reject" ? "در حال رد…" : "تأیید رد"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {claimModalSlug ? (
+        <div
+          className="admin-claim-modal-overlay"
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={closeClaimModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-claim-title"
+            className="dashboard-panel"
+            style={{
+              maxWidth: "28rem",
+              width: "100%",
+              margin: 0,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="admin-claim-title" style={{ marginTop: 0, fontSize: "1.2rem", color: "#10b981" }}>
+              ✓ Mark as Claimed
+            </h2>
+            <p style={{ marginTop: "0.75rem", marginBottom: "1rem", lineHeight: 1.6 }}>
+              Are you sure you want to mark <strong style={{ color: "#10b981" }}>"{claimModalSlug}"</strong> as claimed?
+            </p>
+            <div
+              style={{
+                background: "#f0fdf4",
+                border: "1px solid #86efac",
+                borderRadius: "6px",
+                padding: "0.75rem",
+                marginBottom: "1rem"
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "0.9rem", color: "#166534" }}>
+                <strong>What this does:</strong>
+              </p>
+              <ul style={{ margin: "0.5rem 0 0 0", paddingInlineStart: "1.5rem", fontSize: "0.9rem", color: "#166534" }}>
+                <li>Hides the public "Claim Ownership" button</li>
+                <li>Marks business as verified/claimed</li>
+                <li>Shows "آگهی تأییدشده" message to users</li>
+              </ul>
+            </div>
+            <p className="field-hint" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+              <strong>Note:</strong> This action can be reverted by updating the database manually if needed.
+            </p>
+            <div className="dashboard-actions dashboard-actions--inline" style={{ borderTop: "none", marginTop: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={closeClaimModal}
+                disabled={!!claimingSlug}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={confirmMarkAsClaimed}
+                disabled={!!claimingSlug}
+                style={{
+                  background: "#10b981",
+                  borderColor: "#10b981"
+                }}
+              >
+                {claimingSlug ? "Marking as Claimed..." : "✓ Yes, Mark as Claimed"}
               </button>
             </div>
           </div>
