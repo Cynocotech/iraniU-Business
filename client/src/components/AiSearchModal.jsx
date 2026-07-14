@@ -3,6 +3,21 @@ import { apiPost } from "../api.js";
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAADmEnAaO3lpBKumP";
 
+function sendSearchFeedback(searchId, payload) {
+  if (!searchId) return;
+  const body = JSON.stringify({ search_id: searchId, ...payload });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/ai-search/feedback", new Blob([body], { type: "application/json" }));
+  } else {
+    fetch("/api/ai-search/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  }
+}
+
 const OVERLAY = {
   position: "fixed", inset: 0, zIndex: 9999,
   background: "rgba(10,2,20,0.82)", backdropFilter: "blur(4px)",
@@ -179,12 +194,42 @@ function Skeletons() {
   );
 }
 
+const FEEDBACK_ROW = {
+  display: "flex", alignItems: "center", gap: "0.5rem",
+  marginTop: "0.5rem", direction: "rtl",
+};
+const FEEDBACK_LABEL = { color: "rgba(255,255,255,0.3)", fontSize: "0.77rem" };
+const FEEDBACK_BTN = {
+  background: "none", border: "1px solid rgba(160,80,255,0.2)",
+  borderRadius: "6px", cursor: "pointer",
+  color: "rgba(255,255,255,0.5)", fontSize: "0.9rem",
+  padding: "0.1rem 0.45rem", lineHeight: "1.5",
+};
+const FEEDBACK_THANKS = {
+  color: "rgba(200,160,255,0.6)", fontSize: "0.77rem",
+  marginTop: "0.5rem", direction: "rtl",
+};
+
+function ModalFeedbackButtons({ searchId }) {
+  const [sent, setSent] = useState(false);
+  if (!searchId) return null;
+  if (sent) return <p style={FEEDBACK_THANKS}>ممنون از بازخورد شما ✓</p>;
+  return (
+    <div style={FEEDBACK_ROW}>
+      <span style={FEEDBACK_LABEL}>آیا نتایج مفید بود؟</span>
+      <button style={FEEDBACK_BTN} onClick={() => { sendSearchFeedback(searchId, { feedback: 1 }); setSent(true); }} aria-label="مفید بود">👍</button>
+      <button style={FEEDBACK_BTN} onClick={() => { sendSearchFeedback(searchId, { feedback: -1 }); setSent(true); }} aria-label="مفید نبود">👎</button>
+    </div>
+  );
+}
+
 export default function AiSearchModal({ onClose }) {
   const [inputValue, setInputValue] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState(null);
   const [results, setResults] = useState(null);
+  const [searchId, setSearchId] = useState(null);
   const [error, setError] = useState(null);
 
   const widgetIdRef = useRef(null);
@@ -245,11 +290,13 @@ export default function AiSearchModal({ onClose }) {
     setError(null);
     setAnswer(null);
     setResults(null);
+    setSearchId(null);
 
     try {
       const data = await apiPost("/api/ai-search", { query: q, turnstileToken: captchaToken });
       setAnswer(typeof data.answer_fa === "string" ? data.answer_fa : "");
       setResults(Array.isArray(data.businesses) ? data.businesses : []);
+      setSearchId(data.search_id ?? null);
       setTimeout(() => bodyRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 50);
     } catch (err) {
       const code = err.code || "";
@@ -295,7 +342,12 @@ export default function AiSearchModal({ onClose }) {
 
           {!loading && hasResults && (
             <>
-              {answer && <div style={ANSWER_BOX}>{answer}</div>}
+              {answer && (
+                <>
+                  <div style={ANSWER_BOX}>{answer}</div>
+                  <ModalFeedbackButtons key={searchId} searchId={searchId} />
+                </>
+              )}
               {results.length === 0 ? (
                 <div style={EMPTY}>کسب‌وکاری با این مشخصات پیدا نشد. عبارت دیگری امتحان کنید.</div>
               ) : (
@@ -306,6 +358,7 @@ export default function AiSearchModal({ onClose }) {
                       key={b.slug}
                       href={`/business?slug=${encodeURIComponent(b.slug)}`}
                       style={RESULT_ITEM}
+                      onClick={() => sendSearchFeedback(searchId, { clicked_slug: b.slug })}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = "rgba(160,80,255,0.4)";
                         e.currentTarget.style.background = "rgba(255,255,255,0.07)";

@@ -9,7 +9,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GPT_MODEL = "gpt-4o-mini";
 const EMBED_MODEL = "text-embedding-3-small";
 
-// In-memory rate limiter: 10 req/min per IP
+// ── Rate limiter ──────────────────────────────────────────────────────────────
 const _rateMap = new Map();
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
@@ -33,13 +33,38 @@ function checkRateLimit(ip) {
   return true;
 }
 
+// ── Category cache (refreshed every 6 hours) ──────────────────────────────────
+let _categoryCache = [];
+let _categoryCacheTime = 0;
+const CATEGORY_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function getCategories() {
+  if (Date.now() - _categoryCacheTime < CATEGORY_TTL_MS && _categoryCache.length > 0) {
+    return _categoryCache;
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT category FROM public.businesses
+        WHERE listing_approval = 'approved' AND category IS NOT NULL
+        ORDER BY category`
+    );
+    _categoryCache = rows.map((r) => r.category);
+    _categoryCacheTime = Date.now();
+    console.log(`[ai-search] category cache refreshed: ${_categoryCache.length} categories`);
+  } catch (e) {
+    console.warn("[ai-search] category cache refresh failed:", e.message);
+  }
+  return _categoryCache;
+}
+
+// Warm cache at startup
+getCategories().catch(() => {});
+
+// ── OpenAI helpers ────────────────────────────────────────────────────────────
 async function openaiChat(messages) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: GPT_MODEL,
       response_format: { type: "json_object" },
@@ -52,9 +77,8 @@ async function openaiChat(messages) {
     throw new Error(`OpenAI chat ${res.status}: ${body?.error?.message || "unknown"}`);
   }
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "{}";
   try {
-    return JSON.parse(text);
+    return JSON.parse(data.choices?.[0]?.message?.content || "{}");
   } catch {
     return {};
   }
@@ -63,10 +87,7 @@ async function openaiChat(messages) {
 async function openaiEmbed(text) {
   const res = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({ model: EMBED_MODEL, input: text }),
   });
   if (!res.ok) {
@@ -79,6 +100,7 @@ async function openaiEmbed(text) {
   return embedding;
 }
 
+// ── DB retrieval helpers ──────────────────────────────────────────────────────
 const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
             category, city, address, postcode, rating, price_range,
             phone, reservation_link, cover_image_url, promo_title,
@@ -141,7 +163,9 @@ function mergeCandidates(primary, secondary) {
   return [...primary, ...extra].slice(0, 25);
 }
 
+// ── Main search endpoint ──────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
+  const t0 = Date.now();
   const ip = clientIp(req);
 
   if (!checkRateLimit(ip)) {
@@ -179,6 +203,13 @@ router.post("/", async (req, res) => {
     });
   }
 
+  // Build parse prompt with injected real category list
+  const categories = await getCategories();
+  const categoryEnum =
+    categories.length > 0
+      ? `\n\nدسته‌بندی‌های دقیق موجود (category باید دقیقاً یکی از این مقادیر باشد یا null):\n${categories.join("، ")}`
+      : "";
+
   // Parse query intent
   let parsed = {};
   try {
@@ -186,14 +217,14 @@ router.post("/", async (req, res) => {
       {
         role: "system",
         content: `شما یک دستیار تجزیه‌گر جستجو برای دایرکتوری کسب‌وکارهای ایرانی در بریتانیا هستید. خروجی باید JSON با این کلیدها باشد:
-{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean, "keywords_en": string|null}
+{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean, "keywords_en": string|null, "search_text": string|null}
 - is_off_topic: true اگر سوال اصلاً مربوط به پیدا کردن کسب‌وکار، خدمات یا محصول نیست (اخبار، دستور غذا، سیاست و غیره).
 - is_exchange_query: true اگر کاربر صرافی یا تبادل ارز می‌خواهد.
-- is_job_query: true اگر دنبال کار یا استخدام است.
+- is_job_query: true اگر کاربر موقعیت شغلی یا استخدام می‌خواهد — هم «دنبال کار هستم» هم «شرکت‌هایی که نیرو می‌خواهند» و هم «استخدام می‌کنند» را شامل می‌شود.
 - name_contains: پر کنید اگر کاربر به دنبال کسب‌وکارهایی با کلمه‌ای خاص در نامشان است (مثلاً «نامشان ایران دارد» → «ایران»).
-- keywords_en: ترجمه انگلیسی کلیدواژه‌های اصلی جستجو برای بهبود جستجوی معنایی (مثلاً «رستوران وکیل پزشک» → «restaurant lawyer doctor physician»).
-- category: دسته کسب‌وکار به فارسی اگر مشخص است (مثلاً «رستوران»، «وکیل»، «صرافی»).
-- city: همیشه به انگلیسی (London نه لندن، Manchester نه منچستر).`,
+- keywords_en: ترجمه انگلیسی کلیدواژه‌های اصلی جستجو برای بهبود جستجوی معنایی.
+- search_text: درخواست کاربر را به یک جمله توصیفی فارسی روشن بازنویسی کنید — اختصارات را گسترش دهید، اصطلاحات عامیانه را به کلمات رسمی تبدیل کنید، نام‌های مکانی را نگه‌دارید. این متن برای بردار-جستجوی معنایی استفاده می‌شود.
+- city: همیشه به انگلیسی (London نه لندن، Manchester نه منچستر).${categoryEnum}`,
       },
       { role: "user", content: q },
     ]);
@@ -207,32 +238,47 @@ router.post("/", async (req, res) => {
 
   if (parsed.is_off_topic) {
     return res.json({
-      answer_fa: "این دستیار فقط برای جستجوی کسب‌وکارهای ایرانی در بریتانیا طراحی شده است. لطفاً نام یک کسب‌وکار، خدمت یا محصول را جستجو کنید — مثلاً «رستوران در لندن» یا «وکیل مهاجرت».",
+      answer_fa:
+        "این دستیار فقط برای جستجوی کسب‌وکارهای ایرانی در بریتانیا طراحی شده است. لطفاً نام یک کسب‌وکار، خدمت یا محصول را جستجو کنید — مثلاً «رستوران در لندن» یا «وکیل مهاجرت».",
       businesses: [],
     });
   }
 
-  const city = typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : null;
+  const city =
+    typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : null;
   const isExchange = !!parsed.is_exchange_query;
   const isJob = !!parsed.is_job_query;
-  const nameContains = typeof parsed.name_contains === "string" && parsed.name_contains.trim()
-    ? parsed.name_contains.trim() : null;
-  const category = typeof parsed.category === "string" && parsed.category.trim()
-    ? parsed.category.trim() : null;
-  const keywordsEn = typeof parsed.keywords_en === "string" && parsed.keywords_en.trim()
-    ? parsed.keywords_en.trim() : null;
+  const nameContains =
+    typeof parsed.name_contains === "string" && parsed.name_contains.trim()
+      ? parsed.name_contains.trim()
+      : null;
+  const category =
+    typeof parsed.category === "string" && parsed.category.trim()
+      ? parsed.category.trim()
+      : null;
+  const keywordsEn =
+    typeof parsed.keywords_en === "string" && parsed.keywords_en.trim()
+      ? parsed.keywords_en.trim()
+      : null;
+  const searchText =
+    typeof parsed.search_text === "string" && parsed.search_text.trim()
+      ? parsed.search_text.trim()
+      : null;
+
+  // Embedding input: prefer the expanded search_text, fall back to bilingual raw query
+  const embeddingInput = searchText || (keywordsEn ? `${q}\n${keywordsEn}` : q);
 
   // Retrieve candidates
-  let candidates;
+  let candidates = [];
   let cityFallback = false;
+  let queryVec = null;
+
   try {
     if (nameContains) {
       // Name-keyword query: direct name_fa text search
       candidates = await retrieveByName(nameContains, { city, isExchange, isJob });
     } else {
-      // Semantic query: bilingual embedding + vector search + optional category hybrid
-      const embeddingInput = keywordsEn ? `${q}\n${keywordsEn}` : q;
-      let queryVec;
+      // Semantic query: embed → vector search → city fallback → category hybrid
       try {
         queryVec = await openaiEmbed(embeddingInput);
       } catch (e) {
@@ -250,10 +296,19 @@ router.post("/", async (req, res) => {
           cityFallback = true;
         }
       }
-      // Hybrid: also pull direct category matches and merge
       if (category) {
         const catRows = await retrieveByCategory(category, { city, isExchange, isJob });
         candidates = mergeCandidates(candidates, catRows);
+      }
+    }
+
+    // Final retry: if 0 candidates and city/category were restrictive filters,
+    // drop both and run a single pure semantic vector search.
+    if (candidates.length === 0 && queryVec && (city || category)) {
+      const fallback = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+      if (fallback.length > 0) {
+        candidates = fallback;
+        if (city) cityFallback = true;
       }
     }
   } catch (e) {
@@ -272,7 +327,7 @@ router.post("/", async (req, res) => {
     });
   }
 
-  // Recommend from candidates
+  // Build slim candidate list for the recommender
   const slim = candidates.map((c) => ({
     slug: c.slug,
     name: c.name_fa,
@@ -281,10 +336,10 @@ router.post("/", async (req, res) => {
     about: [c.listing_title, c.subtitle, c.description].filter(Boolean).join(" — ").slice(0, 200),
   }));
 
-  // Build city-fallback note for recommender when the requested city had no results
-  const cityFallbackNote = cityFallback && city
-    ? `\nنکته مهم: دایرکتوری ایرانیو در حال حاضر فقط کسب‌وکارهای ایرانی لندن را پوشش می‌دهد و در شهر "${city}" نتیجه‌ای یافت نشد. نتایج زیر از لندن هستند. لطفاً این موضوع را در ابتدای answer_fa به کاربر اطلاع دهید.`
-    : "";
+  const cityFallbackNote =
+    cityFallback && city
+      ? `\nنکته مهم: دایرکتوری ایرانیو در حال حاضر فقط کسب‌وکارهای ایرانی لندن را پوشش می‌دهد و در شهر "${city}" نتیجه‌ای یافت نشد. نتایج زیر از لندن هستند. لطفاً این موضوع را در ابتدای answer_fa به کاربر اطلاع دهید.`
+      : "";
 
   let recommendation = {};
   try {
@@ -314,7 +369,7 @@ router.post("/", async (req, res) => {
       ? recommendation.answer_fa
       : "نتایج جستجوی شما:";
 
-  // Join back — discard any slug the LLM invented
+  // Discard any slug the LLM invented
   const bySlug = new Map(candidates.map((c) => [c.slug, c]));
   const allowedSlugs = new Set(candidates.map((c) => c.slug));
 
@@ -338,7 +393,69 @@ router.post("/", async (req, res) => {
         })
     : [];
 
-  return res.json({ answer_fa: answerFa, businesses });
+  // Insert search log row; failure must never fail the search response
+  let searchId = null;
+  try {
+    const logRes = await pool.query(
+      `INSERT INTO public.ai_search_logs
+         (query, parsed_json, search_text, returned_slugs, result_count, duration_ms)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [
+        q,
+        JSON.stringify(parsed),
+        searchText || null,
+        businesses.map((b) => b.slug).join(",") || null,
+        businesses.length,
+        Date.now() - t0,
+      ]
+    );
+    searchId = logRes.rows[0]?.id ?? null;
+  } catch (e) {
+    console.warn("[ai-search] log insert failed:", e.message);
+  }
+
+  return res.json({ answer_fa: answerFa, businesses, search_id: searchId });
+});
+
+// ── Feedback endpoint ─────────────────────────────────────────────────────────
+router.post("/feedback", async (req, res) => {
+  const ip = clientIp(req);
+  if (!checkRateLimit(ip)) return res.status(429).json({ error: "rate_limited" });
+
+  const { search_id, clicked_slug, feedback } = req.body || {};
+
+  const id = Number(search_id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "invalid_search_id" });
+  }
+  if (feedback !== undefined && feedback !== 1 && feedback !== -1) {
+    return res.status(400).json({ error: "invalid_feedback", hint: "feedback must be 1 or -1" });
+  }
+
+  const sets = [];
+  const params = [];
+  if (typeof clicked_slug === "string") {
+    sets.push(`clicked_slug = $${params.push(clicked_slug.slice(0, 200))}`);
+  }
+  if (feedback !== undefined) {
+    sets.push(`feedback = $${params.push(Number(feedback))}`);
+  }
+  if (sets.length === 0) {
+    return res.status(400).json({ error: "nothing_to_update" });
+  }
+  params.push(id);
+
+  try {
+    await pool.query(
+      `UPDATE public.ai_search_logs SET ${sets.join(", ")} WHERE id = $${params.length}`,
+      params
+    );
+    return res.json({ ok: true });
+  } catch (e) {
+    console.warn("[ai-search] feedback update failed:", e.message);
+    return res.status(503).json({ error: "db_error" });
+  }
 });
 
 export const aiSearchRouter = router;

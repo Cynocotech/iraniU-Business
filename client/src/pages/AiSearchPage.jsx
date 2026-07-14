@@ -4,6 +4,21 @@ import Seo from "../components/Seo.jsx";
 import ListingCard from "../components/ListingCard.jsx";
 import { apiPost } from "../api.js";
 
+function sendSearchFeedback(searchId, payload) {
+  if (!searchId) return;
+  const body = JSON.stringify({ search_id: searchId, ...payload });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/ai-search/feedback", new Blob([body], { type: "application/json" }));
+  } else {
+    fetch("/api/ai-search/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  }
+}
+
 const TURNSTILE_SITE_KEY = "0x4AAAAAADmEnAaO3lpBKumP";
 
 const STYLES = `
@@ -137,12 +152,45 @@ const STYLES = `
   }
   .ai-page__nav a:hover { color: #fff; border-color: rgba(255,255,255,0.28); }
 
+  /* Feedback */
+  .ai-page__feedback {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-top: 0.6rem; direction: rtl;
+  }
+  .ai-page__feedback-label {
+    color: rgba(255,255,255,0.35); font-size: 0.8rem;
+  }
+  .ai-page__feedback-btn {
+    background: none; border: 1px solid rgba(160,80,255,0.2);
+    border-radius: 6px; cursor: pointer;
+    color: rgba(255,255,255,0.55); font-size: 0.95rem;
+    padding: 0.15rem 0.55rem; transition: border-color 0.15s, background 0.15s;
+    line-height: 1.5;
+  }
+  .ai-page__feedback-btn:hover { border-color: rgba(160,80,255,0.5); background: rgba(160,80,255,0.1); }
+  .ai-page__feedback-thanks {
+    color: rgba(200,160,255,0.65); font-size: 0.8rem; margin-top: 0.5rem; direction: rtl;
+  }
+
   @media(max-width:600px){
     .ai-page__search-wrap { padding: 1rem; }
     .ai-page__row { flex-direction: column; }
     .ai-page__btn { width: 100%; }
   }
 `;
+
+function FeedbackButtons({ searchId }) {
+  const [sent, setSent] = useState(false);
+  if (!searchId) return null;
+  if (sent) return <p className="ai-page__feedback-thanks">ممنون از بازخورد شما ✓</p>;
+  return (
+    <div className="ai-page__feedback">
+      <span className="ai-page__feedback-label">آیا نتایج مفید بود؟</span>
+      <button className="ai-page__feedback-btn" onClick={() => { sendSearchFeedback(searchId, { feedback: 1 }); setSent(true); }} aria-label="مفید بود">👍</button>
+      <button className="ai-page__feedback-btn" onClick={() => { sendSearchFeedback(searchId, { feedback: -1 }); setSent(true); }} aria-label="مفید نبود">👎</button>
+    </div>
+  );
+}
 
 function SkeletonGrid() {
   return (
@@ -171,6 +219,7 @@ export default function AiSearchPage() {
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState(null);
   const [results, setResults] = useState(null);
+  const [searchId, setSearchId] = useState(null);
   const [error, setError] = useState(null);
 
   const widgetIdRef = useRef(null);
@@ -226,10 +275,12 @@ export default function AiSearchPage() {
     setError(null);
     setAnswer(null);
     setResults(null);
+    setSearchId(null);
     try {
       const data = await apiPost("/api/ai-search", { query: q, turnstileToken: token });
       setAnswer(typeof data.answer_fa === "string" ? data.answer_fa : "");
       setResults(Array.isArray(data.businesses) ? data.businesses : []);
+      setSearchId(data.search_id ?? null);
     } catch (e) {
       const code = e.code || "";
       if (code === "captcha_failed") {
@@ -330,9 +381,10 @@ export default function AiSearchPage() {
         {!loading && hasResults && (
           <>
             {answer && (
-              <div className="ai-page__answer" role="status">
-                {answer}
-              </div>
+              <>
+                <div className="ai-page__answer" role="status">{answer}</div>
+                <FeedbackButtons key={searchId} searchId={searchId} />
+              </>
             )}
 
             {results.length === 0 ? (
@@ -347,7 +399,11 @@ export default function AiSearchPage() {
                 </p>
                 <div className="listing-cards">
                   {results.map((b) => (
-                    <div key={b.slug} className="listings-page__stack-item">
+                    <div
+                      key={b.slug}
+                      className="listings-page__stack-item"
+                      onClick={() => sendSearchFeedback(searchId, { clicked_slug: b.slug })}
+                    >
                       <ListingCard b={b} />
                       {b.reason_fa && (
                         <p className="ai-page__reason">{b.reason_fa}</p>
