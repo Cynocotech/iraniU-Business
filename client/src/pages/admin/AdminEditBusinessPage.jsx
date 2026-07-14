@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardBusinessForm from "../../components/DashboardBusinessForm.jsx";
-import { apiGet, apiPatch, apiPost } from "../../api.js";
+import { apiGet, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
 function rowIsActive(r) {
@@ -20,58 +20,11 @@ export default function AdminEditBusinessPage() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramMsg, setTelegramMsg] = useState(null);
 
-  // ── Tags ──
-  const [tags, setTags] = useState([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [tagInput, setTagInput] = useState("");
-  const [tagMsg, setTagMsg] = useState(null);
-  const [tagSaving, setTagSaving] = useState(false);
-  const tagInputRef = useRef(null);
 
   useEffect(() => {
     apiGet("/api/businesses").then(setList).catch(() => setList([]));
   }, []);
 
-  useEffect(() => {
-    if (!slug) { setTags([]); return; }
-    setTagsLoading(true);
-    setTagMsg(null);
-    apiGet(`/api/businesses/${encodeURIComponent(slug)}`)
-      .then((b) => {
-        try { setTags(JSON.parse(b.ai_tags_json || "[]")); } catch { setTags([]); }
-      })
-      .catch(() => setTags([]))
-      .finally(() => setTagsLoading(false));
-  }, [slug]);
-
-  const saveTags = useCallback(async (nextTags) => {
-    if (!slug) return;
-    setTagSaving(true);
-    setTagMsg(null);
-    try {
-      await apiPatch(`/api/businesses/${encodeURIComponent(slug)}`, {
-        ai_tags_json: JSON.stringify(nextTags),
-      });
-      setTags(nextTags);
-      setTagMsg({ ok: true, text: "برچسب‌ها ذخیره شد." });
-      setTimeout(() => setTagMsg(null), 2500);
-    } catch (e) {
-      setTagMsg({ ok: false, text: e.message || "خطا" });
-    } finally {
-      setTagSaving(false);
-    }
-  }, [slug]);
-
-  const addTag = () => {
-    const t = tagInput.trim();
-    if (!t || tags.includes(t)) { setTagInput(""); return; }
-    const next = [...tags, t];
-    setTagInput("");
-    saveTags(next);
-    tagInputRef.current?.focus();
-  };
-
-  const removeTag = (t) => saveTags(tags.filter((x) => x !== t));
 
   const onSlugChange = useCallback(
     (s) => {
@@ -198,89 +151,14 @@ export default function AdminEditBusinessPage() {
       </section>
 
       {slug ? (
-        <>
-          <DashboardBusinessForm
-            slug={slug}
-            onSlugChange={onSlugChange}
-            sectionTitle="ویرایش آگهی (سوپرادمین)"
-            hideSlugPicker
-            allowEditName
-          />
-
-          {/* ── AI Tags panel ── */}
-          <div className="panel-card" style={{ marginTop: "1.25rem" }}>
-            <div className="panel-card__head">
-              <h3 className="panel-card__title">
-                <i className="fa-solid fa-tags" style={{ marginInlineEnd: "0.5rem", color: "#6366f1" }} />
-                برچسب‌های جستجو (AI Tags)
-              </h3>
-            </div>
-            <div className="panel-card__body" style={{ padding: "1.25rem" }}>
-              <p className="field-hint" style={{ marginTop: 0 }}>
-                این برچسب‌ها فقط برای جستجوی هوش مصنوعی استفاده می‌شوند و برای کاربران نمایش داده نمی‌شوند.
-                برچسب‌های تولیدشده توسط AI را می‌توانید حذف یا تکمیل کنید.
-              </p>
-
-              {tagsLoading ? (
-                <p className="field-hint">در حال بارگذاری…</p>
-              ) : (
-                <>
-                  {/* Tag chips */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "1rem", minHeight: "2rem" }}>
-                    {tags.length === 0 && (
-                      <span className="field-hint" style={{ margin: 0 }}>برچسبی ثبت نشده</span>
-                    )}
-                    {tags.map((t) => (
-                      <span key={t} style={{
-                        display: "inline-flex", alignItems: "center", gap: "0.3rem",
-                        background: "#ede9fe", color: "#4c1d95", borderRadius: "999px",
-                        padding: "0.2rem 0.65rem", fontSize: "0.82rem", fontWeight: 500,
-                        border: "1px solid #c4b5fd",
-                      }}>
-                        {t}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(t)}
-                          disabled={tagSaving}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#7c3aed", lineHeight: 1, padding: 0, fontSize: "0.9rem" }}
-                          aria-label={`حذف برچسب ${t}`}
-                        >×</button>
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Add tag input */}
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      ref={tagInputRef}
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-                      placeholder="برچسب جدید… مثلاً: DSS accepted"
-                      disabled={tagSaving}
-                      style={{ minWidth: "220px", flex: "1 1 220px" }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      onClick={addTag}
-                      disabled={tagSaving || !tagInput.trim()}
-                    >
-                      {tagSaving ? "…" : "+ افزودن"}
-                    </button>
-                  </div>
-
-                  {tagMsg && (
-                    <p className="field-hint" role="status" style={{ marginTop: "0.5rem", color: tagMsg.ok ? "var(--color-success,#2e7d32)" : "#b71c1c" }}>
-                      {tagMsg.text}
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </>
+        <DashboardBusinessForm
+          slug={slug}
+          onSlugChange={onSlugChange}
+          sectionTitle="ویرایش آگهی (سوپرادمین)"
+          hideSlugPicker
+          allowEditName
+          showTagsPanel
+        />
       ) : (
         <p className="field-hint">برای نمایش فرم ویرایش، ابتدا یک آگهی را از بالا انتخاب کنید.</p>
       )}
