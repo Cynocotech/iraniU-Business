@@ -7,26 +7,45 @@ import { fileURLToPath } from "url";
 import { dbGet, dbAll, dbRun, dbTransaction, ensureRestaurantSafraDemo, bootstrapDb } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword, validatePasswordComplexity } from "./authUtil.js";
-import { requireSuperAdmin, requireManager } from "./authMiddleware.js";
+import { requireSuperAdmin, requireManager, requireManagerOrSuperAdmin } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
 import { isTwilioModuleEnabled } from "./twilioModuleSettings.js";
+import { isCareersModuleEnabled, setCareersModuleEnabled } from "./careersModuleSettings.js";
+import { isDesktopGateEnabled } from "./desktopGateSettings.js";
 import { sendListingApprovedEmail, sendListingRejectedEmail } from "./listingDecisionEmail.js";
+import {
+  htmlBusinessRegistrationReceivedFa,
+  htmlBusinessActivatedFa,
+  htmlClaimReceivedFa,
+  htmlClaimVerifiedFa,
+  htmlAdminAddedBusinessWelcomeFa,
+} from "./emailBranding.js";
+import { getEffectiveSmtpSettings, sendMailViaSettings } from "./smtpSettings.js";
 import { notifyAdminsNewPendingListing } from "./pendingListingNotify.js";
+import { verifyTurnstileToken } from "./turnstileVerify.js";
+import { clientIp } from "./telegramNotify.js";
+import { createSignupVerification } from "./businessSignupVerification.js";
 import multer from "multer";
 import { parseBusinessCsv, runBulkInsert } from "./businessBulkImport.js";
 import { exportIraniuBusinessesCsv } from "./exportBusinessesCsv.js";
 import { cascadeDeleteBusinessBySlug } from "./cascadeDeleteBusiness.js";
 import { analyzeDuplicateNames, executeDedupeByName } from "./dedupeBusinessesByName.js";
 import { chatbotRouter } from "./chatbotApi.js";
+import { aiSearchRouter } from "./aiSearchRoutes.js";
+import { uploadToS3, deleteFromS3, extractS3KeyFromUrl, generateExchangeBannerKey, getStorageMode, isS3Enabled } from "./s3Upload.js";
+import { getWalletWithTransactions, grantTokens, spendTokensForBoost, checkAndAwardMilestones, checkWeeklyEditBonus, BOOST_PLANS } from "./tokenWallet.js";
+import { getExternalPosts, normalizeExternalPost } from "./newsApi.js";
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
+  "name_en",
   "description",
   "category",
   "phone",
   "address",
+  "postcode",
   "google_review_url",
   "subtitle",
   "hours_json",
@@ -57,6 +76,7 @@ const PATCHABLE_BUSINESS = new Set([
   "exchange_company_verified",
   "exchange_features_json",
   "exchange_today_rate_enabled",
+  "logo_url",
 ]);
 
 /** گزارش‌های آگهی — کلیدها باید با کلاینت هم‌خوان باشند */
@@ -89,6 +109,18 @@ const uploadExchangeBanner = multer({
   },
 });
 
+const uploadBusinessImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype || "")) {
+      cb(new Error("bad_file_type"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
 const looseReviewRedirect =
@@ -111,7 +143,12 @@ const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const exchangeBannerDir = path.join(uploadsDir, "exchange-banners");
 if (!fs.existsSync(exchangeBannerDir)) fs.mkdirSync(exchangeBannerDir, { recursive: true });
-app.use("/uploads", express.static(uploadsDir));
+app.use("/uploads", express.static(uploadsDir, {
+  maxAge: "7d",
+  setHeaders: (res) => {
+    res.setHeader("Cache-Control", "public, max-age=604800");
+  },
+}));
 
 registerAuthRoutes(app);
 
@@ -119,10 +156,34 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
+app.get("/api/storage-status", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const mode = await getStorageMode();
+  const { getEffectiveS3Config } = await import("./s3Settings.js");
+  const s3Config = await getEffectiveS3Config();
+  const config = {
+    mode,
+    bucket: mode === "s3" ? s3Config.bucket : null,
+    region: mode === "s3" ? s3Config.region : null,
+  };
+  res.json(config);
+}));
+
 /** عمومی — برای مخفی کردن منوی Twilio در پنل مدیر */
 app.get("/api/twilio-module-status", (_req, res) => {
   res.json({ enabled: isTwilioModuleEnabled() });
 });
+
+/** عمومی — برای مخفی کردن فیلدهای Job Vacancies در پنل مدیر */
+app.get("/api/careers-module-status", asyncHandler(async (_req, res) => {
+  const enabled = await isCareersModuleEnabled();
+  res.json({ enabled });
+}));
+
+/** عمومی — کنترل حالت «فقط موبایل/تبلت» (Desktop Gate) */
+app.get("/api/desktop-gate-status", asyncHandler(async (_req, res) => {
+  const enabled = await isDesktopGateEnabled();
+  res.json({ enabled });
+}));
 
 function isListingApproved(row) {
   const a = row && row.listing_approval;
@@ -192,27 +253,49 @@ function normalizeBannerDailyUserCap(v) {
   return Math.max(1, Math.min(50, n));
 }
 
+app.use("/api/ai-search", aiSearchRouter);
+
 app.get("/api/businesses", asyncHandler(async (req, res) => {
   const auth = parseAuthHeader(req);
   const isAdmin = auth && auth.typ === "adm";
+  const boostOrder = `CASE COALESCE(boost.plan_id, '')
+    WHEN 'diamond'  THEN 1
+    WHEN 'platinum' THEN 2
+    WHEN 'gold'     THEN 3
+    WHEN 'silver'   THEN 4
+    ELSE 5
+  END`;
+  const boostJoin = `LEFT JOIN LATERAL (
+    SELECT plan_id, ends_at
+    FROM ad_boosts
+    WHERE business_slug = b.slug
+      AND is_active = 1
+      AND ends_at > NOW()::TEXT
+    ORDER BY ends_at DESC
+    LIMIT 1
+  ) boost ON TRUE`;
   const rows = isAdmin
-    ? await dbAll(`SELECT * FROM businesses ORDER BY name_fa`)
+    ? await dbAll(`SELECT b.*, boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at
+        FROM businesses b ${boostJoin}
+        ORDER BY ${boostOrder}, b.name_fa`)
     : await dbAll(
-        `SELECT * FROM businesses WHERE (
-             listing_approval = 'approved'
-             OR listing_approval IS NULL
-             OR listing_approval = ''
+        `SELECT b.*, boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at
+         FROM businesses b ${boostJoin}
+         WHERE (
+             b.listing_approval = 'approved'
+             OR b.listing_approval IS NULL
+             OR b.listing_approval = ''
              OR (
-               listing_approval = 'pending'
+               b.listing_approval = 'pending'
                AND (
-                 exchange_manager_id IS NOT NULL
-                 OR COALESCE(category, '') LIKE '%صراف%'
-                 OR lower(COALESCE(category, '')) LIKE '%exchange%'
+                 b.exchange_manager_id IS NOT NULL
+                 OR COALESCE(b.category, '') LIKE '%صراف%'
+                 OR lower(COALESCE(b.category, '')) LIKE '%exchange%'
                )
              )
            )
-           AND (status IS NULL OR status = '' OR status = 'active')
-           ORDER BY name_fa`
+           AND (b.status IS NULL OR b.status = '' OR b.status = 'active')
+           ORDER BY ${boostOrder}, b.name_fa`
       );
   res.json(rows);
 }));
@@ -286,12 +369,19 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
     try {
       let imageUrl = "";
       if (req.file?.buffer?.length) {
-        const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
-        const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
-        const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
-        const absPath = path.join(exchangeBannerDir, filename);
-        fs.writeFileSync(absPath, req.file.buffer);
-        imageUrl = `/uploads/exchange-banners/${filename}`;
+        // Upload to S3 if configured, otherwise use local storage
+        if (await isS3Enabled()) {
+          const key = generateExchangeBannerKey(req.file.originalname);
+          const result = await uploadToS3(req.file.buffer, key, req.file.mimetype);
+          imageUrl = result.url;
+        } else {
+          const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+          const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+          const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+          const absPath = path.join(exchangeBannerDir, filename);
+          fs.writeFileSync(absPath, req.file.buffer);
+          imageUrl = `/uploads/exchange-banners/${filename}`;
+        }
       } else {
         imageUrl = parseExchangeBannerImageSource(req.body?.image_url);
       }
@@ -357,17 +447,30 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
       if (!req.file?.buffer?.length) {
         return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است." });
       }
-      const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
-      const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
-      const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
-      const absPath = path.join(exchangeBannerDir, filename);
-      fs.writeFileSync(absPath, req.file.buffer);
-      const imageUrl = `/uploads/exchange-banners/${filename}`;
+
+      let imageUrl;
+      if (await isS3Enabled()) {
+        const key = generateExchangeBannerKey(req.file.originalname);
+        const result = await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        imageUrl = result.url;
+      } else {
+        const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+        const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+        const filename = `exchange-banner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+        const absPath = path.join(exchangeBannerDir, filename);
+        fs.writeFileSync(absPath, req.file.buffer);
+        imageUrl = `/uploads/exchange-banners/${filename}`;
+      }
+
       await dbRun(`UPDATE exchange_banners SET image_url = $1 WHERE id = $2`, [imageUrl, id]);
 
-      const prevRel = String(prev.image_url || "");
-      if (prevRel.startsWith("/uploads/exchange-banners/")) {
-        const prevAbs = path.join(uploadsDir, prevRel.replace(/^\/uploads\//, ""));
+      // Delete old image
+      const prevUrl = String(prev.image_url || "");
+      if (await isS3Enabled()) {
+        const s3Key = await extractS3KeyFromUrl(prevUrl);
+        if (s3Key) await deleteFromS3(s3Key);
+      } else if (prevUrl.startsWith("/uploads/exchange-banners/")) {
+        const prevAbs = path.join(uploadsDir, prevUrl.replace(/^\/uploads\//, ""));
         try {
           if (fs.existsSync(prevAbs)) fs.unlinkSync(prevAbs);
         } catch {}
@@ -484,9 +587,14 @@ app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(as
     const row = await dbGet(`SELECT id, image_url FROM exchange_banners WHERE id = $1`, [id]);
     if (!row) return res.status(404).json({ error: "not_found" });
     await dbRun(`DELETE FROM exchange_banners WHERE id = $1`, [id]);
-    const rel = String(row.image_url || "");
-    if (rel.startsWith("/uploads/exchange-banners/")) {
-      const abs = path.join(uploadsDir, rel.replace(/^\/uploads\//, ""));
+
+    // Delete image from storage
+    const imageUrl = String(row.image_url || "");
+    if (await isS3Enabled()) {
+      const s3Key = await extractS3KeyFromUrl(imageUrl);
+      if (s3Key) await deleteFromS3(s3Key);
+    } else if (imageUrl.startsWith("/uploads/exchange-banners/")) {
+      const abs = path.join(uploadsDir, imageUrl.replace(/^\/uploads\//, ""));
       try {
         if (fs.existsSync(abs)) fs.unlinkSync(abs);
       } catch {}
@@ -504,6 +612,188 @@ app.delete("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(as
     res.status(500).json({ error: "delete_failed", hint: String(e.message || e) });
   }
 }));
+
+// ─── Blog admin routes ────────────────────────────────────────────────────────
+
+app.get("/api/admin/blog", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT id, slug, title_fa, excerpt_fa, cover_image_url, category, is_published, view_count, published_at, created_at FROM blog_posts ORDER BY created_at DESC`);
+  res.json(rows);
+}));
+
+app.post("/api/admin/blog", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { slug, title_fa, excerpt_fa, body_fa, cover_image_url, author, category, tags, is_published, published_at } = req.body;
+  if (!slug || !title_fa) return res.status(400).json({ error: "slug and title_fa required" });
+  const row = await dbGet(
+    `INSERT INTO blog_posts (slug, title_fa, excerpt_fa, body_fa, cover_image_url, author, category, tags, is_published, published_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    [slug, title_fa, excerpt_fa||"", body_fa||"", cover_image_url||"", author||"تیم ایرانیو", category||"عمومی", tags||"", is_published===false?0:1, published_at||new Date().toISOString()]
+  );
+  res.json(row);
+}));
+
+app.patch("/api/admin/blog/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { title_fa, excerpt_fa, body_fa, cover_image_url, author, category, tags, is_published, published_at } = req.body;
+  const row = await dbGet(
+    `UPDATE blog_posts SET title_fa=$1, excerpt_fa=$2, body_fa=$3, cover_image_url=$4, author=$5, category=$6, tags=$7, is_published=$8, published_at=$9, updated_at=NOW()::TEXT WHERE id=$10 RETURNING *`,
+    [title_fa, excerpt_fa||"", body_fa||"", cover_image_url||"", author||"تیم ایرانیو", category||"عمومی", tags||"", is_published===false?0:1, published_at, Number(req.params.id)]
+  );
+  if (!row) return res.status(404).json({ error: "not_found" });
+  res.json(row);
+}));
+
+app.delete("/api/admin/blog/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
+  await dbRun(`DELETE FROM blog_posts WHERE id = $1`, [Number(req.params.id)]);
+  res.json({ ok: true });
+}));
+
+// ─── Blog source settings ────────────────────────────────────────────────────
+
+app.get("/api/admin/blog-settings", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = 'blog_source'`);
+  res.json({ blog_source: row?.value || "both" });
+}));
+
+app.post("/api/admin/blog-settings", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const source = String(req.body.blog_source || "both");
+  if (!["local", "external", "both"].includes(source)) {
+    return res.status(400).json({ error: "invalid value" });
+  }
+  await dbRun(
+    `INSERT INTO app_meta (key, value) VALUES ('blog_source', $1) ON CONFLICT (key) DO UPDATE SET value = $1`,
+    [source]
+  );
+  res.json({ ok: true, blog_source: source });
+}));
+
+// ─── TfL proxy ───────────────────────────────────────────────────────────────
+const TFL_BASE = "https://api.tfl.gov.uk";
+const TFL_KEY = (process.env.TFL_APP_KEY || "").trim();
+function tflParams(extra = {}) {
+  const p = new URLSearchParams(extra);
+  if (TFL_KEY) p.set("app_key", TFL_KEY);
+  return p.toString() ? `?${p}` : "";
+}
+async function tflFetch(path) {
+  const r = await fetch(`${TFL_BASE}${path}`, { signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw new Error(`TfL ${r.status}`);
+  return r.json();
+}
+
+app.get("/api/tfl/status", asyncHandler(async (_req, res) => {
+  const data = await tflFetch(`/line/mode/tube,dlr,overground,elizabeth-line/status${tflParams()}`);
+  const lines = data.map((l) => ({
+    id: l.id,
+    name: l.name,
+    status: l.lineStatuses?.[0]?.statusSeverityDescription || "Unknown",
+    severity: l.lineStatuses?.[0]?.statusSeverity ?? 10,
+    reason: l.lineStatuses?.[0]?.reason || null,
+  }));
+  res.json(lines);
+}));
+
+app.get("/api/tfl/journey", asyncHandler(async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) return res.status(400).json({ error: "from and to required" });
+  const extra = { nationalSearch: "false" };
+  if (TFL_KEY) extra.app_key = TFL_KEY;
+  const p = new URLSearchParams(extra);
+  const data = await tflFetch(`/journey/journeyresults/${encodeURIComponent(from)}/to/${encodeURIComponent(to)}?${p}`);
+  res.json(data);
+}));
+
+app.get("/api/tfl/stop-search", asyncHandler(async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: "q required" });
+  const p = new URLSearchParams({ query: q, ...(TFL_KEY && { app_key: TFL_KEY }) });
+  const data = await tflFetch(`/stoppoint/search?${p}`);
+  res.json(data);
+}));
+
+// ─── Public blog categories ──────────────────────────────────────────────────
+app.get("/api/blog-categories", asyncHandler(async (req, res) => {
+  const source = await getBlogSource();
+  const cats = new Set();
+  if (source === "local" || source === "both") {
+    const rows = await dbAll(`SELECT DISTINCT category FROM blog_posts WHERE is_published = 1 AND category IS NOT NULL`);
+    rows.forEach((r) => r.category && cats.add(r.category));
+  }
+  if (source === "external" || source === "both") {
+    try {
+      const { posts } = await getExternalPosts({ limit: 100, offset: 0 });
+      posts.forEach((p) => {
+        const cat = p.category?.category_name || p.sub_category?.subcategory_name;
+        if (cat) cats.add(cat);
+      });
+    } catch (e) {
+      console.error("[blog-categories] CyberCina error:", e.message);
+    }
+  }
+  res.json({ categories: [...cats].sort() });
+}));
+
+// ─── External blog preview (admin only) ──────────────────────────────────────
+
+app.get("/api/admin/external-blog-preview", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const limit = Math.min(20, parseInt(req.query.limit) || 9);
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+  try {
+    const { total, posts } = await getExternalPosts({ limit, offset });
+    res.json({ total, posts: posts.map(normalizeExternalPost) });
+  } catch (e) {
+    res.status(502).json({ error: "external_api_error", message: e.message });
+  }
+}));
+
+/** Upload business image (cover or gallery) */
+app.post("/api/upload/business-image", (req, res) => {
+  uploadBusinessImage.single("image")(req, res, async (err) => {
+    if (err) {
+      if (String(err.message || "").includes("bad_file_type")) {
+        return res.status(400).json({ error: "bad_file_type", hint: "فقط تصویر png/jpg/webp/gif مجاز است." });
+      }
+      if (String(err.message || "").toLowerCase().includes("file too large")) {
+        return res.status(400).json({ error: "file_too_large", hint: "حداکثر حجم تصویر ۱۰ مگابایت است." });
+      }
+      return res.status(400).json({ error: "upload_failed", hint: String(err.message || err) });
+    }
+
+    const auth = parseAuthHeader(req);
+    if (!auth || (auth.typ !== "mgr" && auth.typ !== "mgrx" && auth.typ !== "adm")) {
+      return res.status(401).json({ error: "unauthorized", hint: "Login required" });
+    }
+
+    if (!req.file?.buffer?.length) {
+      return res.status(400).json({ error: "missing_file", hint: "فایل تصویر لازم است" });
+    }
+
+    try {
+      let imageUrl;
+      const businessImagesDir = path.join(uploadsDir, "business-images");
+      if (!fs.existsSync(businessImagesDir)) fs.mkdirSync(businessImagesDir, { recursive: true });
+
+      if (await isS3Enabled()) {
+        const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+        const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).slice(2, 8);
+        const key = `business-images/business-${timestamp}-${random}${safeExt}`;
+        const result = await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        imageUrl = result.url;
+      } else {
+        const ext = path.extname(String(req.file.originalname || "")).toLowerCase() || ".jpg";
+        const safeExt = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+        const filename = `business-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+        const absPath = path.join(businessImagesDir, filename);
+        fs.writeFileSync(absPath, req.file.buffer);
+        imageUrl = `/uploads/business-images/${filename}`;
+      }
+
+      res.json({ ok: true, url: imageUrl });
+    } catch (error) {
+      console.error("business image upload", error);
+      res.status(500).json({ error: "upload_failed", hint: String(error.message || error) });
+    }
+  });
+});
 
 function adminBusinessMatchesSearchTokens(row, tokens) {
   if (!tokens.length) return true;
@@ -668,6 +958,16 @@ app.get("/api/categories", asyncHandler(async (_req, res) => {
   res.json(rows);
 }));
 
+app.get("/api/cities", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT DISTINCT city
+       FROM businesses
+       WHERE city IS NOT NULL AND city != ''
+       ORDER BY city ASC`
+  );
+  res.json(rows.map(r => r.city));
+}));
+
 app.get("/api/businesses/:slug", asyncHandler(async (req, res) => {
   const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [req.params.slug]);
   if (!row) return res.status(404).json({ error: "not_found", slug: req.params.slug });
@@ -687,7 +987,24 @@ app.get("/api/businesses/:slug", asyncHandler(async (req, res) => {
     if (!canSee) return res.status(404).json({ error: "not_found", slug: req.params.slug });
   }
   const twilioOn = await isTwilioModuleEnabled();
-  res.json({ ...row, twilio_module_enabled: twilioOn });
+  const isAuthed = auth && (auth.typ === "adm" || auth.typ === "mgr" || auth.typ === "mgrx");
+  const { listing_contact_email: _hidden, ...publicRow } = row;
+  const hasEmail = !!String(row.listing_contact_email || "").trim();
+  res.json({ ...(isAuthed ? row : publicRow), has_email: hasEmail, twilio_module_enabled: twilioOn });
+}));
+
+app.get("/api/businesses/:slug/reveal-email", asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug || "").trim();
+  const row = await dbGet(`SELECT listing_contact_email, listing_approval, status FROM businesses WHERE slug = $1`, [slug]);
+  if (!row) return res.status(404).json({ error: "not_found" });
+  if (!isBusinessVisibleToPublic(row)) return res.status(404).json({ error: "not_found" });
+  const origin = req.headers.origin || req.headers.referer || "";
+  if (!origin.includes("iraniu.uk") && !origin.includes("localhost")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const email = String(row.listing_contact_email || "").trim();
+  if (!email) return res.status(404).json({ error: "no_email" });
+  res.json({ ok: true, e: Buffer.from(email).toString("base64") });
 }));
 
 app.get("/api/business-report-reasons", (_req, res) => {
@@ -718,6 +1035,53 @@ app.post("/api/businesses/:slug/report", asyncHandler(async (req, res) => {
   const row = await dbGet(`SELECT * FROM business_reports WHERE id = $1`, [info.rows[0].id]);
   res.status(201).json(row);
 }));
+
+function generateTempPassword() {
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const digits = "0123456789";
+  const special = "!@#$%&";
+  const all = lower + upper + digits + special;
+  const base = [
+    lower[Math.floor(Math.random() * lower.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    upper[Math.floor(Math.random() * upper.length)],
+    upper[Math.floor(Math.random() * upper.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    special[Math.floor(Math.random() * special.length)],
+    special[Math.floor(Math.random() * special.length)],
+  ];
+  for (let i = 0; i < 6; i++) base.push(all[Math.floor(Math.random() * all.length)]);
+  for (let i = base.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [base[i], base[j]] = [base[j], base[i]];
+  }
+  return base.join("");
+}
+
+async function generateUsernameFromEmail(email) {
+  const base =
+    String(email || "")
+      .split("@")[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 24) || "user";
+  const validBase = base.length >= 3 ? base : `${base}usr`;
+  let username = validBase;
+  let i = 2;
+  while (true) {
+    const taken =
+      (await dbGet(`SELECT 1 FROM identity.managers WHERE login_username = $1`, [username])) ||
+      (await dbGet(`SELECT 1 FROM identity.exchange_managers WHERE login_username = $1`, [username]));
+    if (!taken) break;
+    username = `${validBase}_${i++}`;
+    if (i > 999) { username = `user_${Date.now().toString(36).slice(-6)}`; break; }
+  }
+  return username;
+}
 
 const DEFAULT_JSON_HOURS = "[]";
 const DEFAULT_JSON_GALLERY = JSON.stringify(["", "", "", ""]);
@@ -767,6 +1131,13 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
   const auth = parseAuthHeader(req);
   const listing_approval = auth && auth.typ === "adm" ? "approved" : "pending";
 
+  if (!(auth && auth.typ === "adm")) {
+    const captchaValid = await verifyTurnstileToken(b.captcha_token, clientIp(req));
+    if (!captchaValid) {
+      return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود" });
+    }
+  }
+
   const acceptTerms =
     b.accept_listing_terms === true ||
     b.accept_listing_terms === 1 ||
@@ -804,12 +1175,12 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
   const listing_title = String(b.listing_title ?? "").trim();
   const description = String(b.description ?? "").trim();
   const google_review_url = String(b.google_review_url ?? "").trim();
-  const cta = String(b.cta ?? "").trim();
+  const cta = String(b.cta ?? "").trim() || "تماس با ما";
   const price_range = String(b.price_range ?? "").trim();
-  if (!city || !phone || !address || !category || !listing_title || !description || !google_review_url || !cta || !price_range) {
+  if (!city || !phone || !address || !category || !listing_title || !description || !google_review_url) {
     return res.status(400).json({
       error: "missing_business_fields",
-      hint: "شهر، تلفن، آدرس، دسته، عنوان، توضیحات، لینک Google، دکمهٔ فراخوان و محدودهٔ قیمت الزامی است",
+      hint: "شهر، تلفن، آدرس، دسته، عنوان، توضیحات و لینک Google الزامی است",
     });
   }
   try {
@@ -822,17 +1193,19 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
     });
   }
 
+  const postcode = String(b.postcode ?? "").trim();
+
   await dbRun(
     `INSERT INTO businesses (
-      slug, name_fa, description, category, phone, address, google_review_url, claimed, package,
+      slug, name_fa, name_en, description, category, phone, address, postcode, google_review_url, claimed, package,
       subtitle, hours_json, promo_title, promo_description, cover_image_url, gallery_json,
       listing_title, city, price_range, rating, cta, status, manager_id, biolink_json, listing_approval,
       listing_terms_accepted_at, listing_terms_version, listing_contact_email
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, 0, 'basic',
-      $8, $9, $10, $11, $12, $13,
-      $14, $15, $16, $17, $18, $19, NULL, $20, $21,
-      $22, $23, $24
+      $1, $2, $26, $3, $4, $5, $6, $7, $8, 0, 'basic',
+      $9, $10, $11, $12, $13, $14,
+      $15, $16, $17, $18, $19, $20, NULL, $21, $22,
+      $23, $24, $25
     )`,
     [
       slug,
@@ -841,6 +1214,7 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
       category,
       phone,
       address,
+      postcode,
       google_review_url,
       String(b.subtitle ?? ""),
       hours_json,
@@ -859,6 +1233,7 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
       listing_terms_accepted_at,
       listing_terms_version,
       listing_contact_email,
+      String(b.name_en ?? ""),
     ]
   );
 
@@ -868,6 +1243,46 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
       await notifyAdminsNewPendingListing(row);
     } catch (e) {
       console.error("[email] pending listing notify", e);
+    }
+    // Send "registration received" confirmation email to the applicant
+    if (listing_contact_email) {
+      try {
+        const html = await htmlBusinessRegistrationReceivedFa({ nameFa: name_fa });
+        await sendMailViaSettings({
+          to: listing_contact_email,
+          subject: "درخواست ثبت کسب‌وکار شما در IraniU دریافت شد",
+          html,
+          text: `درخواست ثبت کسب‌وکار "${name_fa}" دریافت شد. پس از تأیید از طریق ایمیل یا تماس با شما ارتباط خواهیم گرفت.`,
+        });
+      } catch (e) {
+        console.error("[email] business registration received", e);
+      }
+    }
+  }
+  if (!(auth && auth.typ === "adm")) {
+    try {
+      await createSignupVerification(row);
+    } catch (e) {
+      console.error("[email] signup verification", e);
+    }
+  } else if (listing_contact_email) {
+    // Admin-created listing: send welcome email with listing link, claim link, and signup/login links
+    try {
+      const html = await htmlAdminAddedBusinessWelcomeFa({
+        nameFa: name_fa,
+        slug,
+        city,
+        phone,
+        address,
+      });
+      await sendMailViaSettings({
+        to: listing_contact_email,
+        subject: `کسب‌وکار شما "${name_fa}" در IraniU ثبت شد`,
+        html,
+        text: `کسب‌وکار شما "${name_fa}" در IraniU ثبت و منتشر شد. برای مشاهده و مدیریت آگهی خود به ${process.env.PUBLIC_SITE_URL || "https://directory.iraniu.uk"}/business?slug=${encodeURIComponent(slug)} مراجعه کنید.`,
+      });
+    } catch (e) {
+      console.error("[email] admin-added business welcome", e);
     }
   }
   res.status(201).json(row);
@@ -897,12 +1312,48 @@ app.post("/api/claim-requests", asyncHandler(async (req, res) => {
     [business_slug, email]
   );
   if (dup) return res.status(409).json({ error: "duplicate_pending" });
+
+  // Auto-create unverified manager account so admin doesn't need to recreate
+  let claim_manager_id = null;
+  try {
+    const emailLower = email.toLowerCase();
+    const existing = await dbGet(`SELECT id FROM identity.managers WHERE email = $1`, [emailLower]);
+    if (existing) {
+      claim_manager_id = existing.id;
+    } else {
+      const username = await generateUsernameFromEmail(emailLower);
+      const mgr = await dbRun(
+        `INSERT INTO identity.managers (email, name, phone, login_username, must_change_password)
+         VALUES ($1, $2, $3, $4, 1) RETURNING id`,
+        [emailLower, applicant_name, phone || null, username]
+      );
+      claim_manager_id = mgr.rows[0].id;
+    }
+  } catch (e) {
+    console.error("[claim] auto-create manager", e);
+  }
+
   const info = await dbRun(
-    `INSERT INTO claim_requests (business_slug, applicant_name, email, phone, message, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`,
-    [business_slug, applicant_name, email, phone || null, message || null]
+    `INSERT INTO claim_requests (business_slug, applicant_name, email, phone, message, status, claim_manager_id)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6) RETURNING id`,
+    [business_slug, applicant_name, email, phone || null, message || null, claim_manager_id]
   );
   const row = await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [info.rows[0].id]);
+
+  // Send claim received email to applicant
+  const bizForEmail = await dbGet(`SELECT name_fa FROM businesses WHERE slug = $1`, [business_slug]);
+  try {
+    const html = await htmlClaimReceivedFa({ businessName: bizForEmail?.name_fa || business_slug });
+    await sendMailViaSettings({
+      to: email,
+      subject: "درخواست مالکیت (Claim) کسب‌وکار شما دریافت شد — IraniU",
+      html,
+      text: `درخواست مالکیت کسب‌وکار "${bizForEmail?.name_fa || business_slug}" دریافت شد. به زودی از طریق ایمیل یا تماس با شما ارتباط خواهیم گرفت.`,
+    });
+  } catch (e) {
+    console.error("[email] claim received", e);
+  }
+
   res.status(201).json(row);
 }));
 
@@ -1130,16 +1581,67 @@ app.post("/api/admin/businesses/:slug/approve", requireSuperAdmin, asyncHandler(
     message: `Listing approved: ${slug}`,
   });
   const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
-  try {
-    await sendListingApprovedEmail({
-      to: row.listing_contact_email,
-      nameFa: row.name_fa,
-      slug: row.slug,
-    });
-  } catch (e) {
-    console.error("listing approve email", e);
+
+  // If no manager account exists yet, create one with a temp password and send Persian activation email
+  if (!row.manager_id && row.listing_contact_email) {
+    try {
+      const emailLower = row.listing_contact_email.toLowerCase();
+      const tempPassword = generateTempPassword();
+      const hash = hashPassword(tempPassword);
+      // Check if a manager with this email already exists
+      let existingMgr = await dbGet(`SELECT id FROM identity.managers WHERE LOWER(email) = $1`, [emailLower]);
+      let managerId;
+      if (existingMgr) {
+        managerId = existingMgr.id;
+        await dbRun(
+          `UPDATE identity.managers SET password_hash = $1, must_change_password = 1 WHERE id = $2`,
+          [hash, managerId]
+        );
+      } else {
+        const username = await generateUsernameFromEmail(emailLower);
+        const inserted = await dbGet(
+          `INSERT INTO identity.managers (login_username, email, password_hash, name, must_change_password)
+           VALUES ($1, $2, $3, $4, 1) RETURNING id`,
+          [username, emailLower, hash, row.name_fa || username]
+        );
+        managerId = inserted.id;
+      }
+      await dbRun(`UPDATE businesses SET manager_id = $1, claimed = 1 WHERE slug = $2`, [managerId, slug]);
+      const s = await getEffectiveSmtpSettings();
+      const loginUrl = s.siteUrl ? `${String(s.siteUrl).replace(/\/$/, "")}/login` : "/login";
+      const mgr = await dbGet(`SELECT login_username FROM identity.managers WHERE id = $1`, [managerId]);
+      const html = await htmlBusinessActivatedFa({
+        nameFa: row.name_fa,
+        username: mgr?.login_username || emailLower,
+        tempPassword,
+        loginUrl,
+      });
+      await sendMailViaSettings({
+        to: row.listing_contact_email,
+        subject: "حساب کاربری شما در IraniU فعال شد",
+        html,
+        text: `آگهی "${row.name_fa}" تأیید شد. نام کاربری: ${mgr?.login_username || emailLower} — رمز موقت: ${tempPassword} — ${loginUrl}`,
+      });
+    } catch (e) {
+      console.error("listing approve manager create / email", e);
+    }
+  } else {
+    // Manager already linked — ensure claimed = 1 and send approval email
+    if (row.manager_id) {
+      await dbRun(`UPDATE businesses SET claimed = 1 WHERE slug = $1 AND claimed != 1`, [slug]);
+    }
+    try {
+      await sendListingApprovedEmail({
+        to: row.listing_contact_email,
+        nameFa: row.name_fa,
+        slug: row.slug,
+      });
+    } catch (e) {
+      console.error("listing approve email", e);
+    }
   }
-  res.json(row);
+
+  res.json(await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]));
 }));
 
 app.post("/api/admin/businesses/:slug/reject", requireSuperAdmin, asyncHandler(async (req, res) => {
@@ -1190,15 +1692,96 @@ app.post("/api/admin/claim-requests/:id/decide", requireSuperAdmin, asyncHandler
     await dbRun(`UPDATE claim_requests SET status = 'rejected', decided_at = $1 WHERE id = $2`, [now, id]);
     return res.json(await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [id]));
   }
-  const biz = await dbGet(`SELECT claimed FROM businesses WHERE slug = $1`, [row.business_slug]);
+  const biz = await dbGet(`SELECT claimed, name_fa FROM businesses WHERE slug = $1`, [row.business_slug]);
   if (!biz) return res.status(404).json({ error: "business_missing" });
   if (biz.claimed) {
     await dbRun(`UPDATE claim_requests SET status = 'rejected', decided_at = $1 WHERE id = $2`, [now, id]);
     return res.status(409).json({ error: "business_already_claimed" });
   }
+
+  // Get or create manager with temp password
+  const emailLower = String(row.email || "").toLowerCase();
+  let managerId = null;
+  let managerUsername = emailLower;
+  const tempPassword = generateTempPassword();
+  const tempHash = hashPassword(tempPassword);
+
+  // Try pre-created manager from claim submission first
+  let mgr = row.claim_manager_id
+    ? await dbGet(`SELECT id, login_username FROM identity.managers WHERE id = $1`, [row.claim_manager_id])
+    : null;
+
+  // Fallback: lookup by email
+  if (!mgr) {
+    mgr = await dbGet(`SELECT id, login_username FROM identity.managers WHERE email = $1`, [emailLower]);
+  }
+
+  if (mgr) {
+    managerId = mgr.id;
+    managerUsername = mgr.login_username || emailLower;
+    await dbRun(
+      `UPDATE identity.managers SET password_hash = $1, must_change_password = 1 WHERE id = $2`,
+      [tempHash, managerId]
+    );
+  } else {
+    // Create fresh manager
+    const username = await generateUsernameFromEmail(emailLower);
+    const newMgr = await dbRun(
+      `INSERT INTO identity.managers (email, name, phone, login_username, password_hash, must_change_password)
+       VALUES ($1, $2, $3, $4, $5, 1) RETURNING id`,
+      [emailLower, row.applicant_name || "Manager", row.phone || null, username, tempHash]
+    );
+    managerId = newMgr.rows[0].id;
+    managerUsername = username;
+  }
+
+  // Link business to manager and mark as claimed
+  await dbRun(`UPDATE businesses SET claimed = 1, manager_id = $1 WHERE slug = $2`, [managerId, row.business_slug]);
   await dbRun(`UPDATE claim_requests SET status = 'approved', decided_at = $1 WHERE id = $2`, [now, id]);
-  await dbRun(`UPDATE businesses SET claimed = 1 WHERE slug = $1`, [row.business_slug]);
+  // Award claim milestone tokens (fire-and-forget)
+  checkAndAwardMilestones(row.business_slug).catch(() => {});
+
+  // Send claim verified email with credentials
+  try {
+    const s = await getEffectiveSmtpSettings();
+    const loginUrl = s.siteUrl
+      ? `${String(s.siteUrl).replace(/\/$/, "")}/login`
+      : "https://directory.iraniu.uk/login";
+    const html = await htmlClaimVerifiedFa({
+      businessName: biz.name_fa || row.business_slug,
+      username: managerUsername,
+      tempPassword,
+      loginUrl,
+    });
+    await sendMailViaSettings({
+      to: emailLower,
+      subject: "تأیید مالکیت کسب‌وکار و فعال‌سازی حساب کاربری — IraniU",
+      html,
+      text: `ضمن تبریک، حساب شما فعال شد.\nنام کاربری: ${managerUsername}\nرمز موقت: ${tempPassword}\nلینک ورود: ${loginUrl}`,
+    });
+  } catch (e) {
+    console.error("[email] claim verified", e);
+  }
+
   res.json(await dbGet(`SELECT * FROM claim_requests WHERE id = $1`, [id]));
+}));
+
+/** Remove claimed status from a business (admin only) */
+app.post("/api/admin/businesses/:slug/unclaim", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug || "").trim();
+  if (!slug) return res.status(400).json({ error: "missing_slug" });
+  const biz = await dbGet(`SELECT slug, claimed FROM businesses WHERE slug = $1`, [slug]);
+  if (!biz) return res.status(404).json({ error: "not_found" });
+  await dbRun(`UPDATE businesses SET claimed = 0, manager_id = NULL, exchange_manager_id = NULL WHERE slug = $1`, [slug]);
+  writeSystemLog({
+    level: "info",
+    actorType: "superadmin",
+    action: "business_unclaimed",
+    targetType: "business",
+    targetId: slug,
+    message: `Admin removed claimed status and manager from ${slug}`,
+  });
+  res.json({ ok: true, slug });
 }));
 
 async function attachLinkedBusinesses(managerRow, kind = "directory") {
@@ -1256,7 +1839,7 @@ app.delete("/api/managers/:id", requireSuperAdmin, asyncHandler(async (req, res)
   const existing = await dbGet(`SELECT id, email FROM identity.managers WHERE id = $1`, [id]);
   if (!existing) return res.status(404).json({ error: "not_found" });
   await dbTransaction(async (client) => {
-    await client.query(`UPDATE businesses SET manager_id = NULL WHERE manager_id = $1`, [id]);
+    await client.query(`UPDATE businesses SET manager_id = NULL, claimed = 0 WHERE manager_id = $1`, [id]);
     await client.query(`DELETE FROM identity.managers WHERE id = $1`, [id]);
   });
   writeSystemLog({
@@ -1275,7 +1858,7 @@ app.delete("/api/exchange-managers/:id", requireSuperAdmin, asyncHandler(async (
   const existing = await dbGet(`SELECT id, email FROM identity.exchange_managers WHERE id = $1`, [id]);
   if (!existing) return res.status(404).json({ error: "not_found" });
   await dbTransaction(async (client) => {
-    await client.query(`UPDATE businesses SET exchange_manager_id = NULL WHERE exchange_manager_id = $1`, [id]);
+    await client.query(`UPDATE businesses SET exchange_manager_id = NULL, claimed = 0 WHERE exchange_manager_id = $1`, [id]);
     await client.query(`DELETE FROM identity.exchange_managers WHERE id = $1`, [id]);
   });
   writeSystemLog({
@@ -1443,7 +2026,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, asyncHandler
     .toLowerCase();
 
   if (midLooksEmpty && !managerIdentifier) {
-    await dbRun(`UPDATE businesses SET manager_id = NULL WHERE slug = $1`, [slug]);
+    await dbRun(`UPDATE businesses SET manager_id = NULL, claimed = 0 WHERE slug = $1`, [slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "business_manager_unlinked",
@@ -1496,7 +2079,7 @@ app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, asyncHandler
       }
       return res.status(400).json({ error: "invalid_manager_id" });
     }
-    await dbRun(`UPDATE businesses SET manager_id = $1 WHERE slug = $2`, [id, slug]);
+    await dbRun(`UPDATE businesses SET manager_id = $1, claimed = 1 WHERE slug = $2`, [id, slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "business_manager_linked",
@@ -1529,7 +2112,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, asy
     .trim()
     .toLowerCase();
   if (midLooksEmpty && !managerIdentifier) {
-    await dbRun(`UPDATE businesses SET exchange_manager_id = NULL WHERE slug = $1`, [slug]);
+    await dbRun(`UPDATE businesses SET exchange_manager_id = NULL, claimed = 0 WHERE slug = $1`, [slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "exchange_business_manager_unlinked",
@@ -1578,7 +2161,7 @@ app.patch("/api/admin/exchange-businesses/:slug/manager", requireSuperAdmin, asy
       }
       return res.status(400).json({ error: "invalid_exchange_manager_id" });
     }
-    await dbRun(`UPDATE businesses SET exchange_manager_id = $1 WHERE slug = $2`, [id, slug]);
+    await dbRun(`UPDATE businesses SET exchange_manager_id = $1, claimed = 1 WHERE slug = $2`, [id, slug]);
     writeSystemLog({
       ...actorFromAuth(req.auth),
       action: "exchange_business_manager_linked",
@@ -1644,7 +2227,7 @@ app.post("/api/admin/businesses/:slug/send-to-telegram-channel", requireSuperAdm
 
 app.get("/api/admin/categories", requireSuperAdmin, asyncHandler(async (_req, res) => {
   const rows = await dbAll(
-    `SELECT id, name, sort_order, is_active, created_at
+    `SELECT id, name, icon, sort_order, is_active, created_at
        FROM business_categories
        ORDER BY sort_order ASC, name ASC`
   );
@@ -1654,14 +2237,15 @@ app.get("/api/admin/categories", requireSuperAdmin, asyncHandler(async (_req, re
 app.post("/api/admin/categories", requireSuperAdmin, asyncHandler(async (req, res) => {
   const name = String((req.body && req.body.name) || "").trim();
   if (!name) return res.status(400).json({ error: "missing_name" });
+  const icon = String((req.body && req.body.icon) || "").trim() || null;
   const nextOrder = (await dbGet(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM business_categories`)).n;
   try {
     const info = await dbRun(
-      `INSERT INTO business_categories (name, sort_order, is_active) VALUES ($1, $2, 1) RETURNING id`,
-      [name, nextOrder]
+      `INSERT INTO business_categories (name, icon, sort_order, is_active) VALUES ($1, $2, $3, 1) RETURNING id`,
+      [name, icon, nextOrder]
     );
     const row = await dbGet(
-      `SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = $1`,
+      `SELECT id, name, icon, sort_order, is_active, created_at FROM business_categories WHERE id = $1`,
       [info.rows[0].id]
     );
     writeSystemLog({
@@ -1696,12 +2280,13 @@ app.patch("/api/admin/categories/:id", requireSuperAdmin, asyncHandler(async (re
     updates.sort_order = n;
   }
   if ("is_active" in b) updates.is_active = b.is_active ? 1 : 0;
+  if ("icon" in b) updates.icon = String(b.icon || "").trim() || null;
   const keys = Object.keys(updates);
   if (!keys.length) return res.status(400).json({ error: "no_fields" });
   const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
   const values = keys.map((k) => updates[k]);
   await dbRun(`UPDATE business_categories SET ${setClause} WHERE id = $${keys.length + 1}`, [...values, id]);
-  const row = await dbGet(`SELECT id, name, sort_order, is_active, created_at FROM business_categories WHERE id = $1`, [id]);
+  const row = await dbGet(`SELECT id, name, icon, sort_order, is_active, created_at FROM business_categories WHERE id = $1`, [id]);
   writeSystemLog({
     ...actorFromAuth(req.auth),
     action: "category_updated",
@@ -1772,6 +2357,9 @@ app.get("/api/admin/system-logs", requireSuperAdmin, asyncHandler(async (req, re
   const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit || "200"), 10) || 200));
   const level = String(req.query.level || "").trim().toLowerCase();
   const actor = String(req.query.actor_type || "").trim().toLowerCase();
+  const search = String(req.query.search || "").trim();
+  const dateFrom = String(req.query.from || "").trim();
+  const dateTo = String(req.query.to || "").trim();
   const levelOk = ["info", "warn", "error"].includes(level);
   const actorOk = ["system", "superadmin", "manager", "exchange_manager"].includes(actor);
   const where = [];
@@ -1784,9 +2372,23 @@ app.get("/api/admin/system-logs", requireSuperAdmin, asyncHandler(async (req, re
     where.push("sl.actor_type = ?");
     params.push(actor);
   }
-  // Build positional placeholders ($1, $2, ...) for the dynamic WHERE.
-  const whereClauses = where.map((clause, i) => clause.replace("?", `$${i + 1}`));
-  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  if (search) {
+    where.push("(sl.message ILIKE ? OR sl.action ILIKE ? OR sl.target_type ILIKE ? OR sl.target_id ILIKE ?)");
+    const needle = `%${search}%`;
+    params.push(needle, needle, needle, needle);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+    where.push("sl.created_at >= ?");
+    params.push(`${dateFrom} 00:00:00`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+    where.push("sl.created_at <= ?");
+    params.push(`${dateTo} 23:59:59`);
+  }
+  // Build positional placeholders ($1, $2, ...) for the dynamic WHERE, left to right.
+  let placeholderIndex = 0;
+  const whereSqlBody = where.join(" AND ").replace(/\?/g, () => `$${++placeholderIndex}`);
+  const whereSql = where.length ? `WHERE ${whereSqlBody}` : "";
   const limitParamIndex = params.length + 1;
   const q = `
     SELECT sl.*,
@@ -1971,10 +2573,48 @@ async function updateBusinessBySlug(req, res) {
     return res.status(400).json({ error: "no_fields" });
   }
 
+  // Fetch current image URLs before overwriting so we can delete removed ones from S3
+  const IMAGE_FIELDS = ["cover_image_url", "logo_url"];
+  const changingImages = IMAGE_FIELDS.filter((f) => f in updates);
+  const changingGallery = "gallery_json" in updates;
+  let oldRow = null;
+  if ((changingImages.length || changingGallery) && (await isS3Enabled())) {
+    oldRow = await dbGet(`SELECT cover_image_url, logo_url, gallery_json FROM businesses WHERE slug = $1`, [slug]);
+  }
+
   const keys = Object.keys(updates);
   const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
   const values = keys.map((k) => updates[k]);
   await dbRun(`UPDATE businesses SET ${setClause} WHERE slug = $${keys.length + 1}`, [...values, slug]);
+
+  // Delete old images from S3 that were replaced or cleared
+  if (oldRow && (await isS3Enabled())) {
+    const toDelete = [];
+
+    for (const field of IMAGE_FIELDS) {
+      if (!(field in updates)) continue;
+      const oldUrl = String(oldRow[field] || "");
+      const newUrl = String(updates[field] || "");
+      if (oldUrl && oldUrl !== newUrl) toDelete.push(oldUrl);
+    }
+
+    if (changingGallery) {
+      const parseUrls = (raw) => {
+        try { return (JSON.parse(raw) || []).flat().map(String).filter(Boolean); } catch { return []; }
+      };
+      const oldUrls = new Set(parseUrls(oldRow.gallery_json));
+      const newUrls = new Set(parseUrls(updates.gallery_json));
+      for (const url of oldUrls) if (!newUrls.has(url)) toDelete.push(url);
+    }
+
+    // Fire-and-forget: don't block the response
+    (async () => {
+      for (const url of toDelete) {
+        const key = await extractS3KeyFromUrl(url);
+        if (key) await deleteFromS3(key);
+      }
+    })().catch(() => {});
+  }
   writeSystemLog({
     ...actorFromAuth(auth),
     action: "business_profile_updated",
@@ -1984,11 +2624,120 @@ async function updateBusinessBySlug(req, res) {
     meta: { fields: keys },
   });
   const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
+  // Fire-and-forget milestone check (non-blocking)
+  checkAndAwardMilestones(slug).catch(() => {});
+  // Weekly edit bonus — only for manager saves, not admin edits
+  if (auth && (auth.typ === "mgr" || auth.typ === "mgrx")) {
+    checkWeeklyEditBonus(slug).catch(() => {});
+  }
   res.json(row);
 }
 
 /** مسیر تخت — بدون بخش /slug/save که روی بعضی سرورها ۴۰۴ می‌شود */
 app.post("/api/businesses/update", asyncHandler(updateBusinessBySlug));
+
+/* ─────────────────────────────────────────────────────────────
+   Token Wallet — manager endpoints
+   ──────────────────────────────────────────────────────────── */
+app.get("/api/wallet/plans", (_req, res) => {
+  res.json(BOOST_PLANS);
+});
+
+app.get("/api/wallet", requireManagerOrSuperAdmin, asyncHandler(async (req, res) => {
+  const auth = parseAuthHeader(req);
+  let slug;
+  if (auth.typ === "mgr") {
+    const biz = await dbGet(`SELECT slug FROM businesses WHERE manager_id = $1 LIMIT 1`, [auth.sub]);
+    if (!biz) return res.status(404).json({ error: "no_business" });
+    slug = biz.slug;
+  } else if (auth.typ === "mgrx") {
+    const biz = await dbGet(`SELECT slug FROM businesses WHERE exchange_manager_id = $1 LIMIT 1`, [auth.sub]);
+    if (!biz) return res.status(404).json({ error: "no_business" });
+    slug = biz.slug;
+  } else {
+    slug = req.query.slug;
+    if (!slug) return res.status(400).json({ error: "missing_slug" });
+  }
+  const data = await getWalletWithTransactions(slug);
+  res.json(data);
+}));
+
+app.post("/api/wallet/boost", requireManagerOrSuperAdmin, asyncHandler(async (req, res) => {
+  const auth = parseAuthHeader(req);
+  let slug;
+  if (auth.typ === "mgr") {
+    const biz = await dbGet(`SELECT slug FROM businesses WHERE manager_id = $1 LIMIT 1`, [auth.sub]);
+    if (!biz) return res.status(404).json({ error: "no_business" });
+    slug = biz.slug;
+  } else if (auth.typ === "mgrx") {
+    const biz = await dbGet(`SELECT slug FROM businesses WHERE exchange_manager_id = $1 LIMIT 1`, [auth.sub]);
+    if (!biz) return res.status(404).json({ error: "no_business" });
+    slug = biz.slug;
+  } else {
+    slug = req.body?.slug;
+    if (!slug) return res.status(400).json({ error: "missing_slug" });
+  }
+  const { plan_id } = req.body || {};
+  if (!plan_id) return res.status(400).json({ error: "missing_plan_id" });
+  try {
+    const result = await spendTokensForBoost(slug, plan_id);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+}));
+
+/* ─────────────────────────────────────────────────────────────
+   Token Wallet — superadmin endpoints
+   ──────────────────────────────────────────────────────────── */
+app.get("/api/admin/wallets", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`
+    SELECT
+      b.slug AS business_slug,
+      b.name_fa,
+      b.category,
+      b.status AS biz_status,
+      COALESCE(tw.balance, 0) AS balance,
+      COALESCE(tw.total_earned, 0) AS total_earned,
+      COALESCE(tw.total_spent, 0) AS total_spent,
+      tw.updated_at,
+      ab.plan_id AS active_boost_plan,
+      ab.ends_at AS boost_ends_at
+    FROM businesses b
+    LEFT JOIN token_wallets tw ON tw.business_slug = b.slug
+    LEFT JOIN LATERAL (
+      SELECT plan_id, ends_at FROM ad_boosts
+      WHERE business_slug = b.slug
+        AND is_active = 1
+        AND ends_at > NOW()::TEXT
+      ORDER BY ends_at DESC LIMIT 1
+    ) ab ON TRUE
+    ORDER BY COALESCE(tw.balance, 0) DESC, b.name_fa
+  `);
+  res.json(rows);
+}));
+
+app.post("/api/admin/wallets/grant", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { business_slug, amount, description } = req.body || {};
+  if (!business_slug || !amount) return res.status(400).json({ error: "missing_fields" });
+  const n = parseInt(String(amount), 10);
+  if (!Number.isFinite(n) || n <= 0 || n > 10000) return res.status(400).json({ error: "invalid_amount" });
+  const biz = await dbGet(`SELECT slug FROM businesses WHERE slug = $1`, [business_slug]);
+  if (!biz) return res.status(404).json({ error: "business_not_found" });
+  await grantTokens(business_slug, n, description || "اعطای توکن توسط ادمین");
+  res.json({ ok: true });
+}));
+
+app.get("/api/admin/wallets/boosts", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`
+    SELECT ab.*, b.name_fa
+    FROM ad_boosts ab
+    LEFT JOIN businesses b ON b.slug = ab.business_slug
+    ORDER BY ab.created_at DESC
+    LIMIT 100
+  `);
+  res.json(rows);
+}));
 
 /** PUT / PATCH / POST — پشتیبان */
 app.put("/api/businesses/:slug", asyncHandler(updateBusinessBySlug));
@@ -2029,6 +2778,70 @@ app.get("/api/admin/stats", requireSuperAdmin, asyncHandler(async (_req, res) =>
     res.status(500).json({ error: "stats_failed" });
   }
 }));
+
+/* ── City Images (homepage) ── */
+const CITY_IMAGES_KEY = "homepage_city_images";
+const cityImagesDir = path.join(uploadsDir, "city-images");
+if (!fs.existsSync(cityImagesDir)) fs.mkdirSync(cityImagesDir, { recursive: true });
+
+const uploadCityImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype || "")) { cb(new Error("bad_file_type")); return; }
+    cb(null, true);
+  },
+});
+
+app.get("/api/city-images", asyncHandler(async (_req, res) => {
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = $1`, [CITY_IMAGES_KEY]);
+  const data = row ? JSON.parse(row.value || "{}") : {};
+  res.json(data);
+}));
+
+app.get("/api/admin/city-images", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = $1`, [CITY_IMAGES_KEY]);
+  const data = row ? JSON.parse(row.value || "{}") : {};
+  res.json(data);
+}));
+
+app.patch("/api/admin/city-images", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const updates = req.body && typeof req.body === "object" ? req.body : {};
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = $1`, [CITY_IMAGES_KEY]);
+  const current = row ? JSON.parse(row.value || "{}") : {};
+  const merged = { ...current };
+  for (const [city, url] of Object.entries(updates)) {
+    const u = String(url || "").trim();
+    if (u) merged[city] = u; else delete merged[city];
+  }
+  await dbRun(
+    `INSERT INTO app_meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
+    [CITY_IMAGES_KEY, JSON.stringify(merged)]
+  );
+  res.json(merged);
+}));
+
+app.post("/api/admin/city-images/:city/upload", requireSuperAdmin, (req, res) => {
+  const city = String(req.params.city || "").trim();
+  if (!city) return res.status(400).json({ error: "missing_city" });
+  uploadCityImage.single("image")(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: "upload_failed", hint: String(err.message || err) });
+    if (!req.file) return res.status(400).json({ error: "no_file" });
+    const ext = req.file.mimetype.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+    const filename = `${city.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.${ext}`;
+    const filePath = path.join(cityImagesDir, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
+    const imageUrl = `/uploads/city-images/${filename}`;
+    const row = await dbGet(`SELECT value FROM app_meta WHERE key = $1`, [CITY_IMAGES_KEY]);
+    const current = row ? JSON.parse(row.value || "{}") : {};
+    current[city] = imageUrl;
+    await dbRun(
+      `INSERT INTO app_meta (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
+      [CITY_IMAGES_KEY, JSON.stringify(current)]
+    );
+    res.json({ city, imageUrl, all: current });
+  });
+});
 
 app.get("/api/qr/stats/:bid", asyncHandler(async (req, res) => {
   const bid = sanitizeBid(req.params.bid);
@@ -2265,22 +3078,101 @@ app.patch("/api/manager/twilio-settings", requireManager, asyncHandler(async (re
   });
 }));
 
-/** Google review redirect: increment scan counter then 302 */
+// ─── Blog public routes ───────────────────────────────────────────────────────
+
+async function getBlogSource() {
+  const row = await dbGet(`SELECT value FROM app_meta WHERE key = 'blog_source'`);
+  return row?.value || "both";
+}
+
+app.get("/api/blog", asyncHandler(async (req, res) => {
+  const page  = Math.max(1, parseInt(req.query.page)  || 1);
+  const limit = Math.min(20, parseInt(req.query.limit) || 9);
+  const cat   = (req.query.category || "").trim();
+  const q     = (req.query.q || "").trim();
+  const offset = (page - 1) * limit;
+
+  const source = await getBlogSource();
+  let allPosts = [];
+
+  // Local posts
+  if (source === "local" || source === "both") {
+    let where = "WHERE is_published = 1";
+    const params = [];
+    if (cat) { params.push(cat); where += ` AND category = $${params.length}`; }
+    if (q) {
+      params.push(`%${q}%`);
+      const idx = params.length;
+      where += ` AND (title_fa ILIKE $${idx} OR excerpt_fa ILIKE $${idx})`;
+    }
+    const rows = await dbAll(
+      `SELECT id, slug, title_fa, excerpt_fa, cover_image_url, author, category, tags, published_at, view_count FROM blog_posts ${where} ORDER BY published_at DESC`,
+      params
+    );
+    allPosts.push(...rows.map((r) => ({ ...r, source: "local" })));
+  }
+
+  // External posts (CyberCina)
+  if (source === "external" || source === "both") {
+    try {
+      const { posts: ext } = await getExternalPosts({ limit: 100, offset: 0, ...(q && { search: q }) });
+      const normalized = ext.map(normalizeExternalPost);
+      const filtered = cat ? normalized.filter((p) => p.category === cat) : normalized;
+      allPosts.push(...filtered);
+    } catch (e) {
+      console.error("[blog] CyberCina fetch error:", e.message);
+    }
+  }
+
+  // Deduplicate by slug (local wins over external)
+  const seen = new Set();
+  allPosts = allPosts.filter((p) => {
+    if (seen.has(p.slug)) return false;
+    seen.add(p.slug);
+    return true;
+  });
+
+  // Sort newest first
+  allPosts.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+
+  const total = allPosts.length;
+  const posts = allPosts.slice(offset, offset + limit);
+
+  res.json({ posts, total, page, limit });
+}));
+
+app.get("/api/blog/:slug", asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  const source = await getBlogSource();
+
+  // Try local first
+  if (source === "local" || source === "both") {
+    const row = await dbGet(`SELECT * FROM blog_posts WHERE slug = $1 AND is_published = 1`, [slug]);
+    if (row) {
+      await dbRun(`UPDATE blog_posts SET view_count = view_count + 1 WHERE id = $1`, [row.id]);
+      return res.json({ ...row, source: "local" });
+    }
+  }
+
+  // Fall back to external
+  if (source === "external" || source === "both") {
+    try {
+      const { posts } = await getExternalPosts({ slug, limit: 1, offset: 0 });
+      if (posts.length > 0) return res.json(normalizeExternalPost(posts[0]));
+    } catch (e) {
+      console.error("[blog/:slug] CyberCina error:", e.message);
+    }
+  }
+
+  res.status(404).json({ error: "not_found" });
+}));
+
+/** Google review redirect: increment scan counter, redirect to Iraniu profile */
 app.get("/go", asyncHandler(async (req, res) => {
   const t = req.query.t;
   const bidRaw = req.query.bid || "default";
   const bid = sanitizeBid(bidRaw);
   const key = "qr_" + bid.slice(0, 80);
-  const decoded = base64UrlToString(String(t || ""));
-  const target = resolveReviewRedirectUrl(decoded, { loose: looseReviewRedirect });
-
-  if (!target) {
-    const hint = looseReviewRedirect
-      ? "لینک https معتبر نیست."
-      : "فقط لینک‌های Google Maps / نظر Google مجاز است، یا سرور را با ALLOW_ANY_REVIEW_REDIRECT=1 برای تست با هر آدرس https اجرا کنید.";
-    return res.status(400).send(`<!DOCTYPE html><html lang="fa" dir="rtl"><meta charset="utf-8"><title>خطا</title>
-      <body style="font-family:Tahoma;padding:2rem;text-align:center"><p>${hint}</p></body></html>`);
-  }
 
   try {
     await dbRun(`INSERT INTO qr_scans (business_slug) VALUES ($1)`, [key]);
@@ -2288,7 +3180,9 @@ app.get("/go", asyncHandler(async (req, res) => {
     console.error("qr_scans insert", e);
   }
 
-  res.redirect(302, target);
+  // Redirect to Iraniu business profile page instead of Google directly
+  const profileUrl = `/business?slug=${encodeURIComponent(bid)}`;
+  res.redirect(302, profileUrl);
 }));
 
 const clientDist = path.join(__dirname, "..", "..", "client", "dist");
@@ -2300,7 +3194,16 @@ function mountProdStatic() {
     console.warn("client/dist not found — run: npm run build --prefix client");
     return;
   }
-  const staticMw = express.static(clientDist, { index: false });
+  const staticMw = express.static(clientDist, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      } else if (/\.(js|css|png|jpg|jpeg|webp|svg|ico|woff|woff2|ttf|eot|gif)$/.test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+      }
+    },
+  });
   app.use((req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/chatbot") || req.path === "/go") return next();
     return staticMw(req, res, next);
@@ -2308,8 +3211,10 @@ function mountProdStatic() {
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/chatbot") || req.path === "/go") return next();
     const indexHtml = path.join(clientDist, "index.html");
-    if (fs.existsSync(indexHtml)) res.sendFile(indexHtml);
-    else next();
+    if (fs.existsSync(indexHtml)) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.sendFile(indexHtml);
+    } else next();
   });
 }
 
@@ -2337,9 +3242,9 @@ async function main() {
     res.status(500).json({ error: "server_error" });
   });
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     const mode = isProd ? "production" : "development";
-    console.log(`Iraniu ${mode} — http://127.0.0.1:${PORT} (site + /api + /go on one port)`);
+    console.log(`Iraniu ${mode} — http://0.0.0.0:${PORT} (site + /api + /go on one port)`);
   });
 }
 

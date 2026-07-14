@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ListingCard from "../components/ListingCard.jsx";
+import AiSearch from "../components/AiSearch.jsx";
 import Seo from "../components/Seo.jsx";
 import { apiGet, apiPost } from "../api.js";
 import { getListingsLocationFromForm } from "../lib/listingsSearchNavigate.js";
@@ -43,8 +44,31 @@ function incrementDailyBannerSeenCount(scope, bannerId) {
   } catch {}
 }
 
+function AdSenseSlot({ code }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
+  }, []);
+  const insHtml = String(code || "").replace(/<script[\s\S]*?<\/script>/gi, "").trim();
+  if (!insHtml) return null;
+  return <div ref={ref} dangerouslySetInnerHTML={{ __html: insHtml }} />;
+}
+
 function DirectoryAdBanner({ banner, onBannerClick }) {
-  if (!banner?.image_url) return null;
+  const hasImage = !!banner?.image_url;
+  const hasAdsense = !hasImage && !!banner?.adsense_code;
+  if (!hasImage && !hasAdsense) return null;
+
+  if (hasAdsense) {
+    return (
+      <div className="listings-page__ad-banner listings-page__ad-banner--adsense" aria-label="آگهی">
+        <span className="ad-badge-sponsor">Sponsored</span>
+        <AdSenseSlot code={banner.adsense_code} />
+      </div>
+    );
+  }
+
   const link = String(banner.link_url || "").trim();
   const external = /^https?:\/\//i.test(link);
   const label = banner.title || "بنر تبلیغاتی";
@@ -81,7 +105,8 @@ export default function ListingsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [fullscreenBanner, setFullscreenBanner] = useState(null);
-  const PAGE_SIZE = 9;
+  const [sortBy, setSortBy] = useState("default");
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     setLoading(true);
@@ -98,13 +123,29 @@ export default function ListingsPage() {
       .catch(() => setDirectoryBanners([]));
   }, []);
 
+  const featuredRows = useMemo(() => {
+    const boosted = rows.filter((b) => b.active_boost_plan === "diamond" || b.active_boost_plan === "platinum");
+    // daily shuffle within each tier so all businesses get fair rotation
+    const seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, "")) % 9973;
+    function hashSlug(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff; return h; }
+    const diamond  = boosted.filter((b) => b.active_boost_plan === "diamond").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
+    const platinum = boosted.filter((b) => b.active_boost_plan === "platinum").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
+    return [...diamond, ...platinum];
+  }, [rows]);
+
   const filtered = useMemo(() => filterRows(rows, searchParams), [rows, searchParams]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sortedFiltered = useMemo(() => {
+    const arr = [...filtered];
+    if (sortBy === "rating") arr.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    if (sortBy === "name") arr.sort((a, b) => (a.name_fa || "").localeCompare(b.name_fa || "", "fa"));
+    return arr;
+  }, [filtered, sortBy]);
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedRows = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, safePage]);
+    return sortedFiltered.slice(start, start + PAGE_SIZE);
+  }, [sortedFiltered, safePage]);
 
   useEffect(() => {
     setPage(1);
@@ -199,15 +240,38 @@ export default function ListingsPage() {
   }, [searchParams]);
 
   return (
-    <section
-      className="section container listings-page listings-page--plain"
-      aria-labelledby="listings-title"
-    >
+    <>
+      <style>{`
+        .listings-hero { background: linear-gradient(135deg,#1a0a2e 0%,#3a0a5e 100%); padding: 3.5rem 1.5rem 2.5rem; }
+        .listings-hero__inner { max-width: 1200px; margin: 0 auto; }
+        .listings-hero__eyebrow { color: rgba(200,160,255,0.75); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }
+        .listings-hero__h1 { color: #fff; font-size: clamp(1.6rem,4vw,2.4rem); font-weight: 800; margin: 0 0 0.4rem; }
+        .listings-hero__sub { color: rgba(255,255,255,0.6); font-size: 0.95rem; margin: 0 0 1.5rem; }
+        .listings-hero__actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .listings-main { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+        @media(max-width:768px){ .listings-main { padding: 1.5rem 1rem 3rem; } }
+      `}</style>
+
       <Seo title={listingsSeo.title} description={listingsSeo.description || SEO_DEFAULT_DESCRIPTION} />
+
+      {/* Hero bar */}
+      <div className="listings-hero">
+        <div className="listings-hero__inner">
+          <p className="listings-hero__eyebrow">فهرست ایرانیو</p>
+          <h1 className="listings-hero__h1" id="listings-title">لیست کسب‌وکارها</h1>
+          <p className="listings-hero__sub">جستجو و فیلتر در میان کسب‌وکارهای ایرانی در بریتانیا</p>
+          <div className="listings-hero__actions">
+            <Link to="/exchanges" className="demo-btn demo-btn--outline">صرافی‌ها</Link>
+            <Link to="/onboarding" className="demo-btn demo-btn--accent">ثبت کسب‌وکار رایگان</Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen banner modal */}
       {fullscreenBanner ? (
         <div className="admin-detail-modal public-fs-banner-modal">
           <div className="admin-detail-modal__backdrop" onClick={() => setFullscreenBanner(null)} />
-          <div className="admin-detail-modal__panel public-fs-banner-modal__panel" role="dialog" aria-modal="true" aria-label="تبلیغ تمام‌صفحه">
+          <div className="admin-detail-modal__panel public-fs-banner-modal__panel" role="dialog" aria-modal="true" aria-label="تبلی�� تمام‌صفحه">
             <button type="button" className="admin-detail-modal__close" onClick={() => setFullscreenBanner(null)} aria-label="بستن">
               ×
             </button>
@@ -217,19 +281,77 @@ export default function ListingsPage() {
           </div>
         </div>
       ) : null}
-      <div className="listings-page__intro">
-        <p className="listings-page__eyebrow">فهرست ایرانیو</p>
-        <h1 id="listings-title">لیست کسب‌وکارها</h1>
-        <p className="listings-page__intro-lead">جستجو و فیلتر؛ نتایج به‌صورت کارت زیر نمایش داده می‌شوند.</p>
-        <div className="listings-page__intro-actions">
-          <Link className="btn btn--ghost" to="/exchanges">
-            صرافی‌ها
-          </Link>
-          <Link className="btn btn--accent" to="/">
-            بازگشت به خانه
-          </Link>
+
+      {featuredRows.length > 0 && (
+        <div className="listings-featured-band" aria-labelledby="featured-listings-title">
+          <div className="listings-featured-band__inner">
+            <div className="featured-section__head">
+              <span className="featured-section__icon" aria-hidden="true">⭐</span>
+              <div>
+                <h2 id="featured-listings-title" className="featured-section__title">آگهی‌های ویژه</h2>
+                <p className="featured-section__sub">{featuredRows.length} کسب‌وکار برجسته این دوره</p>
+              </div>
+            </div>
+            <div className="hp-listings-grid">
+              {featuredRows.map((b) => {
+                const href = `/business?slug=${encodeURIComponent(b.slug)}`;
+                const cover = String(b.cover_image_url || "").trim();
+                const bp = b.active_boost_plan;
+                const letter = String(b.name_fa || "?").charAt(0);
+                const rating = Number(b.rating) || 0;
+                const BOOST_LABEL = { diamond: "💠 الماسی", platinum: "💎 پلاتینیوم", gold: "🥇 طلایی", silver: "🥈 نقره‌ای" };
+                return (
+                  <article key={b.slug} className={`hp-card${bp ? ` hp-card--boost-${bp}` : ""}`}>
+                    <Link to={href} style={{ display: "block", flexShrink: 0 }}>
+                      <div className="hp-card__media">
+                        {cover
+                          ? <img className="hp-card__img" src={cover} alt="" loading="lazy" />
+                          : <div className="hp-card__placeholder">{letter}</div>
+                        }
+                        <div className="hp-card__badges">
+                          {bp && <span className={`hp-card__badge hp-card__badge--boost-${bp}`}>{BOOST_LABEL[bp]}</span>}
+                          {!bp && <span className="hp-card__badge hp-card__badge--featured">Featured</span>}
+                        </div>
+                        {b.category && <span className="hp-card__cat-tag">{b.category}</span>}
+                      </div>
+                    </Link>
+                    <div className="hp-card__body">
+                      <Link to={href} className="hp-card__title">{b.name_fa}</Link>
+                      {(b.address || b.city) && (
+                        <div className="hp-card__meta">
+                          <i className="fa-solid fa-location-dot" aria-hidden="true" />
+                          {[b.address, b.city].filter(Boolean).join("، ")}
+                        </div>
+                      )}
+                      {b.phone && (
+                        <div className="hp-card__meta">
+                          <i className="fa-solid fa-phone" aria-hidden="true" />
+                          <span dir="ltr">{b.phone}</span>
+                        </div>
+                      )}
+                      {rating > 0 && (
+                        <div className="hp-card__rating">
+                          <span className="hp-card__stars">{"★".repeat(Math.min(5, Math.round(rating)))}</span>
+                          <span className="hp-card__rating-val">{rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                      <div className="hp-card__footer">
+                        <Link to={href} className="hp-card__view">
+                          مشاهده آگهی <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.75rem" }} />
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      <main className="listings-main" aria-labelledby="listings-title">
+
+      <AiSearch />
 
       <form
         key={searchParams.toString()}
@@ -293,93 +415,109 @@ export default function ListingsPage() {
       </form>
 
       <div className="listings-results-root">
-        <div className="listings-toolbar">
-          <p className="listings-toolbar__status">
-            {loading ? (
-              <span className="listings-toolbar__loading">در حال بارگذاری فهرست…</span>
-            ) : err ? (
-              <span className="listings-error">{err}</span>
-            ) : filtered.length === rows.length ? (
-              <>
-                <span className="listings-toolbar__count">{rows.length}</span>
-              </>
-            ) : (
-              <>
-                <span className="listings-toolbar__count">{filtered.length}</span> (با فیلتر جستجو)
-              </>
+        <>
+            {!loading && !err && (
+              <div className="listings-sort-bar">
+                <span className="listings-sort-bar__count">
+                  <i className="fa-solid fa-list" aria-hidden="true" />
+                  {sortedFiltered.length !== rows.length
+                    ? <>{sortedFiltered.length} نتیجه (از {rows.length} آگهی)</>
+                    : <>{rows.length} کسب‌وکار</>
+                  }
+                </span>
+                <select
+                  className="listings-sort-bar__select"
+                  value={sortBy}
+                  onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+                  aria-label="مرتب‌سازی"
+                >
+                  <option value="default">مرتب‌سازی: پیش‌فرض</option>
+                  <option value="rating">بالاترین امتیاز</option>
+                  <option value="name">نام (الف-ی)</option>
+                </select>
+              </div>
             )}
-          </p>
-        </div>
+            <div className="listings-toolbar">
+              <p className="listings-toolbar__status">
+                {loading ? (
+                  <span className="listings-toolbar__loading">در حال بارگذاری فهرست…</span>
+                ) : err ? (
+                  <span className="listings-error">{err}</span>
+                ) : null}
+              </p>
+            </div>
 
-        {loading ? (
-          <div className="listing-cards listing-cards--skeleton" aria-busy="true" aria-label="بارگذاری">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="listing-card listing-card--skeleton">
-                <div className="listing-card__media listing-card__skeleton-shimmer" />
-                <div className="listing-card__body">
-                  <div className="listing-card__skeleton-line listing-card__skeleton-line--title" />
-                  <div className="listing-card__skeleton-line" />
-                  <div className="listing-card__skeleton-line listing-card__skeleton-line--short" />
-                </div>
+            {loading ? (
+              <div className="listing-cards listing-cards--skeleton" aria-busy="true" aria-label="بارگذاری">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="listing-card listing-card--skeleton">
+                    <div className="listing-card__media listing-card__skeleton-shimmer" />
+                    <div className="listing-card__body">
+                      <div className="listing-card__skeleton-line listing-card__skeleton-line--title" />
+                      <div className="listing-card__skeleton-line" />
+                      <div className="listing-card__skeleton-line listing-card__skeleton-line--short" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 && !err && rows.length === 0 ? (
-          <div className="listings-empty">
-            <p>هنوز کسب‌وکاری در فهرست ثبت نشده است.</p>
-          </div>
-        ) : filtered.length === 0 && !err ? (
-          <div className="listings-empty">
-            <p>موردی با این فیلترها پیدا نشد. عبارت جستجو یا دسته را عوض کنید.</p>
-          </div>
-        ) : (
-          <div className="listing-cards">
-            {!loading && !err && topBanners[0] ? (
-              <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--top">
-                <DirectoryAdBanner banner={topBanners[0]} onBannerClick={() => trackBannerClick(topBanners[0]?.id)} />
+            ) : sortedFiltered.length === 0 && !err && rows.length === 0 ? (
+              <div className="listings-empty">
+                <p>هنوز کسب‌وکاری در فهرست ثبت نشده است.</p>
               </div>
-            ) : null}
-            {pagedRows.map((b, idx) => (
-              <Fragment key={b.slug}>
-                <div className="listings-page__stack-item">
-                  <ListingCard b={b} />
-                </div>
-                {idx % 2 === 1 && betweenBannersForPage[Math.floor(idx / 2)] ? (
-                  <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--between">
-                    <DirectoryAdBanner
-                      banner={betweenBannersForPage[Math.floor(idx / 2)]}
-                      onBannerClick={() => trackBannerClick(betweenBannersForPage[Math.floor(idx / 2)]?.id)}
-                    />
+            ) : sortedFiltered.length === 0 && !err ? (
+              <div className="listings-empty">
+                <p>موردی با این فیلترها پیدا نشد. عبارت جستجو یا دسته را عوض کنید.</p>
+              </div>
+            ) : (
+              <div className="listing-cards">
+                {!loading && !err && topBanners[0] ? (
+                  <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--top">
+                    <DirectoryAdBanner banner={topBanners[0]} onBannerClick={() => trackBannerClick(topBanners[0]?.id)} />
                   </div>
                 ) : null}
-              </Fragment>
-            ))}
-          </div>
-        )}
-        {!loading && !err && filtered.length > PAGE_SIZE && (
-          <nav className="listings-pagination" aria-label="صفحه‌بندی">
-            <button
-              type="button"
-              className="btn btn--ghost listings-pagination__btn"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-            >
-              قبلی
-            </button>
-            <p className="listings-pagination__status">
-              صفحه {safePage} از {totalPages}
-            </p>
-            <button
-              type="button"
-              className="btn btn--ghost listings-pagination__btn"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage >= totalPages}
-            >
-              بعدی
-            </button>
-          </nav>
-        )}
+                {pagedRows.map((b, idx) => (
+                  <Fragment key={b.slug}>
+                    <div className="listings-page__stack-item">
+                      <ListingCard b={b} />
+                    </div>
+                    {idx % 2 === 1 && betweenBannersForPage[Math.floor(idx / 2)] ? (
+                      <div className="listings-page__ad-banner-wrap listings-page__ad-banner-wrap--between">
+                        <DirectoryAdBanner
+                          banner={betweenBannersForPage[Math.floor(idx / 2)]}
+                          onBannerClick={() => trackBannerClick(betweenBannersForPage[Math.floor(idx / 2)]?.id)}
+                        />
+                      </div>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </div>
+            )}
+            {!loading && !err && sortedFiltered.length > PAGE_SIZE && (
+              <nav className="listings-pagination" aria-label="صفحه‌بندی">
+                <button
+                  type="button"
+                  className="btn btn--ghost listings-pagination__btn"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                >
+                  قبلی
+                </button>
+                <p className="listings-pagination__status">
+                  صفحه {safePage} از {totalPages}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn--ghost listings-pagination__btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                >
+                  بعدی
+                </button>
+              </nav>
+            )}
+          </>
       </div>
-    </section>
+      </main>
+    </>
   );
 }

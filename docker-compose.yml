@@ -1,15 +1,35 @@
 services:
+  iraniu-db:
+    image: pgvector/pgvector:pg16
+    container_name: iraniu-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-iraniu}
+      POSTGRES_USER: ${POSTGRES_USER:-iraniu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - iraniu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-iraniu} -d ${POSTGRES_DB:-iraniu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   iraniu-app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: iraniu-app
     restart: unless-stopped
+    depends_on:
+      iraniu-db:
+        condition: service_healthy
     ports:
       - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
+      DATABASE_URL: postgres://${POSTGRES_USER:-iraniu}:${POSTGRES_PASSWORD:-changeme}@iraniu-db:5432/${POSTGRES_DB:-iraniu}
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3001}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -25,8 +45,10 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-1}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - iraniu_data:/app/server/data
 
 volumes:
   iraniu_data:
+  iraniu_pgdata:
