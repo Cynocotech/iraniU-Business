@@ -106,7 +106,7 @@ const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
             phone, reservation_link, cover_image_url, promo_title,
             careers_title, exchange_manager_id`;
 
-async function retrieveByName(nameKeyword, { city, isExchange, isJob }) {
+async function retrieveByName(nameKeyword, { city, isExchange, isJob, isPromo }) {
   // Search only name_fa — listing_title is auto-generated ("X ایرانی در Y لندن") and
   // would falsely match "ایران" for every business in the directory.
   const { rows } = await pool.query(
@@ -116,15 +116,16 @@ async function retrieveByName(nameKeyword, { city, isExchange, isJob }) {
         AND name_fa ILIKE '%' || $1 || '%'
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
-        AND (NOT $4 OR careers_title IS NOT NULL)
+        AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
+        AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
       ORDER BY rating DESC NULLS LAST
       LIMIT 20`,
-    [nameKeyword, city || null, !!isExchange, !!isJob]
+    [nameKeyword, city || null, !!isExchange, !!isJob, !!isPromo]
   );
   return rows;
 }
 
-async function retrieveByCategory(category, { city, isExchange, isJob }) {
+async function retrieveByCategory(category, { city, isExchange, isJob, isPromo }) {
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
        FROM public.businesses
@@ -132,15 +133,16 @@ async function retrieveByCategory(category, { city, isExchange, isJob }) {
         AND category ILIKE '%' || $1 || '%'
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
-        AND (NOT $4 OR careers_title IS NOT NULL)
+        AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
+        AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
       ORDER BY rating DESC NULLS LAST
       LIMIT 15`,
-    [category, city || null, !!isExchange, !!isJob]
+    [category, city || null, !!isExchange, !!isJob, !!isPromo]
   );
   return rows;
 }
 
-async function retrieveCandidates(queryVec, { city, isExchange, isJob }) {
+async function retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo }) {
   const vecStr = `[${queryVec.join(",")}]`;
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
@@ -149,10 +151,11 @@ async function retrieveCandidates(queryVec, { city, isExchange, isJob }) {
         AND embedding IS NOT NULL
         AND ($1::text IS NULL OR city ILIKE '%' || $1 || '%' OR address ILIKE '%' || $1 || '%')
         AND (NOT $2 OR exchange_manager_id IS NOT NULL)
-        AND (NOT $3 OR careers_title IS NOT NULL)
+        AND (NOT $3 OR (careers_title IS NOT NULL AND careers_title != ''))
+        AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
       ORDER BY embedding <=> $4::vector
       LIMIT 20`,
-    [city || null, !!isExchange, !!isJob, vecStr]
+    [city || null, !!isExchange, !!isJob, vecStr, !!isPromo]
   );
   return rows;
 }
@@ -217,10 +220,11 @@ router.post("/", async (req, res) => {
       {
         role: "system",
         content: `شما یک دستیار تجزیه‌گر جستجو برای دایرکتوری کسب‌وکارهای ایرانی در بریتانیا هستید. خروجی باید JSON با این کلیدها باشد:
-{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "name_contains": string|null, "is_off_topic": boolean, "keywords_en": string|null, "search_text": string|null}
+{"category": string|null, "city": string|null, "price_range": string|null, "is_exchange_query": boolean, "is_job_query": boolean, "is_promo_query": boolean, "name_contains": string|null, "is_off_topic": boolean, "keywords_en": string|null, "search_text": string|null}
 - is_off_topic: true اگر سوال اصلاً مربوط به پیدا کردن کسب‌وکار، خدمات یا محصول نیست (اخبار، دستور غذا، سیاست و غیره).
 - is_exchange_query: true اگر کاربر صرافی یا تبادل ارز می‌خواهد.
 - is_job_query: true اگر کاربر موقعیت شغلی یا استخدام می‌خواهد — هم «دنبال کار هستم» هم «شرکت‌هایی که نیرو می‌خواهند» و هم «استخدام می‌کنند» را شامل می‌شود.
+- is_promo_query: true اگر کاربر به دنبال تخفیف، پیشنهاد ویژه، آفر یا پروموشن است — مثلاً «کجا تخفیف می‌دن»، «آفر ویژه»، «پیشنهاد ارزان».
 - name_contains: پر کنید اگر کاربر به دنبال کسب‌وکارهایی با کلمه‌ای خاص در نامشان است (مثلاً «نامشان ایران دارد» → «ایران»).
 - keywords_en: ترجمه انگلیسی کلیدواژه‌های اصلی جستجو برای بهبود جستجوی معنایی.
 - search_text: درخواست کاربر را به یک جمله توصیفی فارسی روشن بازنویسی کنید — اختصارات را گسترش دهید، اصطلاحات عامیانه را به کلمات رسمی تبدیل کنید، نام‌های مکانی را نگه‌دارید. این متن برای بردار-جستجوی معنایی استفاده می‌شود.
@@ -264,6 +268,7 @@ router.post("/", async (req, res) => {
     typeof parsed.search_text === "string" && parsed.search_text.trim()
       ? parsed.search_text.trim()
       : null;
+  const isPromo = !!parsed.is_promo_query;
 
   // Embedding input: prefer the expanded search_text, fall back to bilingual raw query
   const embeddingInput = searchText || (keywordsEn ? `${q}\n${keywordsEn}` : q);
@@ -276,7 +281,7 @@ router.post("/", async (req, res) => {
   try {
     if (nameContains) {
       // Name-keyword query: direct name_fa text search
-      candidates = await retrieveByName(nameContains, { city, isExchange, isJob });
+      candidates = await retrieveByName(nameContains, { city, isExchange, isJob, isPromo });
     } else {
       // Semantic query: embed → vector search → city fallback → category hybrid
       try {
@@ -288,16 +293,16 @@ router.post("/", async (req, res) => {
           answer_fa: "سرویس هوش مصنوعی موقتاً در دسترس نیست. لطفاً دوباره امتحان کنید.",
         });
       }
-      candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
+      candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo });
       if (candidates.length < 3 && city) {
-        const broader = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+        const broader = await retrieveCandidates(queryVec, { city: null, isExchange, isJob, isPromo });
         if (broader.length > candidates.length) {
           candidates = broader;
           cityFallback = true;
         }
       }
       if (category) {
-        const catRows = await retrieveByCategory(category, { city, isExchange, isJob });
+        const catRows = await retrieveByCategory(category, { city, isExchange, isJob, isPromo });
         candidates = mergeCandidates(candidates, catRows);
       }
     }
@@ -305,7 +310,7 @@ router.post("/", async (req, res) => {
     // Final retry: if 0 candidates and city/category were restrictive filters,
     // drop both and run a single pure semantic vector search.
     if (candidates.length === 0 && queryVec && (city || category)) {
-      const fallback = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+      const fallback = await retrieveCandidates(queryVec, { city: null, isExchange, isJob, isPromo });
       if (fallback.length > 0) {
         candidates = fallback;
         if (city) cityFallback = true;
