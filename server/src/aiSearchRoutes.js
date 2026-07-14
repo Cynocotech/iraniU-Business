@@ -85,13 +85,13 @@ const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
             careers_title, exchange_manager_id`;
 
 async function retrieveByName(nameKeyword, { city, isExchange, isJob }) {
+  // Search only name_fa — listing_title is auto-generated ("X ایرانی در Y لندن") and
+  // would falsely match "ایران" for every business in the directory.
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
        FROM public.businesses
       WHERE listing_approval = 'approved'
-        AND (name_fa ILIKE '%' || $1 || '%'
-          OR listing_title ILIKE '%' || $1 || '%'
-          OR subtitle ILIKE '%' || $1 || '%')
+        AND name_fa ILIKE '%' || $1 || '%'
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
         AND (NOT $4 OR careers_title IS NOT NULL)
@@ -224,9 +224,10 @@ router.post("/", async (req, res) => {
 
   // Retrieve candidates
   let candidates;
+  let cityFallback = false;
   try {
     if (nameContains) {
-      // Name-keyword query: direct name/title/subtitle text search
+      // Name-keyword query: direct name_fa text search
       candidates = await retrieveByName(nameContains, { city, isExchange, isJob });
     } else {
       // Semantic query: bilingual embedding + vector search + optional category hybrid
@@ -243,8 +244,11 @@ router.post("/", async (req, res) => {
       }
       candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob });
       if (candidates.length < 3 && city) {
-        // Too few with city filter — broaden to all cities
-        candidates = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+        const broader = await retrieveCandidates(queryVec, { city: null, isExchange, isJob });
+        if (broader.length > candidates.length) {
+          candidates = broader;
+          cityFallback = true;
+        }
       }
       // Hybrid: also pull direct category matches and merge
       if (category) {
@@ -277,6 +281,11 @@ router.post("/", async (req, res) => {
     about: [c.listing_title, c.subtitle, c.description].filter(Boolean).join(" — ").slice(0, 200),
   }));
 
+  // Build city-fallback note for recommender when the requested city had no results
+  const cityFallbackNote = cityFallback && city
+    ? `\nنکته مهم: دایرکتوری ایرانیو در حال حاضر فقط کسب‌وکارهای ایرانی لندن را پوشش می‌دهد و در شهر "${city}" نتیجه‌ای یافت نشد. نتایج زیر از لندن هستند. لطفاً این موضوع را در ابتدای answer_fa به کاربر اطلاع دهید.`
+    : "";
+
   let recommendation = {};
   try {
     recommendation = await openaiChat([
@@ -285,7 +294,7 @@ router.post("/", async (req, res) => {
         content: `شما یک دستیار راهنمای کسب‌وکار ایرانی در بریتانیا (ایرانیو) هستید. فقط از لیست ارائه‌شده انتخاب کنید — هیچ slug دیگری را اختراع نکنید. حداکثر ۸ کسب‌وکار. خروجی JSON:
 {"answer_fa": string, "businesses": [{"slug": string, "reason_fa": string}]}
 - همه گزینه‌های مرتبط را انتخاب کنید؛ محدودیت سختگیرانه‌ای نداشته باشید.
-- اگر هیچ‌کدام واقعاً مناسب نبودند، businesses را خالی بگذارید و در answer_fa توضیح دهید.`,
+- اگر هیچ‌کدام واقعاً مناسب نبودند، businesses را خالی بگذارید و در answer_fa توضیح دهید.${cityFallbackNote}`,
       },
       {
         role: "user",
