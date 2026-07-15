@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   /** اگر فقط Vite را جدا اجرا کنید (npm run dev --prefix client)، API را پروکسی کنید. حالت پیشنهادی: یک پورت با npm run dev از ریشه. */
   server: {
+    allowedHosts: ["directory.iraniu.uk"],
     fs: {
       allow: [path.resolve(__dirname, "..")],
     },
