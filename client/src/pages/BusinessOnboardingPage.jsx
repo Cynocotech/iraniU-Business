@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { cn } from "../components/tables/utils.js";
@@ -7,6 +7,11 @@ import { DEFAULT_HOURS_ROWS } from "../lib/businessProfile.js";
 import { LISTING_TERMS_VERSION } from "../lib/listingTerms.js";
 import { buildBusinessListingUrl, ensureHttpsUrl } from "../lib/siteUrl.js";
 import { ListingTermsScrollBox, ListingTermsCheckbox } from "../components/ListingTermsAgreement.jsx";
+import { UK_CITIES } from "../data/ukCities.js";
+import RichEditor from "../components/RichEditor.jsx";
+
+// Cloudflare Turnstile Site Key
+const TURNSTILE_SITE_KEY = "0x4AAAAAADmEnAaO3lpBKumP";
 
 /** فیلد بدون مقدار در جمع‌بندی — قاب + حاشیهٔ قرمز چشمک‌زن (css/styles.css) */
 const ONBOARDING_MISSING_VALUE_CLASS =
@@ -151,6 +156,22 @@ function autoSlugFromNameFa(nameFa) {
   return suggestSlugFromPlaceName(String(nameFa || "").trim()).toLowerCase();
 }
 
+function isPhoneOk(s) {
+  const digits = String(s || "").replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+}
+
+function isUkPostcodeFormat(s) {
+  return /^[A-Z]{1,2}[0-9][0-9A-Z]?\s?[0-9][A-Z]{2}$/i.test(String(s || "").trim());
+}
+
+function isFarsiText(s) {
+  const t = String(s || "").trim();
+  if (!t) return true;
+  // Allow Farsi/Arabic letters, Persian digits, spaces, common Persian punctuation, ZWNJ/ZWJ
+  return /^[؀-ۿ‌‍\s.,\-()«»!؟،؛٪0-9]+$/.test(t);
+}
+
 function emailOk(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 }
@@ -171,18 +192,31 @@ export default function BusinessOnboardingPage() {
   const [msg, setMsg] = useState(null);
 
   const [nameFa, setNameFa] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [nameFaTouched, setNameFaTouched] = useState(false);
+  const [nameEnTouched, setNameEnTouched] = useState(false);
+  const [nameFaStatus, setNameFaStatus] = useState(/** @type {"idle"|"checking"|"available"|"taken"} */ ("idle"));
+  const [slugStatus, setSlugStatus] = useState(/** @type {"idle"|"checking"|"available"|"taken"} */ ("idle"));
+  const [emailStatus, setEmailStatus] = useState(/** @type {"idle"|"checking"|"available"|"taken"|"invalid"} */ ("idle"));
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [postcodeTouched, setPostcodeTouched] = useState(false);
+  const [postcodeStatus, setPostcodeStatus] = useState(/** @type {"idle"|"checking"|"found"|"not_found"} */ ("idle"));
+  const [postcodeInfo, setPostcodeInfo] = useState(/** @type {string|null} */ (null));
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [category, setCategory] = useState("");
   const [listingTitle, setListingTitle] = useState("");
   const [description, setDescription] = useState("");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
-  const [cta, setCta] = useState("");
-  const [priceRange, setPriceRange] = useState("");
   const [listingContactEmail, setListingContactEmail] = useState("");
   const [categories, setCategories] = useState([]);
+  const [cities, setCities] = useState(UK_CITIES);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const turnstileWidgetId = useRef(null);
   /** کلیدهای فیلدی که پس از «بعدی»/«ثبت» خالی/نامعتبر مانده‌اند — حاشیهٔ قرمز چشمک‌زن */
   const [invalidFields, setInvalidFields] = useState(/** @type {string[]} */ ([]));
 
@@ -190,13 +224,138 @@ export default function BusinessOnboardingPage() {
     setInvalidFields((prev) => prev.filter((k) => k !== key));
   };
 
+  // Load Cloudflare Turnstile script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch {}
+    };
+  }, []);
+
+  // Initialize Turnstile widget once the review/terms step is shown
+  useEffect(() => {
+    if (step !== 3) return;
+    const checkAndRender = () => {
+      if (window.turnstile && !turnstileWidgetId.current) {
+        try {
+          turnstileWidgetId.current = window.turnstile.render("#cf-turnstile-onboarding", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (token) => setCaptchaToken(token),
+            "error-callback": () => {
+              setCaptchaToken("");
+              setMsg({ ok: false, text: "خطا در بارگذاری تأیید امنیتی. لطفاً صفحه را رفرش کنید." });
+            },
+            theme: "light",
+            language: "fa",
+          });
+        } catch (e) {
+          console.error("Turnstile render error:", e);
+        }
+      }
+    };
+
+    const timer = setInterval(checkAndRender, 100);
+    const timeout = setTimeout(() => clearInterval(timer), 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(timeout);
+      if (turnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+          turnstileWidgetId.current = null;
+        } catch {}
+      }
+    };
+  }, [step]);
+
   useEffect(() => {
     apiGet("/api/categories")
       .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
 
-  const derivedSlugPreview = useMemo(() => autoSlugFromNameFa(nameFa), [nameFa]);
+  useEffect(() => {
+    apiGet("/api/cities")
+      .then((d) => setCities(Array.from(new Set([...UK_CITIES, ...(Array.isArray(d) ? d : [])])).sort()))
+      .catch(() => setCities(UK_CITIES));
+  }, []);
+
+  useEffect(() => {
+    const name = nameFa.trim();
+    if (!name || !isFarsiText(name)) { setNameFaStatus("idle"); return; }
+    setNameFaStatus("checking");
+    const timer = setTimeout(() => {
+      apiGet(`/api/businesses/check-name-fa?name=${encodeURIComponent(name)}`)
+        .then((d) => setNameFaStatus(d.available ? "available" : "taken"))
+        .catch(() => setNameFaStatus("idle"));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [nameFa]);
+
+  useEffect(() => {
+    const slug = suggestSlugFromPlaceName(nameEn.trim()) || autoSlugFromNameFa(nameFa);
+    if (!slug || !slugPatternOk(slug)) {
+      setSlugStatus("idle");
+      return;
+    }
+    setSlugStatus("checking");
+    const timer = setTimeout(() => {
+      apiGet(`/api/businesses/check-slug?slug=${encodeURIComponent(slug)}`)
+        .then((d) => setSlugStatus(d.available ? "available" : "taken"))
+        .catch(() => setSlugStatus("idle"));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [nameEn, nameFa]);
+
+  useEffect(() => {
+    const email = listingContactEmail.trim().toLowerCase();
+    if (!email) { setEmailStatus("idle"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailStatus("invalid"); return; }
+    setEmailStatus("checking");
+    const timer = setTimeout(() => {
+      apiGet(`/api/businesses/check-email?email=${encodeURIComponent(email)}`)
+        .then((d) => setEmailStatus(d.available ? "available" : "taken"))
+        .catch(() => setEmailStatus("idle"));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [listingContactEmail]);
+
+  useEffect(() => {
+    const pc = postcode.trim().toUpperCase();
+    if (!pc) { setPostcodeStatus("idle"); setPostcodeInfo(null); return; }
+    if (!isUkPostcodeFormat(pc)) { setPostcodeStatus("idle"); setPostcodeInfo(null); return; }
+    setPostcodeStatus("checking");
+    const timer = setTimeout(() => {
+      fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.status === 200 && d.result) {
+            const district = d.result.admin_district || d.result.parish || "";
+            setPostcodeInfo(district);
+            setPostcodeStatus("found");
+            if (district && !city) setCity(district);
+          } else {
+            setPostcodeStatus("not_found");
+            setPostcodeInfo(null);
+          }
+        })
+        .catch(() => { setPostcodeStatus("not_found"); setPostcodeInfo(null); });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [postcode]);
+
+  const derivedSlugPreview = useMemo(() => {
+    const fromEn = suggestSlugFromPlaceName(nameEn.trim());
+    return fromEn || autoSlugFromNameFa(nameFa);
+  }, [nameEn, nameFa]);
 
   const listingPageUrlPreview = useMemo(
     () => buildBusinessListingUrl(derivedSlugPreview),
@@ -235,12 +394,18 @@ export default function BusinessOnboardingPage() {
         emptyValue: !listingPageUrlPreview,
       },
       {
-        label: "نام کسب‌وکار",
+        label: "نام کسب‌وکار (فارسی)",
         value: nameFa.trim() || "—",
         emptyValue: !nameFa.trim(),
       },
+      {
+        label: "نام کسب‌وکار (انگلیسی)",
+        value: nameEn.trim() || "—",
+        valueDir: "ltr",
+        emptyValue: !nameEn.trim(),
+      },
     ],
-    [listingPageUrlPreview, nameFa]
+    [listingPageUrlPreview, nameFa, nameEn]
   );
 
   const contactRows = useMemo(
@@ -272,12 +437,6 @@ export default function BusinessOnboardingPage() {
   const listingRows = useMemo(
     () => [
       { label: "دسته", value: category.trim() || "—", emptyValue: !category.trim() },
-      {
-        label: "محدودهٔ قیمت",
-        value: priceRange.trim() || "—",
-        valueDir: "ltr",
-        emptyValue: !priceRange.trim(),
-      },
       { label: "عنوان در لیست", value: listingTitle.trim() || "—", emptyValue: !listingTitle.trim() },
       {
         label: "توضیحات",
@@ -285,9 +444,8 @@ export default function BusinessOnboardingPage() {
         valueMultiline: true,
         emptyValue: !description.trim(),
       },
-      { label: "دکمهٔ فراخوان", value: cta.trim() || "—", emptyValue: !cta.trim() },
     ],
-    [category, priceRange, listingTitle, description, cta]
+    [category, listingTitle, description]
   );
 
   const linkRows = useMemo(
@@ -303,24 +461,22 @@ export default function BusinessOnboardingPage() {
 
   const canGoNext = () => {
     if (step === 0) {
-      return nameFa.trim().length > 0;
+      return nameFa.trim().length > 0 && isFarsiText(nameFa) && nameFaStatus === "available" && nameEn.trim().length > 0 && slugStatus !== "taken" && slugStatus !== "checking";
     }
     if (step === 1) {
       return (
         city.trim().length > 0 &&
-        phone.trim().length > 0 &&
+        isPhoneOk(phone) &&
         address.trim().length > 0 &&
-        emailOk(listingContactEmail)
+        emailStatus === "available"
       );
     }
     if (step === 2) {
       return (
         category.trim().length > 0 &&
-        priceRange.trim().length > 0 &&
         listingTitle.trim().length > 0 &&
         description.trim().length > 0 &&
-        isHttpUrl(ensureHttpsUrl(googleReviewUrl)) &&
-        cta.trim().length > 0
+        isHttpUrl(ensureHttpsUrl(googleReviewUrl))
       );
     }
     return true;
@@ -329,38 +485,62 @@ export default function BusinessOnboardingPage() {
   const next = () => {
     setMsg(null);
     if (step === 0 && !canGoNext()) {
-      setInvalidFields(["nameFa"]);
+      setNameFaTouched(true);
+      setNameEnTouched(true);
+      const keys = [];
+      if (!nameFa.trim() || !isFarsiText(nameFa) || nameFaStatus === "taken") keys.push("nameFa");
+      if (!nameEn.trim() || slugStatus === "taken") keys.push("nameEn");
+      setInvalidFields(keys);
       setMsg({
         ok: false,
-        text: "نام کسب‌وکار را وارد کنید.",
+        text: !nameFa.trim()
+          ? "نام فارسی کسب‌وکار را وارد کنید."
+          : !isFarsiText(nameFa)
+          ? "نام کسب‌وکار (فارسی) باید فقط با حروف فارسی نوشته شود."
+          : nameFaStatus === "taken"
+          ? "این نام فارسی قبلاً در سیستم ثبت شده است."
+          : nameFaStatus === "checking"
+          ? "لطفاً منتظر بمانید تا بررسی نام تمام شود."
+          : slugStatus === "taken"
+          ? "این آدرس صفحه قبلاً استفاده شده؛ نام انگلیسی دیگری وارد کنید."
+          : slugStatus === "checking"
+          ? "لطفاً منتظر بمانید تا بررسی آدرس تمام شود."
+          : "نام کسب‌وکار (فارسی و انگلیسی) را وارد کنید.",
       });
       return;
     }
     if (step === 1 && !canGoNext()) {
+      setEmailTouched(true);
+      setPhoneTouched(true);
       const keys = [];
       if (!city.trim()) keys.push("city");
-      if (!phone.trim()) keys.push("phone");
+      if (!isPhoneOk(phone)) keys.push("phone");
       if (!address.trim()) keys.push("address");
-      if (!listingContactEmail.trim() || !emailOk(listingContactEmail)) keys.push("listingContactEmail");
+      if (emailStatus !== "available") keys.push("listingContactEmail");
       setInvalidFields(keys);
+      const emailErr = emailStatus === "taken"
+        ? "این ایمیل قبلاً در سیستم ثبت شده است."
+        : emailStatus === "invalid" || emailStatus === "idle"
+        ? "ایمیل تماس معتبر وارد کنید."
+        : emailStatus === "checking"
+        ? "لطفاً منتظر بمانید تا بررسی ایمیل تمام شود."
+        : null;
       setMsg({
         ok: false,
-        text: "شهر، تلفن، آدرس و ایمیل تماس (معتبر) را پر کنید.",
+        text: emailErr || "شهر، تلفن، آدرس و ایمیل تماس را کامل و معتبر وارد کنید.",
       });
       return;
     }
     if (step === 2 && !canGoNext()) {
       const keys = [];
       if (!category.trim()) keys.push("category");
-      if (!priceRange.trim()) keys.push("priceRange");
       if (!listingTitle.trim()) keys.push("listingTitle");
       if (!description.trim()) keys.push("description");
       if (!isHttpUrl(ensureHttpsUrl(googleReviewUrl))) keys.push("googleReviewUrl");
-      if (!cta.trim()) keys.push("cta");
       setInvalidFields(keys);
       setMsg({
         ok: false,
-        text: "دسته، محدودهٔ قیمت، عنوان لیست، توضیحات، لینک معتبر Google و دکمهٔ فراخوان را پر کنید.",
+        text: "دسته، عنوان لیست، توضیحات و لینک معتبر Google را پر کنید.",
       });
       return;
     }
@@ -381,28 +561,25 @@ export default function BusinessOnboardingPage() {
     setInvalidFields([]);
 
     const invalidKeys = [];
-    if (!nameFa.trim()) invalidKeys.push("nameFa");
+    if (!nameFa.trim() || !isFarsiText(nameFa)) invalidKeys.push("nameFa");
+    if (!nameEn.trim()) invalidKeys.push("nameEn");
     if (!city.trim()) invalidKeys.push("city");
-    if (!phone.trim()) invalidKeys.push("phone");
+    if (!isPhoneOk(phone)) invalidKeys.push("phone");
     if (!address.trim()) invalidKeys.push("address");
-    if (!listingContactEmail.trim() || !emailOk(listingContactEmail)) invalidKeys.push("listingContactEmail");
+    if (emailStatus !== "available") invalidKeys.push("listingContactEmail");
     if (!category.trim()) invalidKeys.push("category");
-    if (!priceRange.trim()) invalidKeys.push("priceRange");
     if (!listingTitle.trim()) invalidKeys.push("listingTitle");
     if (!description.trim()) invalidKeys.push("description");
     if (!isHttpUrl(ensureHttpsUrl(googleReviewUrl))) invalidKeys.push("googleReviewUrl");
-    if (!cta.trim()) invalidKeys.push("cta");
 
     const firstErrorStep = (() => {
-      if (!nameFa.trim()) return 0;
-      if (!city.trim() || !phone.trim() || !address.trim() || !emailOk(listingContactEmail)) return 1;
+      if (!nameFa.trim() || !nameEn.trim()) return 0;
+      if (!city.trim() || !isPhoneOk(phone) || !address.trim() || emailStatus !== "available") return 1;
       if (
         !category.trim() ||
-        !priceRange.trim() ||
         !listingTitle.trim() ||
         !description.trim() ||
-        !isHttpUrl(ensureHttpsUrl(googleReviewUrl)) ||
-        !cta.trim()
+        !isHttpUrl(ensureHttpsUrl(googleReviewUrl))
       )
         return 2;
       return null;
@@ -421,29 +598,35 @@ export default function BusinessOnboardingPage() {
       setSaving(false);
       return;
     }
+    if (!captchaToken) {
+      setMsg({ ok: false, text: "لطفاً تأیید امنیتی (Captcha) را تکمیل کنید." });
+      setSaving(false);
+      return;
+    }
     const hours_json = JSON.stringify(
       DEFAULT_HOURS_ROWS.map((r) => ({ day: r.day, hours: r.hours }))
     );
     const gallery_json = JSON.stringify(["", "", "", ""]);
     const basePayload = {
       name_fa: nameFa.trim(),
+      name_en: nameEn.trim(),
       description: description.trim(),
       category: category.trim(),
       city: city.trim(),
       phone: phone.trim(),
       address: address.trim(),
+      postcode: postcode.trim(),
       google_review_url: ensureHttpsUrl(googleReviewUrl.trim()),
       listing_title: listingTitle.trim(),
-      cta: cta.trim(),
-      price_range: priceRange.trim(),
       hours_json,
       gallery_json,
       status: "active",
       accept_listing_terms: true,
       listing_terms_version: LISTING_TERMS_VERSION,
       listing_contact_email: listingContactEmail.trim(),
+      captcha_token: captchaToken,
     };
-    let slugAttempt = autoSlugFromNameFa(nameFa);
+    let slugAttempt = suggestSlugFromPlaceName(nameEn.trim()) || autoSlugFromNameFa(nameFa);
     if (!slugPatternOk(slugAttempt)) {
       slugAttempt = `biz-${Date.now().toString(36)}`;
     }
@@ -538,7 +721,7 @@ export default function BusinessOnboardingPage() {
           <>
             <h2 className="onboarding-panel-title">نام کسب‌وکار</h2>
             <p className="field-hint" style={{ marginTop: 0 }}>
-              آدرس صفحهٔ شما در سایت <strong>به‌صورت خودکار</strong> از روی نام ساخته می‌شود (حروف لاتین یا شناسهٔ کوتاه).
+              آدرس صفحهٔ شما در سایت <strong>به‌صورت خودکار</strong> از روی نام انگلیسی ساخته می‌شود.
             </p>
 
             <div className="form-grid">
@@ -553,9 +736,85 @@ export default function BusinessOnboardingPage() {
                     setNameFa(e.target.value);
                     clearFieldInvalid("nameFa");
                   }}
+                  onBlur={() => setNameFaTouched(true)}
                   required
                 />
+                {nameFaTouched && !nameFa.trim() && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    نام فارسی کسب‌وکار الزامی است
+                  </span>
+                )}
+                {nameFa.trim() && !isFarsiText(nameFa) && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    لطفاً فقط از حروف فارسی استفاده کنید
+                  </span>
+                )}
+                {nameFa.trim() && isFarsiText(nameFa) && nameFaStatus === "checking" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی نام…</span>
+                )}
+                {nameFa.trim() && isFarsiText(nameFa) && nameFaStatus === "available" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#16a34a" }}>این نام در دسترس است</span>
+                )}
+                {nameFa.trim() && isFarsiText(nameFa) && nameFaStatus === "taken" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>این نام قبلاً ثبت شده است</span>
+                )}
               </div>
+
+              <div
+                className={cn("field field--block", invalidFields.includes("nameEn") && "field--invalid-blink")}
+              >
+                <label htmlFor="onb-name-en">
+                  Business Name in English
+                  {derivedSlugPreview && (
+                    <span style={{ display: "block", fontWeight: 400, color: "#64748b", fontSize: "0.8rem", fontFamily: "monospace", marginTop: "0.1rem", wordBreak: "break-all" }}>
+                      slug: {derivedSlugPreview}
+                    </span>
+                  )}
+                </label>
+                <input
+                  id="onb-name-en"
+                  value={nameEn}
+                  dir="ltr"
+                  placeholder="e.g. Reza Barber Shop"
+                  onChange={(e) => {
+                    setNameEn(e.target.value);
+                    clearFieldInvalid("nameEn");
+                  }}
+                  onBlur={() => setNameEnTouched(true)}
+                  required
+                />
+                {nameEnTouched && !nameEn.trim() && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    Business name in English is required
+                  </span>
+                )}
+                {slugStatus === "checking" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی آدرس…</span>
+                )}
+                {slugStatus === "available" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#16a34a" }}>
+                    این آدرس در دسترس است
+                  </span>
+                )}
+                {slugStatus === "taken" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    این آدرس قبلاً استفاده شده — نام انگلیسی دیگری وارد کنید
+                  </span>
+                )}
+              </div>
+
+              {derivedSlugPreview && (
+                <div className="field field--block">
+                  <label>آدرس صفحه (خودکار)</label>
+                  <input
+                    value={listingPageUrlPreview}
+                    dir="ltr"
+                    readOnly
+                    style={{ background: "#f1f5f9", color: "#64748b", cursor: "default" }}
+                    aria-label="آدرس خودکار صفحه"
+                  />
+                </div>
+              )}
             </div>
           </>
         )}
@@ -564,9 +823,40 @@ export default function BusinessOnboardingPage() {
           <>
             <h2 className="onboarding-panel-title">تماس و مکان</h2>
             <div className="form-grid">
+
+              {/* Postcode — moved first; triggers city auto-fill */}
+              <div className="field">
+                <label htmlFor="onb-postcode">Postcode</label>
+                <input
+                  id="onb-postcode"
+                  value={postcode}
+                  onChange={(e) => {
+                    setPostcode(e.target.value.toUpperCase());
+                    setPostcodeTouched(true);
+                  }}
+                  onBlur={() => setPostcodeTouched(true)}
+                  dir="ltr"
+                  placeholder="e.g. SW1A 1AA"
+                />
+                {postcodeStatus === "checking" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی کد پستی…</span>
+                )}
+                {postcodeStatus === "found" && postcodeInfo && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#16a34a" }}>
+                    {postcodeInfo} — شهر به‌صورت خودکار انتخاب شد
+                  </span>
+                )}
+                {postcodeStatus === "not_found" && postcode.trim() && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    کد پستی یافت نشد — آدرس را به‌صورت دستی وارد کنید
+                  </span>
+                )}
+              </div>
+
+              {/* City */}
               <div className={cn("field", invalidFields.includes("city") && "field--invalid-blink")}>
                 <label htmlFor="onb-city">شهر</label>
-                <input
+                <select
                   id="onb-city"
                   value={city}
                   onChange={(e) => {
@@ -576,21 +866,59 @@ export default function BusinessOnboardingPage() {
                   lang="en"
                   dir="ltr"
                   required
+                >
+                  <option value="">— انتخاب شهر —</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  {city && !cities.includes(city) ? <option value={city}>{city}</option> : null}
+                </select>
+              </div>
+
+              {/* Address — manual (full address lookup requires paid API) */}
+              <div className={cn("field field--block", invalidFields.includes("address") && "field--invalid-blink")}>
+                <label htmlFor="onb-address">آدرس کامل</label>
+                <textarea
+                  id="onb-address"
+                  rows={3}
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    clearFieldInvalid("address");
+                  }}
+                  dir="ltr"
+                  placeholder="e.g. 10 Downing Street, London"
+                  required
                 />
               </div>
+
+              {/* Phone — numeric only */}
               <div className={cn("field", invalidFields.includes("phone") && "field--invalid-blink")}>
                 <label htmlFor="onb-phone">تلفن</label>
                 <input
                   id="onb-phone"
+                  type="tel"
                   value={phone}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    const val = e.target.value.replace(/[^\d\s+\-()]/g, "");
+                    setPhone(val);
                     clearFieldInvalid("phone");
                   }}
+                  onBlur={() => setPhoneTouched(true)}
                   dir="ltr"
+                  placeholder="e.g. 020 7946 0958"
                   required
                 />
+                {phoneTouched && !isPhoneOk(phone) && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    شماره تلفن معتبر وارد کنید (فقط عدد)
+                  </span>
+                )}
               </div>
+
+              {/* Email with uniqueness check */}
               <div
                 className={cn("field field--block", invalidFields.includes("listingContactEmail") && "field--invalid-blink")}
               >
@@ -603,25 +931,32 @@ export default function BusinessOnboardingPage() {
                     setListingContactEmail(e.target.value);
                     clearFieldInvalid("listingContactEmail");
                   }}
+                  onBlur={() => setEmailTouched(true)}
                   dir="ltr"
                   autoComplete="email"
                   placeholder="you@example.com"
                   required
                 />
+                {emailStatus === "checking" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی ایمیل…</span>
+                )}
+                {emailStatus === "available" && emailTouched && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#16a34a" }}>
+                    این ایمیل قابل استفاده است
+                  </span>
+                )}
+                {emailStatus === "taken" && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    این ایمیل قبلاً در سیستم ثبت شده است
+                  </span>
+                )}
+                {emailStatus === "invalid" && emailTouched && (
+                  <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
+                    فرمت ایمیل نامعتبر است
+                  </span>
+                )}
               </div>
-              <div className={cn("field field--block", invalidFields.includes("address") && "field--invalid-blink")}>
-                <label htmlFor="onb-address">آدرس کامل</label>
-                <textarea
-                  id="onb-address"
-                  rows={3}
-                  value={address}
-                  onChange={(e) => {
-                    setAddress(e.target.value);
-                    clearFieldInvalid("address");
-                  }}
-                  required
-                />
-              </div>
+
             </div>
           </>
         )}
@@ -653,20 +988,6 @@ export default function BusinessOnboardingPage() {
                 </select>
                 <span className="field-hint">مثال: رستوران، کلینیک — از فهرست مدیریت‌شدهٔ سایت.</span>
               </div>
-              <div className={cn("field", invalidFields.includes("priceRange") && "field--invalid-blink")}>
-                <label htmlFor="onb-price">محدودهٔ قیمت</label>
-                <input
-                  id="onb-price"
-                  value={priceRange}
-                  onChange={(e) => {
-                    setPriceRange(e.target.value);
-                    clearFieldInvalid("priceRange");
-                  }}
-                  dir="ltr"
-                  placeholder="£10–25"
-                  required
-                />
-              </div>
               <div className={cn("field field--block", invalidFields.includes("listingTitle") && "field--invalid-blink")}>
                 <label htmlFor="onb-list-title">عنوان کوتاه در لیست</label>
                 <input
@@ -681,21 +1002,16 @@ export default function BusinessOnboardingPage() {
                 />
               </div>
               <div className={cn("field field--block", invalidFields.includes("description") && "field--invalid-blink")}>
-                <label htmlFor="onb-desc">توضیحات</label>
-                <textarea
-                  id="onb-desc"
-                  rows={4}
+                <label>توضیحات</label>
+                <RichEditor
                   value={description}
-                  onChange={(e) => {
-                    setDescription(e.target.value);
-                    clearFieldInvalid("description");
-                  }}
+                  onChange={(html) => { setDescription(html); clearFieldInvalid("description"); }}
                   placeholder="خدمات، ویژگی‌ها، محله…"
-                  required
+                  minHeight={160}
                 />
               </div>
               <div className={cn("field field--block", invalidFields.includes("googleReviewUrl") && "field--invalid-blink")}>
-                <label htmlFor="onb-greview">لینک صفحهٔ نظر Google (الزامی برای ثبت)</label>
+                <label htmlFor="onb-greview">لینک صفحهٔ Google Maps / نظرات *</label>
                 <input
                   id="onb-greview"
                   type="url"
@@ -708,21 +1024,13 @@ export default function BusinessOnboardingPage() {
                     setGoogleReviewUrl((prev) => ensureHttpsUrl(String(prev).trim()));
                   }}
                   dir="ltr"
-                  placeholder="https://g.page/.../review"
-                />
-              </div>
-              <div className={cn("field field--block", invalidFields.includes("cta") && "field--invalid-blink")}>
-                <label htmlFor="onb-cta">دکمهٔ فراخوان</label>
-                <input
-                  id="onb-cta"
-                  value={cta}
-                  onChange={(e) => {
-                    setCta(e.target.value);
-                    clearFieldInvalid("cta");
-                  }}
-                  placeholder="مثلاً رزرو، تماس، وب‌سایت"
+                  placeholder="https://maps.google.com/maps?cid=..."
                   required
                 />
+                <span className="field-hint" style={{ color: "#6b5f75" }}>
+                  مثال: <span dir="ltr" style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>https://g.page/r/XXXXXXXXXXXX/review</span>
+                  {" · "}در Google Maps، روی کسب‌وکار خود کلیک کنید، سپس «Share» → «Copy link» را بزنید.
+                </span>
               </div>
             </div>
           </>
@@ -859,6 +1167,8 @@ export default function BusinessOnboardingPage() {
                 />
               </div>
             </section>
+
+            <div id="cf-turnstile-onboarding" style={{ marginTop: "1rem", marginBottom: "1rem" }}></div>
 
             <p className="field-hint onboarding-review-footnote">
               پس از ثبت، آگهی تا <strong>تأیید مدیر</strong> در فهرست و جستجو دیده نمی‌شود. بعد از تأیید می‌توانید برای مدیریت
