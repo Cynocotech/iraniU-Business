@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 import { isExchangeBusiness } from "../../lib/exchangeRates.js";
+import { validatePasswordComplexity } from "../../lib/passwordPolicy.js";
+import PasswordRequirementsList from "../../components/PasswordRequirementsList.jsx";
 
 function isExchangeBusinessRow(b) {
   return isExchangeBusiness(b);
@@ -56,6 +58,7 @@ export default function AdminLinkPage() {
   });
   const [creatingManager, setCreatingManager] = useState(false);
   const [createdCreds, setCreatedCreds] = useState(null);
+  const [createMsg, setCreateMsg] = useState(null);
 
   useEffect(() => {
     apiGet("/api/businesses").then(setBusinesses).catch(() => {});
@@ -144,11 +147,11 @@ export default function AdminLinkPage() {
   const createAndLinkManager = async (e) => {
     e.preventDefault();
     if (!slug) {
-      setMsg("ابتدا یک آگهی انتخاب کنید.");
+      setCreateMsg({ type: "err", text: "ابتدا یک آگهی انتخاب کنید." });
       return;
     }
     setCreatingManager(true);
-    setMsg(null);
+    setCreateMsg(null);
     setCreatedCreds(null);
     try {
       const email = String(newMgr.email || "").trim().toLowerCase();
@@ -159,6 +162,8 @@ export default function AdminLinkPage() {
       if (!email || !name || !phone || !login_username || !password) {
         throw new Error("نام، ایمیل، تلفن، نام کاربری و رمز الزامی است.");
       }
+      const pwCheck = validatePasswordComplexity(password);
+      if (!pwCheck.ok) throw new Error(pwCheck.hint);
 
       const created = await apiPost("/api/managers", {
         email,
@@ -178,7 +183,7 @@ export default function AdminLinkPage() {
       setManagerId(String(created?.id || ""));
       setManagerEmail(email);
       setCreatedCreds({ name, email, phone, login_username, password, slug });
-      setMsg("مدیر ساخته شد و آگهی به او لینک شد.");
+      setCreateMsg({ type: "ok", text: "مدیر ساخته شد و آگهی به او لینک شد." });
       setNewMgr({
         name: "",
         email: "",
@@ -187,7 +192,7 @@ export default function AdminLinkPage() {
         password: "",
       });
     } catch (err) {
-      setMsg(err.message || String(err));
+      setCreateMsg({ type: "err", text: err.message || String(err) });
     } finally {
       setCreatingManager(false);
     }
@@ -381,6 +386,7 @@ export default function AdminLinkPage() {
                   تولید رمز
                 </button>
               </div>
+              <PasswordRequirementsList password={newMgr.password} />
             </div>
           </div>
           <div className="dashboard-actions">
@@ -388,6 +394,11 @@ export default function AdminLinkPage() {
               {creatingManager ? "در حال ساخت…" : "ساخت مدیر و لینک به آگهی انتخاب‌شده"}
             </button>
           </div>
+          {createMsg && (
+            <p className={`field-hint${createMsg.type === "err" ? " field-hint--error" : ""}`} style={createMsg.type === "err" ? { color: "#dc2626" } : { color: "#16a34a" }}>
+              {createMsg.text}
+            </p>
+          )}
         </form>
 
         {createdCreds ? (
