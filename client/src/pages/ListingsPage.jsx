@@ -110,7 +110,7 @@ export default function ListingsPage() {
   useEffect(() => {
     setLoading(true);
     setErr(null);
-    apiGet("/api/businesses")
+    apiGet("/api/businesses?slim=1")
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setErr("خطا در بارگذاری"))
       .finally(() => setLoading(false));

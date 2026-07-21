@@ -22,5 +22,15 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("ckeditor5") || id.includes("@ckeditor")) return "ckeditor";
+          if (id.includes("jspdf") || id.includes("html2canvas")) return "pdf";
+          if (id.includes("react-dom")) return "react-dom";
+          if (id.includes("node_modules/react/")) return "react";
+        },
+      },
+    },
   },
 });

@@ -37,6 +37,23 @@ import { aiSearchRouter } from "./aiSearchRoutes.js";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl, generateExchangeBannerKey, getStorageMode, isS3Enabled } from "./s3Upload.js";
 import { getWalletWithTransactions, grantTokens, spendTokensForBoost, checkAndAwardMilestones, checkWeeklyEditBonus, BOOST_PLANS } from "./tokenWallet.js";
 import { getExternalPosts, normalizeExternalPost } from "./newsApi.js";
+import { lookupPostcode } from "./postcodeIo.js";
+import cron from "node-cron";
+
+// Fields populated from postcodes.io — visible to super admins only.
+const ADMIN_ONLY_GEO_FIELDS = [
+  "postcode_latitude",
+  "postcode_longitude",
+  "postcode_primary_care_trust",
+  "postcode_admin_ward",
+];
+
+function stripAdminGeoFields(row) {
+  if (!row || typeof row !== "object") return row;
+  const out = { ...row };
+  for (const f of ADMIN_ONLY_GEO_FIELDS) delete out[f];
+  return out;
+}
 
 const PATCHABLE_BUSINESS = new Set([
   "name_fa",
@@ -44,6 +61,7 @@ const PATCHABLE_BUSINESS = new Set([
   "description",
   "category",
   "phone",
+  "mobile",
   "address",
   "postcode",
   "google_review_url",
@@ -78,7 +96,31 @@ const PATCHABLE_BUSINESS = new Set([
   "exchange_today_rate_enabled",
   "logo_url",
   "ai_tags_json",
+  "qr_tracking_url",
 ]);
+
+const FIELD_MAX_LEN = {
+  name_fa: 100,
+  name_en: 100,
+  listing_title: 160,
+  subtitle: 160,
+  phone: 30,
+  mobile: 30,
+  address: 300,
+  postcode: 12,
+  city: 100,
+  promo_title: 100,
+  promo_description: 10000,
+  description: 10000,
+  cta: 50,
+  listing_contact_email: 200,
+  google_review_url: 500,
+  reservation_link: 500,
+  call_tracking_number: 30,
+  call_forward_number: 30,
+  careers_title: 150,
+  careers_text: 10000,
+};
 
 /** گزارش‌های آگهی — کلیدها باید با کلاینت هم‌خوان باشند */
 const BUSINESS_REPORT_REASONS = [
@@ -259,6 +301,7 @@ app.use("/api/ai-search", aiSearchRouter);
 app.get("/api/businesses", asyncHandler(async (req, res) => {
   const auth = parseAuthHeader(req);
   const isAdmin = auth && auth.typ === "adm";
+  const slim = !isAdmin && req.query.slim === "1";
   const boostOrder = `CASE COALESCE(boost.plan_id, '')
     WHEN 'diamond'  THEN 1
     WHEN 'platinum' THEN 2
@@ -275,30 +318,39 @@ app.get("/api/businesses", asyncHandler(async (req, res) => {
     ORDER BY ends_at DESC
     LIMIT 1
   ) boost ON TRUE`;
+  const slimCols = `
+    b.id, b.slug, b.name_fa, b.category, b.listing_title,
+    b.address, b.city, b.postcode, b.phone, b.call_tracking_number,
+    b.call_tracking_enabled,
+    b.cover_image_url, b.rating, b.claimed, b.status,
+    b.listing_approval, b.exchange_manager_id,
+    b.exchange_rates_json, b.payment_methods_json, b.exchange_features_json,
+    LEFT(b.description, 300) AS description,
+    boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at`;
+  const publicWhere = `
+    WHERE (
+        b.listing_approval = 'approved'
+        OR b.listing_approval IS NULL
+        OR b.listing_approval = ''
+        OR (
+          b.listing_approval = 'pending'
+          AND (
+            b.exchange_manager_id IS NOT NULL
+            OR COALESCE(b.category, '') LIKE '%صراف%'
+            OR lower(COALESCE(b.category, '')) LIKE '%exchange%'
+          )
+        )
+      )
+      AND (b.status IS NULL OR b.status = '' OR b.status = 'active')`;
   const rows = isAdmin
     ? await dbAll(`SELECT b.*, boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at
         FROM businesses b ${boostJoin}
         ORDER BY ${boostOrder}, b.name_fa`)
-    : await dbAll(
-        `SELECT b.*, boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at
-         FROM businesses b ${boostJoin}
-         WHERE (
-             b.listing_approval = 'approved'
-             OR b.listing_approval IS NULL
-             OR b.listing_approval = ''
-             OR (
-               b.listing_approval = 'pending'
-               AND (
-                 b.exchange_manager_id IS NOT NULL
-                 OR COALESCE(b.category, '') LIKE '%صراف%'
-                 OR lower(COALESCE(b.category, '')) LIKE '%exchange%'
-               )
-             )
-           )
-           AND (b.status IS NULL OR b.status = '' OR b.status = 'active')
-           ORDER BY ${boostOrder}, b.name_fa`
-      );
-  res.json(rows);
+    : slim
+    ? await dbAll(`SELECT ${slimCols} FROM businesses b ${boostJoin} ${publicWhere} ORDER BY ${boostOrder}, b.name_fa`)
+    : await dbAll(`SELECT b.*, boost.plan_id AS active_boost_plan, boost.ends_at AS boost_ends_at
+         FROM businesses b ${boostJoin} ${publicWhere} ORDER BY ${boostOrder}, b.name_fa`);
+  res.json(isAdmin ? rows : rows.map(stripAdminGeoFields));
 }));
 
 /** بنرهای تبلیغی صرافی — عمومی */
@@ -1025,9 +1077,15 @@ app.get("/api/businesses/:slug", asyncHandler(async (req, res) => {
   }
   const twilioOn = await isTwilioModuleEnabled();
   const isAuthed = auth && (auth.typ === "adm" || auth.typ === "mgr" || auth.typ === "mgrx");
+  const isAdminAuth = auth && auth.typ === "adm";
   const { listing_contact_email: _hidden, ...publicRow } = row;
   const hasEmail = !!String(row.listing_contact_email || "").trim();
-  res.json({ ...(isAuthed ? row : publicRow), has_email: hasEmail, twilio_module_enabled: twilioOn });
+  const responseRow = isAuthed ? row : publicRow;
+  res.json({
+    ...(isAdminAuth ? responseRow : stripAdminGeoFields(responseRow)),
+    has_email: hasEmail,
+    twilio_module_enabled: twilioOn,
+  });
 }));
 
 app.get("/api/businesses/:slug/reveal-email", asyncHandler(async (req, res) => {
@@ -1214,6 +1272,13 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
   const google_review_url = String(b.google_review_url ?? "").trim();
   const cta = String(b.cta ?? "").trim() || "تماس با ما";
   const price_range = String(b.price_range ?? "").trim();
+
+  const textFieldsToCheck = { name_fa, city, phone, address, listing_title, description, google_review_url, cta };
+  for (const [fk, fv] of Object.entries(textFieldsToCheck)) {
+    if (FIELD_MAX_LEN[fk] && String(fv).length > FIELD_MAX_LEN[fk]) {
+      return res.status(400).json({ error: "field_too_long", field: fk, max: FIELD_MAX_LEN[fk] });
+    }
+  }
   if (!city || !phone || !address || !category || !listing_title || !description || !google_review_url) {
     return res.status(400).json({
       error: "missing_business_fields",
@@ -1273,6 +1338,24 @@ app.post("/api/businesses", asyncHandler(async (req, res) => {
       String(b.name_en ?? ""),
     ]
   );
+
+  // Enrich postcode geo data from postcodes.io — fire-and-forget, non-blocking.
+  if (postcode) {
+    lookupPostcode(postcode)
+      .then((geo) => {
+        if (!geo) return;
+        return dbRun(
+          `UPDATE businesses SET
+             postcode_latitude           = $1,
+             postcode_longitude          = $2,
+             postcode_primary_care_trust = $3,
+             postcode_admin_ward         = $4
+           WHERE slug = $5`,
+          [geo.latitude, geo.longitude, geo.primary_care_trust, geo.admin_ward, slug]
+        );
+      })
+      .catch((e) => console.warn("[postcode-io] new business enrichment failed for", slug, e.message));
+  }
 
   const row = await dbGet(`SELECT * FROM businesses WHERE slug = $1`, [slug]);
   if (listing_approval === "pending") {
@@ -2041,6 +2124,36 @@ app.post("/api/exchange-managers", requireSuperAdmin, asyncHandler(async (req, r
   }
 }));
 
+app.patch("/api/admin/businesses/:slug/geo", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const slug = decodeURIComponent(String(req.params.slug || "").trim());
+  const exists = await dbGet(`SELECT id FROM businesses WHERE slug = $1`, [slug]);
+  if (!exists) return res.status(404).json({ error: "not_found" });
+
+  const { postcode_latitude, postcode_longitude, postcode_primary_care_trust, postcode_admin_ward } = req.body || {};
+
+  const parsedLat = postcode_latitude === null || postcode_latitude === "" ? null : parseFloat(String(postcode_latitude));
+  const parsedLng = postcode_longitude === null || postcode_longitude === "" ? null : parseFloat(String(postcode_longitude));
+
+  if (parsedLat !== null && !Number.isFinite(parsedLat))
+    return res.status(400).json({ error: "invalid_latitude" });
+  if (parsedLng !== null && !Number.isFinite(parsedLng))
+    return res.status(400).json({ error: "invalid_longitude" });
+
+  await dbRun(
+    `UPDATE businesses SET
+       postcode_latitude           = $1,
+       postcode_longitude          = $2,
+       postcode_primary_care_trust = $3,
+       postcode_admin_ward         = $4
+     WHERE slug = $5`,
+    [parsedLat, parsedLng,
+     postcode_primary_care_trust || null,
+     postcode_admin_ward || null,
+     slug]
+  );
+  res.json({ ok: true });
+}));
+
 app.patch("/api/admin/businesses/:slug/manager", requireSuperAdmin, asyncHandler(async (req, res) => {
   const slug = decodeURIComponent(String(req.params.slug || "").trim());
   const exists = await dbGet(`SELECT slug, category FROM businesses WHERE slug = $1`, [slug]);
@@ -2580,6 +2693,9 @@ async function updateBusinessBySlug(req, res) {
         return res.status(400).json({ error: "invalid_json_field" });
       }
     }
+    if (typeof val === "string" && FIELD_MAX_LEN[key] && val.length > FIELD_MAX_LEN[key]) {
+      return res.status(400).json({ error: "field_too_long", field: key, max: FIELD_MAX_LEN[key] });
+    }
     if (typeof val === "string" || val === null) updates[key] = val === null ? null : String(val);
   }
 
@@ -2623,6 +2739,36 @@ async function updateBusinessBySlug(req, res) {
   const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
   const values = keys.map((k) => updates[k]);
   await dbRun(`UPDATE businesses SET ${setClause} WHERE slug = $${keys.length + 1}`, [...values, slug]);
+
+  // Re-enrich / clear postcode geo data whenever postcode field changes — fire-and-forget.
+  if ("postcode" in updates) {
+    const newPostcode = updates.postcode;
+    if (newPostcode) {
+      lookupPostcode(newPostcode)
+        .then((geo) => {
+          if (!geo) return;
+          return dbRun(
+            `UPDATE businesses SET
+               postcode_latitude           = $1,
+               postcode_longitude          = $2,
+               postcode_primary_care_trust = $3,
+               postcode_admin_ward         = $4
+             WHERE slug = $5`,
+            [geo.latitude, geo.longitude, geo.primary_care_trust, geo.admin_ward, slug]
+          );
+        })
+        .catch((e) => console.warn("[postcode-io] update enrichment failed for", slug, e.message));
+    } else {
+      // Postcode was cleared — wipe stale geo data immediately.
+      dbRun(
+        `UPDATE businesses SET
+           postcode_latitude = NULL, postcode_longitude = NULL,
+           postcode_primary_care_trust = NULL, postcode_admin_ward = NULL
+         WHERE slug = $1`,
+        [slug]
+      ).catch((e) => console.warn("[postcode-io] geo clear failed for", slug, e.message));
+    }
+  }
 
   // Delete old images from S3 that were replaced or cleared
   if (oldRow && (await isS3Enabled())) {
@@ -2720,7 +2866,12 @@ app.post("/api/wallet/boost", requireManagerOrSuperAdmin, asyncHandler(async (re
     const result = await spendTokensForBoost(slug, plan_id);
     res.json({ ok: true, ...result });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(400).json({
+      error: e.code || e.message,
+      next_available_at: e.next_available_at || null,
+      active_plan: e.active_plan || null,
+      active_until: e.active_until || null,
+    });
   }
 }));
 
@@ -2816,6 +2967,23 @@ app.get("/api/admin/stats", requireSuperAdmin, asyncHandler(async (_req, res) =>
   }
 }));
 
+app.get("/api/admin/qr-scan-leaderboard", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`
+    SELECT b.slug, b.name_fa, COALESCE(q.scan_count, 0)::int AS scan_count
+    FROM businesses b
+    LEFT JOIN (
+      SELECT business_slug, COUNT(*)::int AS scan_count
+      FROM qr_scans
+      GROUP BY business_slug
+    ) q ON q.business_slug = 'qr_' || b.slug
+    WHERE b.google_review_url IS NOT NULL AND b.google_review_url != ''
+      AND COALESCE(q.scan_count, 0) > 0
+    ORDER BY scan_count DESC
+    LIMIT 20
+  `);
+  res.json(rows || []);
+}));
+
 /* ── City Images (homepage) ── */
 const CITY_IMAGES_KEY = "homepage_city_images";
 const cityImagesDir = path.join(uploadsDir, "city-images");
@@ -2885,6 +3053,33 @@ app.get("/api/qr/stats/:bid", asyncHandler(async (req, res) => {
   const key = "qr_" + bid.slice(0, 80);
   const row = await dbGet(`SELECT COUNT(*)::int AS c FROM qr_scans WHERE business_slug = $1`, [key]);
   res.json({ count: row.c, bid: key });
+}));
+
+const QR_SETTINGS_PATH = path.join(__dirname, "..", "data", "qr-template-settings.json");
+const QR_SETTINGS_DEFAULT = { logoWidth: 150, qrSize: 220, previewScale: 0.55 };
+
+function getQrSettings() {
+  try {
+    return { ...QR_SETTINGS_DEFAULT, ...JSON.parse(fs.readFileSync(QR_SETTINGS_PATH, "utf8")) };
+  } catch {
+    return { ...QR_SETTINGS_DEFAULT };
+  }
+}
+
+app.get("/api/qr-template-settings", asyncHandler(async (_req, res) => {
+  res.json(getQrSettings());
+}));
+
+app.patch("/api/admin/qr-template-settings", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const cur = getQrSettings();
+  const { logoWidth, qrSize, previewScale } = req.body;
+  const next = {
+    logoWidth: Number(logoWidth) >= 40 && Number(logoWidth) <= 600 ? Number(logoWidth) : cur.logoWidth,
+    qrSize: Number(qrSize) >= 80 && Number(qrSize) <= 500 ? Number(qrSize) : cur.qrSize,
+    previewScale: Number(previewScale) >= 0.2 && Number(previewScale) <= 1.5 ? Number(previewScale) : cur.previewScale,
+  };
+  fs.writeFileSync(QR_SETTINGS_PATH, JSON.stringify(next, null, 2));
+  res.json(next);
 }));
 
 /** تعداد کلیک روی شمارهٔ تماس در صفحهٔ عمومی آگهی */
@@ -3217,9 +3412,53 @@ app.get("/go", asyncHandler(async (req, res) => {
     console.error("qr_scans insert", e);
   }
 
-  // Redirect to Iraniu business profile page instead of Google directly
-  const profileUrl = `/business?slug=${encodeURIComponent(bid)}`;
-  res.redirect(302, profileUrl);
+  let targetUrl = `/business?slug=${encodeURIComponent(bid)}`;
+  if (t) {
+    const decoded = base64UrlToString(t);
+    const resolved = resolveReviewRedirectUrl(decoded);
+    if (resolved) targetUrl = resolved;
+  }
+
+  const safeTarget = JSON.stringify(targetUrl);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="2;url=${targetUrl.replace(/"/g, '&quot;')}" />
+  <title>Iraniu</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%}
+    body{
+      min-height:100vh;
+      background:linear-gradient(135deg,#2d082f 0%,#3a0b47 50%,#5c1f6e 100%);
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      font-family:system-ui,-apple-system,sans-serif;
+      gap:2rem;
+    }
+    .logo{max-width:200px;width:70%;height:auto;display:block;}
+    .spinner{
+      width:48px;height:48px;
+      border:4px solid rgba(255,255,255,0.2);
+      border-top-color:#fff;
+      border-radius:50%;
+      animation:spin 0.75s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .msg{color:rgba(255,255,255,0.8);font-size:0.9rem;letter-spacing:0.03em;}
+  </style>
+</head>
+<body>
+  <img class="logo" src="/qr-code-template-main/images/iraniu-logo.png" alt="Iraniu" />
+  <div class="spinner"></div>
+  <p class="msg">در حال انتقال به صفحه نظرات…</p>
+  <script>setTimeout(function(){window.location.replace(${safeTarget});},1500);</script>
+</body>
+</html>`);
 }));
 
 const clientDist = path.join(__dirname, "..", "..", "client", "dist");
@@ -3282,6 +3521,18 @@ async function main() {
   app.listen(PORT, '0.0.0.0', () => {
     const mode = isProd ? "production" : "development";
     console.log(`Iraniu ${mode} — http://0.0.0.0:${PORT} (site + /api + /go on one port)`);
+  });
+
+  // Nightly embedding refresh — runs at 02:30 server time, processes only changed records.
+  cron.schedule("30 2 * * *", async () => {
+    console.log("[cron] nightly embed job starting…");
+    try {
+      const { runEmbedJob } = await import("./jobs/embedBusinesses.js");
+      await runEmbedJob();
+      console.log("[cron] nightly embed job complete.");
+    } catch (e) {
+      console.error("[cron] nightly embed job failed:", e.message);
+    }
   });
 }
 

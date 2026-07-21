@@ -113,7 +113,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    apiGet("/api/businesses")
+    apiGet("/api/businesses?slim=1")
       .then((rows) => {
         const arr = rows || [];
         const boosted = arr.filter((b) => b.active_boost_plan === "diamond" || b.active_boost_plan === "platinum");
