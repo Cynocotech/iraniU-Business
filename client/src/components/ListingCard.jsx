@@ -14,14 +14,65 @@ import {
   parseExchangeRatesJsonOrEmpty,
 } from "../lib/exchangeRates.js";
 
-/** Shared listing / featured business card (matches Listings page). */
+function StarRating({ value }) {
+  const n = Math.round(Number(value));
+  if (!n || n < 1) return null;
+  const filled = Math.min(n, 5);
+  const empty = 5 - filled;
+  return (
+    <span className="listing-card__rating" aria-label={`امتیاز ${value} از ۵`}>
+      <span className="listing-card__rating-stars">
+        {"★".repeat(filled)}
+        <span className="listing-card__rating-empty">{"★".repeat(empty)}</span>
+      </span>
+      <span className="listing-card__rating-val" dir="ltr">{Number(value).toFixed(1)}</span>
+    </span>
+  );
+}
+
+function MapLink({ address, city }) {
+  const query = [address, city].filter(Boolean).join(", ");
+  if (!query) return null;
+  const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  return (
+    <a
+      className="listing-card__map-link"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="نمایش روی نقشه"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <i className="fa-solid fa-map-location-dot" aria-hidden="true" />
+      نقشه
+    </a>
+  );
+}
+
+function stripHtml(str) {
+  return String(str || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const BOOST_BADGE = {
+  diamond:  { label: "💠 الماسی",    cls: "listing-card__boost-badge--diamond"  },
+  platinum: { label: "💎 پلاتینیوم", cls: "listing-card__boost-badge--platinum" },
+  gold:     { label: "🥇 طلایی",     cls: "listing-card__boost-badge--gold"     },
+  silver:   { label: "🥈 نقره‌ای",   cls: "listing-card__boost-badge--silver"   },
+};
+
 export default function ListingCard({ b, titleHeading: TitleTag = "h2", variant = "default" }) {
   const href = `/business?slug=${encodeURIComponent(b.slug)}`;
   const cover = (b.cover_image_url || "").trim();
   const [imgFailed, setImgFailed] = useState(false);
+  const [phoneRevealed, setPhoneRevealed] = useState(false);
   const showImg = Boolean(cover) && !imgFailed;
   const isExchangeVariant = variant === "exchange";
+  const boostPlan = b.active_boost_plan || null;
+  const boostInfo = boostPlan ? BOOST_BADGE[boostPlan] : null;
   const logoMark = String(b.name_fa || "?").trim().charAt(0) || "?";
+  const phone = String(b.phone || b.call_tracking_number || "").trim();
+  const descRaw = stripHtml(b.description || "");
+  const descExcerpt = descRaw.length > 170 ? descRaw.slice(0, 170) + "…" : descRaw;
 
   const exchangeRows = parseExchangeRatesJsonOrEmpty(b.exchange_rates_json);
   const featuredRateRow = exchangeRows.find((r) => getEffectiveRateRaw(r, "buy") || getEffectiveRateRaw(r, "sell")) || exchangeRows[0] || null;
@@ -121,7 +172,13 @@ export default function ListingCard({ b, titleHeading: TitleTag = "h2", variant 
   }
 
   return (
-    <article className="listing-card">
+    <article className={`listing-card${boostPlan ? ` listing-card--boosted listing-card--boost-${boostPlan}` : ""}`}>
+      {boostInfo && (
+        <div className={`listing-card__boost-badge ${boostInfo.cls}`}>
+          {boostInfo.label}
+        </div>
+      )}
+      {/* Image side */}
       <Link
         to={href}
         className={`listing-card__media ${showImg ? "img-shimmer-host" : ""}`}
@@ -145,49 +202,72 @@ export default function ListingCard({ b, titleHeading: TitleTag = "h2", variant 
             <span className="listing-card__placeholder-title">{b.name_fa || "Iraniu Listing"}</span>
           </div>
         )}
-      </Link>
-      <div className="listing-card__body">
-        <TitleTag className="listing-card__title">
-          <Link to={href}>
-            <i className="fa-solid fa-building listing-card__ico" aria-hidden="true" />
-            {b.name_fa}
-            {isExchangeBusiness(b) && isExchangeCompanyVerified(b) ? (
-              <ExchangeCompanyVerifiedBadge className="listing-card__verified-tick" />
-            ) : null}
-          </Link>
-        </TitleTag>
-        {(b.category || b.listing_title) && (
-          <p className="listing-card__cats">
-            <i className="fa-solid fa-tag listing-card__ico" aria-hidden="true" />
-            {b.category || b.listing_title}
-          </p>
+        {b.category && (
+          <span className="listing-card__cat-tag" aria-hidden="true">{b.category}</span>
         )}
-        {b.address ? (
-          <p className="listing-card__line">
-            <span className="listing-card__label">
-              <i className="fa-solid fa-location-dot listing-card__ico" aria-hidden="true" />
-              آدرس
-            </span>
-            {b.address}
-          </p>
-        ) : null}
-        {b.city ? (
-          <p className="listing-card__line">
-            <span className="listing-card__label">
-              <i className="fa-solid fa-map-location-dot listing-card__ico" aria-hidden="true" />
-              منطقه
-            </span>
-            {b.city}
-          </p>
-        ) : null}
+      </Link>
+
+      {/* Content side */}
+      <div className="listing-card__body">
+        <div className="listing-card__content">
+          <TitleTag className="listing-card__title">
+            <Link to={href}>
+              {b.name_fa}
+              {isExchangeBusiness(b) && isExchangeCompanyVerified(b) ? (
+                <ExchangeCompanyVerifiedBadge className="listing-card__verified-tick" />
+              ) : null}
+            </Link>
+          </TitleTag>
+
+          {b.listing_title && b.listing_title !== b.name_fa && (
+            <p className="listing-card__cats">{b.listing_title}</p>
+          )}
+
+          <div className="listing-card__metas">
+            {(b.address || b.city) && (
+              <span className="listing-card__meta">
+                <i className="fa-solid fa-location-dot" aria-hidden="true" />
+                {[b.address, b.city].filter(Boolean).join("، ")}
+              </span>
+            )}
+            {phone && (
+              <span className="listing-card__meta" style={{ cursor: "pointer" }} onClick={() => setPhoneRevealed(true)} title="نمایش شماره تلفن">
+                <i className="fa-solid fa-phone" aria-hidden="true" />
+                {phoneRevealed ? (
+                  <span dir="ltr">{phone}</span>
+                ) : (
+                  <span dir="ltr" style={{ letterSpacing: "1px", fontFamily: "monospace" }}>
+                    {phone.slice(0, 3) + " " + "*".repeat(Math.max(4, phone.length - 3))}
+                    <i className="fa-solid fa-eye" aria-hidden="true" style={{ marginRight: "0.35rem", color: "#73208a", fontSize: "0.82rem" }} />
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+
+          {b.rating && <StarRating value={b.rating} />}
+
+          {b.claimed ? (
+            descExcerpt ? <p className="listing-card__desc">{descExcerpt}</p> : null
+          ) : (
+            <p className="listing-card__desc listing-card__desc--demo">
+              در این بخش می‌توانید اطلاعات کاملی درباره کسب‌وکار خود، خدمات، محصولات، سابقه فعالیت و مزایای رقابتی خود را معرفی کنید. هرچه توضیحات شما کامل‌تر و دقیق‌تر باشد، مشتریان راحت‌تر با برند شما آشنا شده و با اطمینان بیشتری با شما تماس خواهند گرفت.
+            </p>
+          )}
+        </div>
+
+        {/* Action buttons — vertical column, physically on the LEFT in RTL */}
         <div className="listing-card__actions">
-          <Link className="btn btn--primary listing-card__btn" to={href}>
-            مشاهدهٔ صفحه
+          <Link className="listing-card__action-btn listing-card__action-btn--primary" to={href}>
+            <i className="fa-solid fa-eye" aria-hidden="true" />
+            مشاهده
           </Link>
+          <MapLink address={b.address} city={b.city} />
           <Link
-            className="btn btn--ghost listing-card__btn"
+            className="listing-card__action-btn listing-card__action-btn--ghost"
             to={`/business?slug=${encodeURIComponent(b.slug)}&report=1`}
           >
+            <i className="fa-solid fa-flag" aria-hidden="true" />
             گزارش
           </Link>
         </div>
