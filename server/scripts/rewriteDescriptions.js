@@ -48,11 +48,11 @@ const SYSTEM_PROMPT = `You are a professional copywriter specialising in local b
 - DO NOT use generic AI buzzwords: Avoid words like "nestled," "beacon," "tapestry," "testament," "realm," "game-changer," "look no further," or "one-stop shop" (and their Persian equivalents).
 - DO NOT copy 3 or more consecutive words from the original source text.
 - Maintain 100% factual accuracy — do not invent services or contact details not mentioned in the original.
-- Output must be structured clearly using standard Markdown (paragraphs, short bullet points for services if appropriate).
+- Output must be structured as clean HTML using: <p> for paragraphs, <ul><li> for bullet lists, <h3> for section headings. Do NOT use Markdown syntax.
 - Write entirely in Persian (Farsi). Do not switch to English except for proper nouns or brand names that are inherently English.
 
 ### OUTPUT FORMAT
-Provide ONLY the finalized, rewritten business description in Persian. Do not include introductory notes, explanations, or quotes around the response.`;
+Provide ONLY the finalized, rewritten business description as valid HTML. No Markdown, no introductory notes, no explanations, no code fences.`;
 
 async function rewriteOne(description, businessName, city) {
   const context = [
