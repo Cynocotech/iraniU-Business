@@ -58,6 +58,22 @@ const REVIEWS = [
 
 const BOOST_LABEL = { diamond:"💠 الماسی", platinum:"💎 پلاتینیوم", gold:"🥇 طلایی", silver:"🥈 نقره‌ای" };
 
+function _getDailySeed() {
+  return Number(new Date().toISOString().slice(0, 10).replace(/-/g, "")) % 9973;
+}
+function _hashSlug(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
+  return h;
+}
+function _dailyShuffle(arr) {
+  const seed = _getDailySeed();
+  return [...arr]
+    .map(item => ({ item, score: (_hashSlug(item.slug) * (seed + 1)) & 0xffff }))
+    .sort((a, b) => a.score - b.score)
+    .map(x => x.item);
+}
+
 /* ══════════════════════════════════════════════════════════════════
    STYLES
 ═══════════════════════════════════════════════════════════════════ */
@@ -352,15 +368,13 @@ export default function HomePageDemo() {
     apiGet("/api/sections").then((d) => setHomeSections(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
-  /* Boost-sorted featured */
+  /* Boost-sorted featured — daily rotation within each tier, capped by sec.max_items in render */
   const featured = useMemo(() => {
-    const seed = Number(new Date().toISOString().slice(0,10).replace(/-/g,"")) % 9973;
-    const h = (s) => { let x=0; for(let i=0;i<s.length;i++) x=(x*31+s.charCodeAt(i))&0xffff; return x; };
-    const diamond  = businesses.filter(b=>b.active_boost_plan==="diamond").sort((a,b)=>((h(a.slug)+seed)%100)-((h(b.slug)+seed)%100));
-    const platinum = businesses.filter(b=>b.active_boost_plan==="platinum").sort((a,b)=>((h(a.slug)+seed)%100)-((h(b.slug)+seed)%100));
-    const boosted = [...diamond,...platinum];
-    const rest = businesses.filter(b=>!boosted.find(x=>x.slug===b.slug)).slice(0, Math.max(0, 9-boosted.length));
-    return [...boosted,...rest].slice(0,9);
+    const diamond  = _dailyShuffle(businesses.filter(b => b.active_boost_plan === "diamond"));
+    const platinum = _dailyShuffle(businesses.filter(b => b.active_boost_plan === "platinum"));
+    const boosted  = [...diamond, ...platinum];
+    const rest     = _dailyShuffle(businesses.filter(b => !boosted.find(x => x.slug === b.slug)));
+    return [...boosted, ...rest];
   }, [businesses]);
 
   /* Cities with count */
@@ -619,7 +633,7 @@ export default function HomePageDemo() {
                   })}
                 </div>
                 <div className="hp-sec__more">
-                  <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه کسب‌وکارها</Link>
+                  <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه آگهی‌های ویژه →</Link>
                 </div>
               </div>
             </section>

@@ -133,10 +133,13 @@ export default function ListingsPage() {
   }, []);
 
   const featuredRows = useMemo(() => {
-    const boosted = rows.filter((b) => b.active_boost_plan === "diamond" || b.active_boost_plan === "platinum");
     const seed = getDailySeed();
-    const diamond  = boosted.filter((b) => b.active_boost_plan === "diamond").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
-    const platinum = boosted.filter((b) => b.active_boost_plan === "platinum").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
+    const shuffle = (arr) => [...arr]
+      .map(item => ({ item, score: (hashSlug(item.slug) * (seed + 1)) & 0xffff }))
+      .sort((a, b) => a.score - b.score)
+      .map(x => x.item);
+    const diamond  = shuffle(rows.filter((b) => b.active_boost_plan === "diamond"));
+    const platinum = shuffle(rows.filter((b) => b.active_boost_plan === "platinum"));
     return [...diamond, ...platinum];
   }, [rows]);
 
@@ -152,7 +155,7 @@ export default function ListingsPage() {
       const seed = getDailySeed();
       const promoted = arr.filter((b) => b.active_boost_plan);
       const regular  = arr.filter((b) => !b.active_boost_plan);
-      regular.sort((a, b) => ((hashSlug(a.slug) + seed) % 1000) - ((hashSlug(b.slug) + seed) % 1000));
+      regular.sort((a, b) => ((hashSlug(a.slug) * (seed + 1)) & 0xffff) - ((hashSlug(b.slug) * (seed + 1)) & 0xffff));
       return [...promoted, ...regular];
     }
     return arr;
