@@ -1,6 +1,7 @@
 import { Link, useSearchParams, useLocation, useOutletContext } from "react-router-dom";
 import DOMPurify from "dompurify";
 import BusinessReportModal from "../components/BusinessReportModal.jsx";
+import ReservationModal from "../components/ReservationModal.jsx";
 import Seo from "../components/Seo.jsx";
 import { useEffect, useMemo, useState } from "react";
 import "./businessCoverHead.desktop.css";
@@ -115,6 +116,34 @@ const BIZ_STYLES = `
   .biz-links__btn--reservation { background: #73208a; border-color: #73208a; color: #fff; }
   .biz-links__btn--reservation i { color: #fff; }
   .biz-links__btn--reservation:hover { background: #5e1870; border-color: #5e1870; color: #fff; }
+
+  /* ===== Reservation Modal ===== */
+  .resv-modal{display:none;position:fixed;inset:0;z-index:2000;align-items:flex-end;justify-content:center}
+  .resv-modal.is-open{display:flex}
+  @media(min-width:600px){.resv-modal{align-items:center}}
+  .resv-modal__backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+  .resv-modal__panel{position:relative;z-index:1;background:#fff;border-radius:1.2rem 1.2rem 0 0;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding:1.5rem 1.25rem 2rem;box-shadow:0 -4px 32px rgba(0,0,0,.18);overscroll-behavior:contain}
+  @media(min-width:600px){.resv-modal__panel{border-radius:1.2rem;max-height:88vh;padding:2rem}}
+  .resv-modal__header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+  .resv-modal__title{font-size:1.1rem;font-weight:700;margin:0;color:#73208a}
+  .resv-modal__close{background:none;border:none;cursor:pointer;padding:.4rem;font-size:1.3rem;line-height:1;color:#64748b;border-radius:50%;transition:background .15s}
+  .resv-modal__close:hover{background:#f1f5f9}
+  .resv-form{display:flex;flex-direction:column;gap:1rem}
+  .resv-form__row{display:flex;gap:.75rem}
+  .resv-form__row>*{flex:1;min-width:0}
+  .resv-field{display:flex;flex-direction:column;gap:.3rem}
+  .resv-field label{font-size:.82rem;font-weight:600;color:#475569}
+  .resv-field input,.resv-field select,.resv-field textarea{width:100%;padding:.55rem .75rem;border:1.5px solid #cbd5e1;border-radius:.5rem;font-family:inherit;font-size:.95rem;background:#fff;color:#1e293b;transition:border-color .15s,box-shadow .15s;box-sizing:border-box}
+  .resv-field input:focus,.resv-field select:focus,.resv-field textarea:focus{outline:none;border-color:#73208a;box-shadow:0 0 0 3px rgba(115,32,138,.12)}
+  .resv-field textarea{resize:vertical;min-height:72px}
+  .resv-form__submit{width:100%;padding:.75rem;background:#73208a;color:#fff;font-family:inherit;font-size:1rem;font-weight:700;border:none;border-radius:.6rem;cursor:pointer;transition:background .15s,transform .1s;min-height:48px}
+  .resv-form__submit:hover{background:#5e1870}
+  .resv-form__submit:active{transform:scale(.98)}
+  .resv-form__submit:disabled{opacity:.6;cursor:not-allowed}
+  .resv-notice{padding:.75rem 1rem;border-radius:.5rem;font-size:.9rem;line-height:1.5}
+  .resv-notice--success{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+  .resv-notice--error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  .resv-conf-code{display:inline-block;font-family:monospace;font-size:1.3rem;font-weight:700;letter-spacing:.2em;background:#f0f9ff;color:#0369a1;border:2px solid #bae6fd;border-radius:.5rem;padding:.3rem .8rem;margin-top:.3rem}
 
   /* ===== Redesigned unified hero ===== */
   body.business-page .biz-hero-panel {
@@ -475,6 +504,12 @@ export default function BusinessPage() {
     setMobileRevealed(false);
     apiGet(`/api/businesses/${encodeURIComponent(slug)}`)
       .then((row) => {
+        const active = !row.status || row.status === "" || row.status === "active";
+        if (!active) {
+          setB(null);
+          setLoadState("error");
+          return;
+        }
         setB(row);
         setLoadState("ok");
       })
@@ -565,6 +600,7 @@ export default function BusinessPage() {
   };
 
   const reservationLink = String(b?.reservation_link || "").trim();
+  const [resvOpen, setResvOpen] = useState(false);
   const twilioModuleOn = b?.twilio_module_enabled !== false;
   const trackedEnabled = twilioModuleOn && !!b?.call_tracking_enabled;
   const trackedNumber = String(b?.call_tracking_number || "").trim();
@@ -1377,6 +1413,15 @@ export default function BusinessPage() {
                         رزرو آنلاین
                       </a>
                     )}
+                    <button
+                      type="button"
+                      className="biz-links__btn biz-links__btn--reservation"
+                      onClick={() => setResvOpen(true)}
+                      style={{ border: "none", cursor: "pointer" }}
+                    >
+                      <i className="fa-solid fa-utensils" aria-hidden="true" />
+                      رزرو میز
+                    </button>
                     {biolinkLinks.map((lnk) => {
                       const href = normalizeLinkUrl(lnk.url, lnk.preset);
                       const isLocal = /^(mailto:|tel:)/i.test(href);
@@ -1561,6 +1606,13 @@ export default function BusinessPage() {
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         slug={b.slug}
+        businessName={b.name_fa}
+      />
+
+      <ReservationModal
+        open={resvOpen}
+        onClose={() => setResvOpen(false)}
+        businessSlug={b.slug}
         businessName={b.name_fa}
       />
 

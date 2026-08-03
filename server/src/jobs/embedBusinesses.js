@@ -171,6 +171,9 @@ function buildBaseBlob(b) {
     careersStr && `فرصت شغلی: ${careersStr}`,
     b.reservation_link && `امکانات: رزرو آنلاین دارد`,
     featuresStr && `خدمات صرافی: ${featuresStr}`,
+    b.postcode_admin_ward && `منطقه اداری: ${b.postcode_admin_ward}`,
+    b.postcode_primary_care_trust && `منطقه بهداشت: ${b.postcode_primary_care_trust}`,
+    b.mobile && `موبایل: ${b.mobile}`,
   ];
 
   return lines.filter(Boolean).join("\n");
@@ -279,7 +282,8 @@ async function main() {
               payment_methods_json, promo_title, promo_description,
               careers_title, careers_text, reservation_link,
               exchange_manager_id, exchange_features_json,
-              embedding_hash, ai_tags_json
+              postcode_admin_ward, postcode_primary_care_trust,
+              mobile, embedding_hash, ai_tags_json
          FROM businesses
         WHERE listing_approval = 'approved'`
     );
@@ -378,11 +382,19 @@ async function main() {
     );
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
-main().catch((e) => {
-  console.error("[embed] Fatal:", e.message);
-  process.exit(1);
-});
+export { main as runEmbedJob };
+
+// Only auto-run when invoked directly (not when imported by the server cron).
+// End the pool here so the standalone process exits cleanly — when called from
+// the server, the shared pool must stay open.
+if (process.argv[1] && process.argv[1].endsWith("embedBusinesses.js")) {
+  main()
+    .catch((e) => {
+      console.error("[embed] Fatal:", e.message);
+      process.exit(1);
+    })
+    .finally(() => pool.end());
+}

@@ -1,10 +1,13 @@
-import { useLayoutEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLayoutEffect, useState, useEffect, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { apiPost } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { passwordStrengthScore, validatePasswordComplexity } from "../lib/passwordPolicy.js";
 import { pickPreferredManagerSlug } from "../lib/managerDashboardSlug.js";
+
+// Cloudflare Turnstile Site Key
+const TURNSTILE_SITE_KEY = "0x4AAAAAADmEnAaO3lpBKumP";
 
 export default function ExchangeOnboardingPage() {
   const navigate = useNavigate();
@@ -17,6 +20,8 @@ export default function ExchangeOnboardingPage() {
   const [password2, setPassword2] = useState("");
   const [msg, setMsg] = useState(null);
   const [sending, setSending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const turnstileWidgetId = useRef(null);
 
   useLayoutEffect(() => {
     if (loading) return;
@@ -25,6 +30,57 @@ export default function ExchangeOnboardingPage() {
     }
   }, [loading, me, navigate]);
 
+  // Load Cloudflare Turnstile script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch {}
+    };
+  }, []);
+
+  // Initialize Turnstile widget
+  useEffect(() => {
+    const checkAndRender = () => {
+      if (window.turnstile && !turnstileWidgetId.current) {
+        try {
+          turnstileWidgetId.current = window.turnstile.render("#cf-turnstile-exchange", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (token) => setCaptchaToken(token),
+            "error-callback": () => {
+              setCaptchaToken("");
+              setMsg({ ok: false, text: "خطا در بارگذاری تأیید امنیتی. لطفاً صفحه را رفرش کنید." });
+            },
+            theme: "light",
+            language: "fa",
+          });
+        } catch (e) {
+          console.error("Turnstile render error:", e);
+        }
+      }
+    };
+
+    const timer = setInterval(checkAndRender, 100);
+    const timeout = setTimeout(() => clearInterval(timer), 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(timeout);
+      if (turnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+          turnstileWidgetId.current = null;
+        } catch {}
+      }
+    };
+  }, []);
+
   const strength = passwordStrengthScore(password);
   const policy = validatePasswordComplexity(password);
 
@@ -32,6 +88,13 @@ export default function ExchangeOnboardingPage() {
     e.preventDefault();
     setSending(true);
     setMsg(null);
+
+    // Verify captcha token
+    if (!captchaToken) {
+      setMsg({ ok: false, text: "لطفاً تأیید امنیتی (Captcha) را تکمیل کنید." });
+      setSending(false);
+      return;
+    }
 
     if (password !== password2) {
       setMsg({ ok: false, text: "دو بار رمز یکسان نیست." });
@@ -54,6 +117,7 @@ export default function ExchangeOnboardingPage() {
         login_username: loginUsername.trim().toLowerCase(),
         password,
         exchange_onboarding: true,
+        captcha_token: captchaToken,
       });
       const loginData = await loginManager(email.trim().toLowerCase(), password, undefined);
       try {
@@ -75,13 +139,25 @@ export default function ExchangeOnboardingPage() {
       const t = String(err.message || "");
       const networkLike = t.includes("NetworkError") || t.includes("Failed to fetch");
       let text = t;
+      let loginLink = false;
       if (networkLike) text = "ارتباط با سرور برقرار نشد. اینترنت/VPN یا وضعیت سرور را بررسی کنید.";
-      else if (code === "email_taken" || t.includes("email_taken")) text = "این ایمیل قبلاً ثبت شده.";
-      else if (code === "username_taken" || t.includes("username_taken")) text = "این نام کاربری گرفته شده؛ نام دیگری انتخاب کنید.";
+      else if (code === "email_taken" || t.includes("email_taken")) {
+        text = t && t !== "email_taken" ? t : "حسابی با این ایمیل قبلاً وجود دارد. نمی‌توانید با همین ایمیل حساب دیگری بسازید.";
+        loginLink = true;
+      } else if (code === "username_taken" || t.includes("username_taken")) text = "این نام کاربری گرفته شده؛ نام دیگری انتخاب کنید.";
       else if (code === "invalid_username" || t.includes("invalid_username")) text = "نام کاربری باید ۳ تا ۳۲ کاراکتر و فقط شامل a-z، ۰-۹ و _ باشد.";
       else if (code === "invalid_email" || t.includes("invalid_email")) text = "ایمیل نامعتبر است.";
+      else if (code === "captcha_failed" || t.includes("captcha_failed")) text = "تأیید امنیتی ناموفق بود. لطفاً دوباره امتحان کنید.";
       else if (String(code || "").startsWith("password_")) text = err.message;
-      setMsg({ ok: false, text });
+      setMsg({ ok: false, text, loginLink });
+
+      // Reset captcha on error
+      if (turnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.reset(turnstileWidgetId.current);
+          setCaptchaToken("");
+        } catch {}
+      }
     } finally {
       setSending(false);
     }
@@ -211,12 +287,19 @@ export default function ExchangeOnboardingPage() {
               <input id="eo-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
             </div>
           </div>
+
+          {/* Cloudflare Turnstile Captcha */}
+          <div id="cf-turnstile-exchange" style={{ marginTop: "1rem", marginBottom: "1rem" }}></div>
+
           <button type="submit" className="btn btn--primary" disabled={sending}>
             {sending ? "…" : "ثبت‌نام و ورود"}
           </button>
           {msg && (
             <p className="field-hint" style={{ color: msg.ok ? "inherit" : "#b71c1c" }}>
               {msg.text}
+              {msg.loginLink && (
+                <>{" — "}<Link to="/login" style={{ color: "#b71c1c", fontWeight: 600 }}>ورود به پنل</Link></>
+              )}
             </p>
           )}
         </form>

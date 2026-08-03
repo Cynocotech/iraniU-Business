@@ -5,6 +5,7 @@ import { useDashboard } from "../../context/DashboardContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
+import RichEditor from "../../components/RichEditor.jsx";
 
 export default function DashboardCareersPage() {
   const { isSuperAdmin } = useAuth();
@@ -75,14 +76,12 @@ export default function DashboardCareersPage() {
               />
             </div>
             <div className="field field--block">
-              <label htmlFor="dash-careers-text">جزئیات استخدام و همکاری</label>
-              <textarea
-                id="dash-careers-text"
-                rows={10}
+              <label>جزئیات استخدام و همکاری</label>
+              <RichEditor
                 value={careersText}
-                onChange={(e) => setCareersText(e.target.value)}
+                onChange={setCareersText}
                 placeholder="موقعیت‌ها، شرایط، نحوهٔ ارسال رزومه، ایمیل تماس…"
-                style={{ width: "100%" }}
+                minHeight={280}
               />
             </div>
           </div>

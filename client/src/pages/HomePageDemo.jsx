@@ -343,11 +343,13 @@ export default function HomePageDemo() {
   const [searchQ, setSearchQ] = useState("");
   const [searchCity, setSearchCity] = useState("");
   const [activeTab, setActiveTab] = useState("همه");
+  const [homeSections, setHomeSections] = useState([]);
   const typed = useTyped(TYPED_WORDS);
 
   useEffect(() => {
     apiGet("/api/businesses").then((r) => setBusinesses(Array.isArray(r) ? r : [])).catch(() => {});
     apiGet("/api/city-images").then((d) => setCityImagesDb(typeof d === "object" && d ? d : {})).catch(() => {});
+    apiGet("/api/sections").then((d) => setHomeSections(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   /* Boost-sorted featured */
@@ -532,33 +534,158 @@ export default function HomePageDemo() {
         </div>
       </div>
 
-      {/* ── POPULAR CATEGORIES ── */}
-      {topCats.length > 0 && (
-        <section className="hp-sec hp-sec--gray" aria-labelledby="cats-title">
-          <div className="hp-sec__inner">
-            <div className="hp-sec__head">
-              <p className="hp-sec__eyebrow">مرور بر اساس دسته</p>
-              <h2 id="cats-title" className="hp-sec__title">محبوب‌ترین دسته‌بندی‌ها</h2>
-              <p className="hp-sec__sub">از رستوران و صرافی تا وکیل و پزشک — همه را اینجا پیدا کنید</p>
+      {/* ── DYNAMIC HOME SECTIONS (admin-controlled) or default fallback ── */}
+      {homeSections.length > 0 ? homeSections.map((sec, si) => {
+        const bgClass = sec.background === "dark" ? "hp-sec--dark" : sec.background === "gray" ? "hp-sec--gray" : "";
+        const secId = `hs-${sec.id}`;
+
+        if (sec.section_type === "category-grid") {
+          const filters = sec.category_filter
+            ? sec.category_filter.split(",").map(s => s.trim()).filter(Boolean)
+            : [];
+          let catsToShow = filters.length > 0
+            ? categories.filter(c => filters.includes(c.name))
+            : [...categories].sort((a,b)=>(catCounts[b.name]||0)-(catCounts[a.name]||0));
+          catsToShow = catsToShow.slice(0, sec.max_items || 8);
+          if (!catsToShow.length) return null;
+          return (
+            <section key={sec.id} className={`hp-sec ${bgClass}`} aria-labelledby={secId}>
+              <div className="hp-sec__inner">
+                <div className="hp-sec__head">
+                  {sec.eyebrow && <p className="hp-sec__eyebrow">{sec.eyebrow}</p>}
+                  <h2 id={secId} className="hp-sec__title">
+                    {sec.icon && <span style={{marginLeft:".4rem"}}>{sec.icon}</span>}
+                    {sec.title}
+                  </h2>
+                  {sec.subtitle && <p className="hp-sec__sub">{sec.subtitle}</p>}
+                </div>
+                <div className="hp-cat-grid">
+                  {catsToShow.map(c => (
+                    <Link key={c.id} to={`/listings?cat=${encodeURIComponent(c.name)}`} className="hp-cat-card">
+                      <div className="hp-cat-card__icon">{c.icon || CAT_ICONS[c.name] || DEFAULT_ICON}</div>
+                      <span className="hp-cat-card__name">{c.name}</span>
+                      {catCounts[c.name] && <span className="hp-cat-card__count">{catCounts[c.name]} آگهی</span>}
+                    </Link>
+                  ))}
+                </div>
+                <div className="hp-sec__more">
+                  <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه</Link>
+                </div>
+              </div>
+            </section>
+          );
+        }
+
+        if (sec.section_type === "featured-listings") {
+          if (!featured.length) return null;
+          return (
+            <section key={sec.id} className={`hp-sec ${bgClass}`} aria-labelledby={secId}>
+              <div className="hp-sec__inner">
+                <div className="hp-sec__head">
+                  {sec.eyebrow && <p className="hp-sec__eyebrow">{sec.eyebrow}</p>}
+                  <h2 id={secId} className="hp-sec__title">
+                    {sec.icon && <span style={{marginLeft:".4rem"}}>{sec.icon}</span>}
+                    {sec.title}
+                  </h2>
+                  {sec.subtitle && <p className="hp-sec__sub">{sec.subtitle}</p>}
+                </div>
+                <div className="hp-listings-grid">
+                  {featured.slice(0, sec.max_items || 9).map(b => {
+                    const href = `/business?slug=${encodeURIComponent(b.slug)}`;
+                    const cover = String(b.cover_image_url||"").trim();
+                    const bp = b.active_boost_plan;
+                    const rating = Number(b.rating)||0;
+                    return (
+                      <article key={b.slug} className={`hp-card${bp?` hp-card--boost-${bp}`:""}`}>
+                        <Link to={href} style={{display:"block",flexShrink:0}}>
+                          <div className="hp-card__media">
+                            {cover ? <img className="hp-card__img" src={cover} alt="" loading="lazy"/> : <div className="hp-card__placeholder">{String(b.name_fa||"?").charAt(0)}</div>}
+                            <div className="hp-card__badges">
+                              {bp && <span className={`hp-card__badge hp-card__badge--boost-${bp}`}>{BOOST_LABEL[bp]}</span>}
+                              {!bp && <span className="hp-card__badge hp-card__badge--featured">Featured</span>}
+                            </div>
+                            {b.category && <span className="hp-card__cat-tag">{b.category}</span>}
+                          </div>
+                        </Link>
+                        <div className="hp-card__body">
+                          <Link to={href} className="hp-card__title">{b.name_fa}</Link>
+                          {(b.address||b.city) && <div className="hp-card__meta"><i className="fa-solid fa-location-dot"/>{[b.address,b.city].filter(Boolean).join("، ")}</div>}
+                          {b.phone && <div className="hp-card__meta"><i className="fa-solid fa-phone"/><span dir="ltr">{b.phone}</span></div>}
+                          {rating > 0 && <div className="hp-card__rating">{"★".repeat(Math.round(rating))}{"☆".repeat(5-Math.round(rating))} <span>{rating.toFixed(1)}</span></div>}
+                          <Link to={href} className="hp-card__cta">مشاهده →</Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="hp-sec__more">
+                  <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه کسب‌وکارها</Link>
+                </div>
+              </div>
+            </section>
+          );
+        }
+
+        if (sec.section_type === "city-grid") {
+          if (!cities.length) return null;
+          return (
+            <section key={sec.id} className={`hp-sec ${bgClass}`} aria-labelledby={secId}>
+              <div className="hp-sec__inner">
+                <div className="hp-sec__head">
+                  {sec.eyebrow && <p className="hp-sec__eyebrow">{sec.eyebrow}</p>}
+                  <h2 id={secId} className="hp-sec__title">
+                    {sec.icon && <span style={{marginLeft:".4rem"}}>{sec.icon}</span>}
+                    {sec.title}
+                  </h2>
+                  {sec.subtitle && <p className="hp-sec__sub">{sec.subtitle}</p>}
+                </div>
+                <div className="hp-city-grid">
+                  {cities.slice(0, sec.max_items || 6).map(([city, cnt]) => {
+                    const img = cityImagesDb[city];
+                    return (
+                      <Link key={city} to={`/listings?city=${encodeURIComponent(city)}`} className="hp-city-card" style={img?{backgroundImage:`url(${img})`}:{}}>
+                        <div className="hp-city-card__overlay"/>
+                        <span className="hp-city-card__name">{city}</span>
+                        <span className="hp-city-card__count">{cnt} کسب‌وکار</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          );
+        }
+
+        return null;
+      }) : (
+        /* ── DEFAULT FALLBACK: popular categories ── */
+        topCats.length > 0 && (
+          <section className="hp-sec hp-sec--gray" aria-labelledby="cats-title">
+            <div className="hp-sec__inner">
+              <div className="hp-sec__head">
+                <p className="hp-sec__eyebrow">مرور بر اساس دسته</p>
+                <h2 id="cats-title" className="hp-sec__title">محبوب‌ترین دسته‌بندی‌ها</h2>
+                <p className="hp-sec__sub">از رستوران و صرافی تا وکیل و پزشک — همه را اینجا پیدا کنید</p>
+              </div>
+              <div className="hp-cat-grid">
+                {topCats.map(c=>(
+                  <Link key={c.id} to={`/listings?cat=${encodeURIComponent(c.name)}`} className="hp-cat-card">
+                    <div className="hp-cat-card__icon">{c.icon || CAT_ICONS[c.name] || DEFAULT_ICON}</div>
+                    <span className="hp-cat-card__name">{c.name}</span>
+                    {catCounts[c.name] && <span className="hp-cat-card__count">{catCounts[c.name]} آگهی</span>}
+                  </Link>
+                ))}
+              </div>
+              <div className="hp-sec__more">
+                <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه دسته‌ها</Link>
+              </div>
             </div>
-            <div className="hp-cat-grid">
-              {topCats.map(c=>(
-                <Link key={c.id} to={`/listings?cat=${encodeURIComponent(c.name)}`} className="hp-cat-card">
-                  <div className="hp-cat-card__icon">{CAT_ICONS[c.name]||DEFAULT_ICON}</div>
-                  <span className="hp-cat-card__name">{c.name}</span>
-                  {catCounts[c.name] && <span className="hp-cat-card__count">{catCounts[c.name]} آگهی</span>}
-                </Link>
-              ))}
-            </div>
-            <div className="hp-sec__more">
-              <Link to="/listings" className="hp-btn hp-btn--dark">مشاهده همه دسته‌ها</Link>
-            </div>
-          </div>
-        </section>
+          </section>
+        )
       )}
 
-      {/* ── FEATURED LISTINGS ── */}
-      <section className="hp-sec" aria-labelledby="featured-title">
+      {/* ── FEATURED LISTINGS (shown only when no sections override it) ── */}
+      {homeSections.length === 0 && <section className="hp-sec" aria-labelledby="featured-title">
         <div className="hp-sec__inner">
           <div className="hp-sec__head">
             <p className="hp-sec__eyebrow">
@@ -625,7 +752,7 @@ export default function HomePageDemo() {
             <Link to="/listings" className="hp-btn hp-btn--orange hp-btn--lg">مشاهده همه آگهی‌ها</Link>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ── AD NETWORK ── */}
       <section className="hp-adnet" aria-labelledby="adnet-title">
@@ -745,8 +872,8 @@ export default function HomePageDemo() {
         </div>
       </div>
 
-      {/* ── POPULAR CITIES ── */}
-      {cities.length > 0 && (
+      {/* ── POPULAR CITIES (fallback — hidden when admin controls via home sections) ── */}
+      {homeSections.length === 0 && cities.length > 0 && (
         <section className="hp-sec hp-sec--gray" aria-labelledby="cities-title">
           <div className="hp-sec__inner">
             <div className="hp-sec__head">
@@ -815,6 +942,24 @@ export default function HomePageDemo() {
         </div>
       </div>
 
+      {/* ── GUIDE BANNER ── */}
+      <div style={{ background: "linear-gradient(135deg,#faf5ff 0%,#ede9fe 100%)", borderTop: "1px solid #e9d5ff", borderBottom: "1px solid #e9d5ff", padding: "2.5rem 1.5rem" }}>
+        <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1.5rem", flexWrap: "wrap" }}>
+          <div>
+            <p style={{ margin: "0 0 0.3rem", fontWeight: 800, fontSize: "1.1rem", color: "#3b0764" }}>
+              <i className="fa-solid fa-book-open" style={{ marginInlineEnd: "0.5rem", color: "#73208a" }} />
+              راهنمای کامل ایرانیو
+            </p>
+            <p style={{ margin: 0, fontSize: "0.88rem", color: "#6b21a8", lineHeight: 1.6 }}>
+              آشنایی با سیستم توکن، پلن‌های تبلیغاتی، ابزارهای پنل و جستجوی هوشمند — همه در یک صفحه.
+            </p>
+          </div>
+          <Link to="/guide" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", background: "#73208a", color: "#fff", fontWeight: 700, fontSize: "0.9rem", fontFamily: "inherit", padding: "0.65rem 1.4rem", borderRadius: "10px", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>
+            مطالعه راهنما <i className="fa-solid fa-arrow-left" />
+          </Link>
+        </div>
+      </div>
+
       {/* ── FOOTER ── */}
       <footer className="hp-footer">
         <div className="hp-footer__inner">
@@ -847,6 +992,7 @@ export default function HomePageDemo() {
                 <li><Link to="/login">ورود</Link></li>
                 <li><Link to="/manager-signup">ثبت‌نام</Link></li>
                 <li><Link to="/dashboard/wallet">کیف پول</Link></li>
+                <li><Link to="/guide">راهنمای کامل</Link></li>
               </ul>
             </div>
             <div>

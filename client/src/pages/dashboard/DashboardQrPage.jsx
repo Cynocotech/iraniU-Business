@@ -15,6 +15,7 @@ export default function DashboardQrPage() {
         businessSlug={dashSlug}
         syncedGoogleReviewUrl={biz?.google_review_url ?? ""}
         syncedBusinessName={biz?.name_fa ?? ""}
+        syncedQrTrackingUrl={biz?.qr_tracking_url ?? ""}
       />
     </DashboardMain>
   );

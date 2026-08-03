@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { apiGet } from "../api.js";
 
 /** مسیرهایی که روی دسکتاپ مجازند (پنل، ادمین، ورود، لینک‌تک). بقیهٔ سایت فقط موبایل/تبلت. */
 function allowDesktopPathname(pathname) {
@@ -10,18 +11,29 @@ function allowDesktopPathname(pathname) {
   if (normalized.startsWith("/login")) return true;
   if (normalized.startsWith("/onboarding/exchange")) return true;
   if (normalized.startsWith("/exchanges")) return true;
+  if (normalized.startsWith("/blog")) return true;
+  if (normalized.startsWith("/listings")) return true;
+  if (normalized.startsWith("/onboarding")) return true;
+  if (normalized.startsWith("/tfl")) return true;
   return false;
 }
 
 export default function DesktopGate() {
   const { pathname } = useLocation();
+  const [gateEnabled, setGateEnabled] = useState(true);
+
+  useEffect(() => {
+    apiGet("/api/desktop-gate-status")
+      .then((d) => setGateEnabled(d?.enabled !== false))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1025px)");
     let gate = null;
 
     function allowDesktop() {
-      return allowDesktopPathname(pathname);
+      return !gateEnabled || allowDesktopPathname(pathname);
     }
 
     function removeGate() {
@@ -64,7 +76,7 @@ export default function DesktopGate() {
       mq.removeEventListener("change", update);
       removeGate();
     };
-  }, [pathname]);
+  }, [pathname, gateEnabled]);
 
   return null;
 }

@@ -7,6 +7,10 @@ import { fileURLToPath } from "url";
 import { dbGet, dbAll, dbRun, dbTransaction, ensureRestaurantSafraDemo, bootstrapDb } from "./db.js";
 import { base64UrlToString, resolveReviewRedirectUrl, sanitizeBid } from "./lib/redirect.js";
 import { parseAuthHeader, stripManagerRow, hashPassword, validatePasswordComplexity } from "./authUtil.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./api/swagger.js";
+import v1Router from "./api/v1/router.js";
+import { initApiDb } from "./api/initApiDb.js";
 import { requireSuperAdmin, requireManager, requireManagerOrSuperAdmin } from "./authMiddleware.js";
 import { registerAuthRoutes, ensureSuperAdminFromEnv } from "./authRoutes.js";
 import { sendBusinessDirectoryPost } from "./telegramBusinessChannel.js";
@@ -195,6 +199,14 @@ app.use("/uploads", express.static(uploadsDir, {
 
 registerAuthRoutes(app);
 
+// Public REST API v1 + Swagger UI
+app.use("/api/v1", v1Router);
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: "Iraniu Directory API",
+  swaggerOptions: { persistAuthorization: true },
+}));
+app.get("/api/openapi.json", (_req, res) => res.json(swaggerSpec));
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
@@ -257,6 +269,8 @@ function normalizeExchangeBannerPlacement(v) {
   const s = String(v || "").trim().toLowerCase();
   if (s === "top") return "top";
   if (s === "fullscreen") return "fullscreen";
+  if (s === "below-categories") return "below-categories";
+  if (s === "in-post") return "in-post";
   return "between";
 }
 
@@ -353,6 +367,20 @@ app.get("/api/businesses", asyncHandler(async (req, res) => {
   res.json(isAdmin ? rows : rows.map(stripAdminGeoFields));
 }));
 
+/** فهرست صرافی‌ها با نرخ‌های ارز — عمومی */
+app.get("/api/exchanges", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(
+    `SELECT id, slug, name_fa, listing_title, address, city, phone, mobile,
+            cover_image_url, exchange_rates_json, payment_methods_json, exchange_features_json,
+            exchange_company_verified, exchange_today_rate_enabled
+       FROM businesses
+       WHERE (COALESCE(category, '') LIKE '%صراف%' OR exchange_manager_id IS NOT NULL)
+         AND (status IS NULL OR status = '' OR status = 'active')
+       ORDER BY exchange_company_verified DESC, name_fa`
+  );
+  res.json(rows);
+}));
+
 /** بنرهای تبلیغی صرافی — عمومی */
 app.get("/api/exchange-banners", asyncHandler(async (_req, res) => {
   const rows = await dbAll(
@@ -367,14 +395,27 @@ app.get("/api/exchange-banners", asyncHandler(async (_req, res) => {
 }));
 
 /** بنرهای تبلیغی دایرکتوری — عمومی */
-app.get("/api/directory-banners", asyncHandler(async (_req, res) => {
+app.get("/api/directory-banners", asyncHandler(async (req, res) => {
+  const { placement, category } = req.query;
+  const params = [];
+  let extraClauses = "";
+  if (placement) {
+    params.push(placement);
+    extraClauses += ` AND placement = $${params.length}`;
+  }
+  if (category) {
+    params.push(category);
+    extraClauses += ` AND (category_filter IS NULL OR category_filter = '' OR category_filter = $${params.length})`;
+  }
   const rows = await dbAll(
-    `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap
+    `SELECT id, title, image_url, link_url, placement, sort_order, daily_user_cap, category_filter
        FROM exchange_banners
        WHERE is_active = 1 AND page_scope = 'directory'
          AND (start_at IS NULL OR trim(start_at) = '' OR start_at <= NOW()::TEXT)
          AND (end_at IS NULL OR trim(end_at) = '' OR end_at >= NOW()::TEXT)
-       ORDER BY (placement = 'top') DESC, sort_order ASC, id DESC`
+         ${extraClauses}
+       ORDER BY (placement = 'top') DESC, sort_order ASC, id DESC`,
+    params
   );
   res.json(rows);
 }));
@@ -400,7 +441,7 @@ app.post("/api/banner-clicks", asyncHandler(async (req, res) => {
 /** بنرهای تبلیغی صرافی — ادمین */
 app.get("/api/admin/exchange-banners", requireSuperAdmin, asyncHandler(async (_req, res) => {
   const rows = await dbAll(
-    `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+    `SELECT id, title, image_url, link_url, page_scope, placement, category_filter, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
               COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
        FROM exchange_banners
        ORDER BY sort_order ASC, id DESC`
@@ -445,6 +486,7 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
       const linkUrl = parseExchangeBannerLink(req.body?.link_url);
       const pageScope = normalizeExchangeBannerScope(req.body?.page_scope);
       const placement = normalizeExchangeBannerPlacement(req.body?.placement);
+      const categoryFilter = String(req.body?.category_filter || "").trim();
       const dailyUserCap = normalizeBannerDailyUserCap(req.body?.daily_user_cap);
       const startAt = normalizeBannerDateTime(req.body?.start_at);
       const endAt = normalizeBannerDateTime(req.body?.end_at);
@@ -455,13 +497,13 @@ app.post("/api/admin/exchange-banners", requireSuperAdmin, (req, res) => {
       const sortOrder = Number.isFinite(sortOrderNum) ? sortOrderNum : 0;
       const isActive = String(req.body?.is_active || "1") === "0" ? 0 : 1;
       const info = await dbRun(
-        `INSERT INTO exchange_banners (title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-        [title, imageUrl, linkUrl, pageScope, placement, dailyUserCap, startAt, endAt, sortOrder, isActive]
+        `INSERT INTO exchange_banners (title, image_url, link_url, page_scope, placement, category_filter, daily_user_cap, start_at, end_at, sort_order, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [title, imageUrl, linkUrl, pageScope, placement, categoryFilter, dailyUserCap, startAt, endAt, sortOrder, isActive]
       );
       const newId = info.rows[0].id;
       const row = await dbGet(
-        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+        `SELECT id, title, image_url, link_url, page_scope, placement, category_filter, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                   COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
            FROM exchange_banners WHERE id = $1`,
         [newId]
@@ -530,7 +572,7 @@ app.post("/api/admin/exchange-banners/:id/image", requireSuperAdmin, (req, res) 
       }
 
       const row = await dbGet(
-        `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+        `SELECT id, title, image_url, link_url, page_scope, placement, category_filter, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                   COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
            FROM exchange_banners WHERE id = $1`,
         [id]
@@ -567,6 +609,7 @@ app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(asy
     const nextLink = req.body?.link_url == null ? prev.link_url || "" : parseExchangeBannerLink(req.body.link_url);
     const nextScope = req.body?.page_scope == null ? prev.page_scope : normalizeExchangeBannerScope(req.body.page_scope);
     const nextPlacement = req.body?.placement == null ? prev.placement : normalizeExchangeBannerPlacement(req.body.placement);
+    const nextCategoryFilter = req.body?.category_filter == null ? prev.category_filter || "" : String(req.body.category_filter || "").trim();
     const nextDailyCap =
       req.body?.daily_user_cap == null ? Number(prev.daily_user_cap || 2) : normalizeBannerDailyUserCap(req.body.daily_user_cap);
     const nextStart = req.body?.start_at == null ? prev.start_at || "" : normalizeBannerDateTime(req.body.start_at);
@@ -580,12 +623,12 @@ app.patch("/api/admin/exchange-banners/:id", requireSuperAdmin, asyncHandler(asy
     const nextActive = req.body?.is_active == null ? prev.is_active : req.body.is_active ? 1 : 0;
     await dbRun(
       `UPDATE exchange_banners
-       SET title = $1, image_url = $2, link_url = $3, page_scope = $4, placement = $5, daily_user_cap = $6, start_at = $7, end_at = $8, sort_order = $9, is_active = $10
-       WHERE id = $11`,
-      [nextTitle, nextImage, nextLink, nextScope, nextPlacement, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id]
+       SET title = $1, image_url = $2, link_url = $3, page_scope = $4, placement = $5, category_filter = $6, daily_user_cap = $7, start_at = $8, end_at = $9, sort_order = $10, is_active = $11
+       WHERE id = $12`,
+      [nextTitle, nextImage, nextLink, nextScope, nextPlacement, nextCategoryFilter, nextDailyCap, nextStart, nextEnd, nextSort, nextActive, id]
     );
     const row = await dbGet(
-      `SELECT id, title, image_url, link_url, page_scope, placement, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
+      `SELECT id, title, image_url, link_url, page_scope, placement, category_filter, daily_user_cap, start_at, end_at, sort_order, is_active, created_at,
                 COALESCE((SELECT COUNT(*) FROM exchange_banner_clicks c WHERE c.banner_id = exchange_banners.id), 0) AS clicks_count
          FROM exchange_banners WHERE id = $1`,
       [id]
@@ -2448,6 +2491,76 @@ app.patch("/api/admin/categories/:id", requireSuperAdmin, asyncHandler(async (re
   res.json(row);
 }));
 
+/* ─── Home Sections ─────────────────────────────────────────────── */
+app.get("/api/admin/home-sections", requireSuperAdmin, asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT * FROM home_sections ORDER BY sort_order, id`);
+  res.json(rows);
+}));
+
+app.post("/api/admin/home-sections", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const b = req.body ?? {};
+  const title = String(b.title || "").trim();
+  if (!title) return res.status(400).json({ error: "title_required" });
+  const VALID_TYPES = ["category-grid", "featured-listings", "services-grid", "city-grid"];
+  const VALID_BG = ["white", "gray", "dark"];
+  const nextOrder = (await dbGet(`SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM home_sections`)).n;
+  const row = await dbGet(
+    `INSERT INTO home_sections (title, subtitle, eyebrow, section_type, category_filter, icon, background, max_items, sort_order, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,1) RETURNING *`,
+    [
+      title,
+      String(b.subtitle || "").trim() || null,
+      String(b.eyebrow || "").trim() || null,
+      VALID_TYPES.includes(b.section_type) ? b.section_type : "category-grid",
+      String(b.category_filter || "").trim() || null,
+      String(b.icon || "").trim() || null,
+      VALID_BG.includes(b.background) ? b.background : "gray",
+      Math.max(1, Math.min(50, Number(b.max_items) || 8)),
+      nextOrder,
+    ]
+  );
+  res.status(201).json(row);
+}));
+
+app.patch("/api/admin/home-sections/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "invalid_id" });
+  const existing = await dbGet(`SELECT id FROM home_sections WHERE id = $1`, [id]);
+  if (!existing) return res.status(404).json({ error: "not_found" });
+  const ALLOWED = ["title","subtitle","eyebrow","section_type","category_filter","icon","background","max_items","sort_order","is_active"];
+  const VALID_TYPES = ["category-grid","featured-listings","services-grid","city-grid"];
+  const VALID_BG = ["white","gray","dark"];
+  const b = req.body ?? {};
+  const sets = []; const vals = [];
+  for (const key of ALLOWED) {
+    if (!(key in b)) continue;
+    let v = b[key];
+    if (key === "section_type") v = VALID_TYPES.includes(v) ? v : "category-grid";
+    if (key === "background") v = VALID_BG.includes(v) ? v : "gray";
+    if (key === "max_items") v = Math.max(1, Math.min(50, Number(v) || 8));
+    if (key === "is_active") v = v ? 1 : 0;
+    if (key === "sort_order") v = Number(v) || 0;
+    vals.push(v); sets.push(`${key} = $${vals.length}`);
+  }
+  if (!sets.length) return res.status(400).json({ error: "no_fields" });
+  vals.push(id);
+  const row = await dbGet(`UPDATE home_sections SET ${sets.join(",")} WHERE id = $${vals.length} RETURNING *`, vals);
+  res.json(row);
+}));
+
+app.delete("/api/admin/home-sections/:id", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "invalid_id" });
+  await dbRun(`DELETE FROM home_sections WHERE id = $1`, [id]);
+  res.json({ ok: true });
+}));
+
+/* Public endpoint — active sections ordered for home page */
+app.get("/api/sections", asyncHandler(async (_req, res) => {
+  const rows = await dbAll(`SELECT * FROM home_sections WHERE is_active = 1 ORDER BY sort_order, id`);
+  res.json(rows);
+}));
+
 app.get("/api/admin/billing", requireSuperAdmin, asyncHandler(async (_req, res) => {
   const rows = await dbAll(`SELECT * FROM billing_records ORDER BY created_at DESC`);
   res.json(rows);
@@ -2937,7 +3050,7 @@ app.get("/api/admin/stats", requireSuperAdmin, asyncHandler(async (_req, res) =>
   try {
     const total_businesses = (await dbGet(`SELECT COUNT(*)::int AS c FROM businesses`)).c;
     const active_businesses = (
-      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE status IS NULL OR status = '' OR status = 'active'`)
+      await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE (status IS NULL OR status = '' OR status = 'active') AND (listing_approval = 'approved' OR listing_approval IS NULL OR listing_approval = '')`)
     ).c;
     const inactive_businesses = (
       await dbGet(`SELECT COUNT(*)::int AS c FROM businesses WHERE status = 'inactive'`)
@@ -3496,6 +3609,7 @@ function mountProdStatic() {
 
 async function main() {
   await bootstrapDb();
+  await initApiDb();
   await ensureSuperAdminFromEnv();
 
   if (isProd) {

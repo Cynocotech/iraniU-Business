@@ -46,7 +46,7 @@ export default function ClaimPage() {
         phone: phone.trim(),
         message: message.trim(),
       });
-      setStatus({ ok: true, text: "درخواست شما ثبت شد. پس از بررسی با شما تماس گرفته می‌شود." });
+      setStatus({ ok: true, text: "درخواست شما دریافت شد. ایمیل تأیید به آدرس شما ارسال گردید — لطفاً پوشه Spam/Junk را نیز بررسی کنید. به زودی از طریق ایمیل یا تماس تلفنی با شما ارتباط خواهیم گرفت." });
       setName("");
       setEmail("");
       setPhone("");
@@ -69,11 +69,11 @@ export default function ClaimPage() {
   return (
     <>
       <Seo
-        title="ادعای مالکیت آگهی"
-        description={`درخواست تأیید مالکیت برای «${businessLabel}» در فهرست ایرانیو.`}
+        title="درخواست صفحه مدیریت"
+        description={`درخواست دسترسی به پنل مدیریت برای «${businessLabel}» در فهرست ایرانیو.`}
       />
     <main className="container" style={{ paddingTop: "2rem", paddingBottom: "2rem", maxWidth: "36rem" }}>
-      <h1>ادعای مالکیت</h1>
+      <h1>درخواست صفحه مدیریت</h1>
       <p className="field-hint">
         آگهی: <strong>{businessLabel}</strong>
         {adId && (
@@ -86,7 +86,7 @@ export default function ClaimPage() {
 
       {!slug && (
         <p className="field-hint" role="alert">
-          از صفحهٔ یک کسب‌وکار روی «ادعای مالکیت» کلیک کنید یا نامک را در آدرس بگذارید:{" "}
+          از صفحهٔ یک کسب‌وکار روی «درخواست صفحه مدیریت» کلیک کنید یا نامک را در آدرس بگذارید:{" "}
           <code dir="ltr">/claim?slug=your-slug</code>
         </p>
       )}
@@ -99,7 +99,7 @@ export default function ClaimPage() {
               <input id="claim-name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="field field--block">
-              <label htmlFor="claim-email">ایمیل</label>
+              <label htmlFor="claim-email">ایمیل <span style={{ color: "#b71c1c" }}>(الزامی)</span></label>
               <input
                 id="claim-email"
                 type="email"
@@ -111,7 +111,7 @@ export default function ClaimPage() {
               />
             </div>
             <div className="field field--block">
-              <label htmlFor="claim-phone">تلفن</label>
+              <label htmlFor="claim-phone">موبایل / شماره تلفن <span style={{ color: "#b71c1c" }}>(الزامی)</span></label>
               <input id="claim-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
             </div>
             <div className="field field--block">

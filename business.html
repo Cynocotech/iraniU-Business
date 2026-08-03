@@ -382,6 +382,13 @@
                 </li>
               </ul>
             </section>
+            <!-- Reservation CTA -->
+            <div class="resv-cta-wrap">
+              <button id="resv-open-btn" class="btn btn--resv btn--block" type="button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM7 12h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
+                رزرو میز آنلاین
+              </button>
+            </div>
             <div class="ad-slot ad-slot--sidebar" role="complementary" aria-label="جای تبلیغ">
               تبلیغ کنار پروفایل — ۳۰۰×۲۵۰ یا ستون ثابت
             </div>
@@ -390,5 +397,90 @@
       </article>
     </main>
 
+    <!-- Reservation Modal -->
+    <div id="resv-modal" class="resv-modal" role="dialog" aria-modal="true" aria-labelledby="resv-modal-title">
+      <div id="resv-backdrop" class="resv-modal__backdrop"></div>
+      <div class="resv-modal__panel">
+        <div class="resv-modal__header">
+          <h2 id="resv-modal-title" class="resv-modal__title">رزرو میز آنلاین</h2>
+          <button id="resv-close-btn" class="resv-modal__close" aria-label="بستن" type="button">&#x2715;</button>
+        </div>
+        <div id="resv-notice" class="resv-notice" hidden></div>
+        <form id="resv-form" class="resv-form" novalidate>
+          <div class="resv-form__row">
+            <div class="resv-field">
+              <label for="resv-name">نام کامل *</label>
+              <input id="resv-name" name="resv_name" type="text" required placeholder="مثلاً: علی احمدی" autocomplete="name" />
+            </div>
+          </div>
+          <div class="resv-form__row">
+            <div class="resv-field">
+              <label for="resv-email">ایمیل *</label>
+              <input id="resv-email" name="resv_email" type="email" required placeholder="ali@example.com" autocomplete="email" dir="ltr" />
+            </div>
+            <div class="resv-field">
+              <label for="resv-phone">تلفن</label>
+              <input id="resv-phone" name="resv_phone" type="tel" placeholder="+44 7900 000000" autocomplete="tel" dir="ltr" />
+            </div>
+          </div>
+          <div class="resv-form__row">
+            <div class="resv-field">
+              <label for="resv-date">تاریخ *</label>
+              <input id="resv-date" name="resv_date" type="date" required />
+            </div>
+            <div class="resv-field">
+              <label for="resv-time">ساعت *</label>
+              <input id="resv-time" name="resv_time" type="time" required value="19:30" />
+            </div>
+          </div>
+          <div class="resv-form__row">
+            <div class="resv-field">
+              <label for="resv-party">تعداد نفر *</label>
+              <select id="resv-party" name="resv_party" required>
+                <option value="1">۱ نفر</option>
+                <option value="2" selected>۲ نفر</option>
+                <option value="3">۳ نفر</option>
+                <option value="4">۴ نفر</option>
+                <option value="5">۵ نفر</option>
+                <option value="6">۶ نفر</option>
+                <option value="7">۷ نفر</option>
+                <option value="8">۸+ نفر</option>
+              </select>
+            </div>
+            <div class="resv-field">
+              <label for="resv-occasion">مناسبت</label>
+              <select id="resv-occasion" name="resv_occasion">
+                <option value="">— بدون مناسبت —</option>
+                <option value="birthday">تولد</option>
+                <option value="anniversary">سالگرد</option>
+                <option value="date">قرار عاشقانه</option>
+                <option value="family">دورهمی خانوادگی</option>
+                <option value="business">کاری / تجاری</option>
+                <option value="celebration">جشن</option>
+                <option value="other">سایر</option>
+              </select>
+            </div>
+          </div>
+          <div class="resv-field">
+            <label for="resv-seating">محل نشستن</label>
+            <select id="resv-seating" name="resv_seating">
+              <option value="no-preference">فرقی ندارد</option>
+              <option value="indoor">داخل سالن</option>
+              <option value="outdoor">فضای باز / تراس</option>
+              <option value="booth">کابین / بوث</option>
+              <option value="window">کنار پنجره</option>
+              <option value="private">اتاق خصوصی</option>
+            </select>
+          </div>
+          <div class="resv-field">
+            <label for="resv-special">درخواست‌های ویژه</label>
+            <textarea id="resv-special" name="resv_special" placeholder="رژیم غذایی خاص، آلرژی، صندلی کودک، نیاز به ویلچر…" rows="3"></textarea>
+          </div>
+          <button type="submit" class="resv-form__submit">تأیید رزرو</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/reservation-modal.js"></script>
   </body>
 </html>

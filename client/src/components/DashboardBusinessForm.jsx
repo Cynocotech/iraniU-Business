@@ -62,6 +62,7 @@ export default function DashboardBusinessForm({
   const [status, setStatus] = useState("active");
   const [subtitle, setSubtitle] = useState("");
   const [phone, setPhone] = useState("");
+  const [mobile, setMobile] = useState("");
   const [listingContactEmail, setListingContactEmail] = useState("");
   const [address, setAddress] = useState("");
   const [postcode, setPostcode] = useState("");
@@ -119,6 +120,7 @@ export default function DashboardBusinessForm({
       setStatus(b.status || "active");
       setSubtitle(b.subtitle || "");
       setPhone(b.phone || "");
+      setMobile(b.mobile || "");
       setListingContactEmail(b.listing_contact_email || "");
       setAddress(b.address || "");
       setPostcode(b.postcode || "");
@@ -198,8 +200,6 @@ export default function DashboardBusinessForm({
           setMilestones({
             list: d.milestones,
             weeklyBonusUsed: d.weeklyBonusUsed ?? 0,
-            boostsThisMonth: d.boostsThisMonth ?? 0,
-            boostMonthlyLimit: d.boostMonthlyLimit ?? 3,
           });
         }
       })
@@ -330,6 +330,7 @@ export default function DashboardBusinessForm({
         status,
         subtitle,
         phone,
+        mobile,
         listing_contact_email: listingContactEmail.trim() || null,
         address,
         postcode: postcode.trim(),
@@ -450,9 +451,14 @@ export default function DashboardBusinessForm({
     if (!milestones) return null;
     const m = milestones.list?.find((x) => x.type === type);
     if (!m) return null;
-    if (m.earned) return (
+    if (m.on_cooldown) return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem", background: "#dcfce7", color: "#166534", borderRadius: 6, padding: "0.1rem 0.45rem", fontSize: "0.7rem", fontWeight: 700, marginInlineStart: "0.5rem" }}>
         <i className="fa-solid fa-check" style={{ fontSize: "0.6rem" }} /> دریافت شد
+      </span>
+    );
+    if (m.earned) return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem", background: "#dbeafe", color: "#1e40af", borderRadius: 6, padding: "0.1rem 0.45rem", fontSize: "0.7rem", fontWeight: 700, marginInlineStart: "0.5rem" }}>
+        <i className="fa-solid fa-rotate-right" style={{ fontSize: "0.6rem" }} /> +{m.amount} توکن
       </span>
     );
     return (
@@ -549,7 +555,7 @@ export default function DashboardBusinessForm({
                   <div className="field field--block">
                     <label htmlFor="dash-name">نام کسب‌وکار</label>
                     {allowEditName ? (
-                      <input id="dash-name" value={nameFa} onChange={(e) => setNameFa(e.target.value)} placeholder="نام فارسی کسب‌وکار" />
+                      <input id="dash-name" value={nameFa} onChange={(e) => setNameFa(e.target.value)} placeholder="نام فارسی کسب‌وکار" maxLength={100} />
                     ) : (
                       <input id="dash-name" value={nameFa} readOnly style={{ background: "#f1f5f9", color: "#475569", cursor: "default" }} />
                     )}
@@ -564,6 +570,7 @@ export default function DashboardBusinessForm({
                       value={listingTitle}
                       onChange={(e) => setListingTitle(e.target.value)}
                       placeholder="رستوران ایرانی اصیل در لندن"
+                      maxLength={160}
                     />
                   </div>
                   <div className="field field--block">
@@ -573,6 +580,7 @@ export default function DashboardBusinessForm({
                       value={subtitle}
                       onChange={(e) => setSubtitle(e.target.value)}
                       placeholder="مثال: غذای ایرانی و کباب — London"
+                      maxLength={160}
                     />
                   </div>
                   <div className="field field--block">
@@ -666,6 +674,7 @@ export default function DashboardBusinessForm({
                       lang="en"
                       dir="ltr"
                       placeholder="London"
+                      maxLength={100}
                     />
                     <datalist id="dash-cities-list">
                       {cities.map((c, i) => (<option key={i} value={c} />))}
@@ -680,15 +689,20 @@ export default function DashboardBusinessForm({
                       dir="ltr"
                       placeholder="SW1A 1AA"
                       style={{ textTransform: "uppercase" }}
+                      maxLength={12}
                     />
                   </div>
                   <div className="field field--block" style={{ gridColumn: "1 / -1" }}>
                     <label htmlFor="dash-address">آدرس (نقشه و تماس)</label>
-                    <textarea id="dash-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <textarea id="dash-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={300} />
                   </div>
                   <div className="field field--block">
                     <label htmlFor="dash-phone">تلفن</label>
-                    <input id="dash-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="phone-ltr" />
+                    <input id="dash-phone" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="phone-ltr" maxLength={30} />
+                  </div>
+                  <div className="field field--block">
+                    <label htmlFor="dash-mobile">موبایل</label>
+                    <input id="dash-mobile" value={mobile} onChange={(e) => setMobile(e.target.value)} dir="ltr" className="phone-ltr" maxLength={30} placeholder="شماره موبایل" />
                   </div>
                   <div className="field field--block">
                     <label htmlFor="dash-listing-email">ایمیل اطلاع تأیید/رد آگهی</label>
@@ -699,6 +713,7 @@ export default function DashboardBusinessForm({
                       onChange={(e) => setListingContactEmail(e.target.value)}
                       dir="ltr"
                       placeholder="برای اطلاع‌رسانی هنگام تأیید یا رد توسط مدیر"
+                      maxLength={200}
                     />
                     <span className="field-hint">اختیاری؛ همان ایمیل فرم ثبت کسب‌وکار.</span>
                   </div>
@@ -712,6 +727,7 @@ export default function DashboardBusinessForm({
                       onBlur={() => setGoogleReviewUrl((prev) => (String(prev).trim() ? ensureHttpsUrl(String(prev).trim()) : ""))}
                       placeholder="https://g.page/.../review"
                       dir="ltr"
+                      maxLength={500}
                     />
                   </div>
                   <div className="field field--block">
@@ -724,6 +740,7 @@ export default function DashboardBusinessForm({
                       onBlur={() => setReservationLink((prev) => (String(prev).trim() ? ensureHttpsUrl(String(prev).trim()) : ""))}
                       placeholder="https://example.com/book"
                       dir="ltr"
+                      maxLength={500}
                     />
                     <p className="field-hint">اگر پر شود، در صفحه عمومی دکمه «رزرو آنلاین» نمایش داده می‌شود و کاربر به این لینک منتقل می‌شود.</p>
                   </div>
@@ -743,7 +760,7 @@ export default function DashboardBusinessForm({
                 <div className="form-grid">
                   <div className="field field--block">
                     <label htmlFor="dash-promo-title">عنوان Promotion</label>
-                    <input id="dash-promo-title" value={promoTitle} onChange={(e) => setPromoTitle(e.target.value)} />
+                    <input id="dash-promo-title" value={promoTitle} onChange={(e) => setPromoTitle(e.target.value)} maxLength={100} />
                   </div>
                   <div className="field field--block">
                     <label>شرح Promotion</label>

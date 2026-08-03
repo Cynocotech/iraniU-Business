@@ -5,8 +5,13 @@ import AuthLoginLayout from "../components/AuthLoginLayout.jsx";
 import Seo from "../components/Seo.jsx";
 import { pickPreferredManagerSlug } from "../lib/managerDashboardSlug.js";
 
+// Cloudflare Turnstile Site Key
+const TURNSTILE_SITE_KEY = "0x4AAAAAADmEnAaO3lpBKumP";
+
 function totpErrMessage(code, fallback) {
   if (code === "invalid_totp") return "کد شش‌رقمی نادرست است. دوباره تلاش کنید.";
+  if (code === "captcha_required") return "لطفاً تأیید امنیتی (Captcha) را تکمیل کنید.";
+  if (code === "captcha_failed") return "تأیید امنیتی ناموفق بود. دوباره تلاش کنید.";
   return fallback;
 }
 
@@ -20,9 +25,64 @@ export default function ManagerLoginPage() {
   const [totp, setTotp] = useState("");
   const [err, setErr] = useState(null);
   const [pending, setPending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
   const totpRef = useRef(null);
+  const turnstileWidgetId = useRef(null);
 
   const redirectTo = params.get("redirect") || "/dashboard";
+
+  // Load Cloudflare Turnstile script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch {}
+    };
+  }, []);
+
+  // Initialize Turnstile widget
+  useEffect(() => {
+    if (phase !== "password") return;
+
+    const checkAndRender = () => {
+      if (window.turnstile && !turnstileWidgetId.current) {
+        try {
+          turnstileWidgetId.current = window.turnstile.render("#cf-turnstile-manager", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (token) => setCaptchaToken(token),
+            "error-callback": () => {
+              setCaptchaToken("");
+              setErr("خطا در بارگذاری تأیید امنیتی. لطفاً صفحه را رفرش کنید.");
+            },
+            theme: "light",
+            language: "fa",
+          });
+        } catch (e) {
+          console.error("Turnstile render error:", e);
+        }
+      }
+    };
+
+    const timer = setInterval(checkAndRender, 100);
+    const timeout = setTimeout(() => clearInterval(timer), 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(timeout);
+      if (turnstileWidgetId.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+          turnstileWidgetId.current = null;
+        } catch {}
+      }
+    };
+  }, [phase]);
 
   useEffect(() => {
     if (phase === "totp" && totpRef.current) {
@@ -35,7 +95,7 @@ export default function ManagerLoginPage() {
     try {
       const raw = localStorage.getItem("iraniu_dashboard_business_slug");
       if (!raw) {
-        const t = sessionStorage.getItem("iraniu_jwt");
+        const t = localStorage.getItem("iraniu_jwt");
         const r = await fetch("/api/auth/me", {
           headers: t ? { Authorization: `Bearer ${t}` } : {},
           credentials: "include",
@@ -54,14 +114,21 @@ export default function ManagerLoginPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr(null);
+
+    // Verify captcha token on password phase
+    if (phase === "password" && !captchaToken) {
+      setErr("لطفاً تأیید امنیتی را تکمیل کنید.");
+      return;
+    }
+
     setPending(true);
     try {
       if (phase === "password") {
-        await loginManager(email, password, undefined);
+        await loginManager(email, password, undefined, captchaToken);
         await afterManagerLogin();
         return;
       }
-      await loginManager(email, password, totp.trim());
+      await loginManager(email, password, totp.trim(), captchaToken);
       await afterManagerLogin();
     } catch (ex) {
       const code = ex?.code;
@@ -71,6 +138,14 @@ export default function ManagerLoginPage() {
         setErr(null);
       } else {
         setErr(totpErrMessage(code, ex.message || "ورود ناموفق"));
+      }
+
+      // Reset captcha on error
+      if (window.turnstile && turnstileWidgetId.current) {
+        try {
+          window.turnstile.reset(turnstileWidgetId.current);
+          setCaptchaToken("");
+        } catch {}
       }
     } finally {
       setPending(false);
@@ -85,6 +160,10 @@ export default function ManagerLoginPage() {
 
   const footer = (
     <p className="auth-login__links">
+      <Link to="/forgot-password">فراموشی رمز عبور؟</Link>
+      <span className="auth-login__links-sep" aria-hidden="true">
+        ·
+      </span>
       <Link to="/manager-signup">ثبت‌نام مدیر</Link>
       <span className="auth-login__links-sep" aria-hidden="true">
         ·
@@ -140,6 +219,9 @@ export default function ManagerLoginPage() {
                 dir="ltr"
                 className="auth-login__input"
               />
+            </div>
+            <div className="field field--block" style={{ marginTop: "1rem" }}>
+              <div id="cf-turnstile-manager" style={{ display: "flex", justifyContent: "center" }}></div>
             </div>
           </div>
         ) : (

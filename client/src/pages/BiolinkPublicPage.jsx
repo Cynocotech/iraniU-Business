@@ -93,7 +93,7 @@ export default function BiolinkPublicPage() {
       <BiolinkPublicView
         slug={slug}
         businessName={biz.name_fa || ""}
-        coverFallback={biz.cover_image_url || ""}
+        coverFallback={biz.logo_url || ""}
         data={data}
       />
       <FloatingBackButton />

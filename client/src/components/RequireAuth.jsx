@@ -15,6 +15,9 @@ export function RequireManager({ children }) {
   if (me?.role !== "manager" && me?.role !== "superadmin") {
     return <Navigate to={`/login?redirect=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   }
+  if (me?.role === "manager" && me?.user?.must_change_password && loc.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
   return children;
 }
 

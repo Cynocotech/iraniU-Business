@@ -1,0 +1,196 @@
+AI Search for Business — iraniu.uk Technical Explanation
+==========================================================
+
+Overview
+--------
+A hybrid semantic search system built on top of a PostgreSQL + pgvector + OpenAI stack.
+Users type a natural language query in Farsi (or mixed Farsi/English), and the system finds
+the most relevant Iranian businesses in the UK directory. Each search makes 3 LLM calls and
+runs a multi-strategy retrieval pipeline.
+
+
+Database Layer
+--------------
+Schema additions (add-vector-embedding.sql):
+
+    ALTER TABLE businesses
+      ADD COLUMN embedding vector(1536),       -- OpenAI embedding
+      ADD COLUMN embedding_hash TEXT;          -- SHA-256 content hash
+
+    CREATE INDEX businesses_embedding_idx
+      ON businesses USING hnsw (embedding vector_cosine_ops);
+
+- vector(1536): dimensionality of text-embedding-3-small
+- HNSW index (Hierarchical Navigable Small World): approximate nearest-neighbour search
+  with cosine similarity
+- embedding_hash: SHA-256 of the text blob; used to skip unchanged rows on re-runs
+
+
+Offline: The Embedding Job (embedBusinesses.js)
+-----------------------------------------------
+Runs nightly via cron. Two-phase process:
+
+Phase 1 — AI tag generation (GPT-4o-mini, batches of 10)
+
+For each approved business, GPT reads name_fa, category, and description and generates
+factual service tags — things not reliably captured by description text alone:
+
+    "DSS accepted", "NHS provider", "FCA regulated",
+    "halal", "free consultation", "wheelchair accessible", ...
+
+These tags are stored as ai_tags_json on the row and later both embedded and searched literally.
+
+Phase 2 — Text blob → vector embedding (text-embedding-3-small, batches of 100)
+
+Builds a structured bilingual text blob per business:
+
+    نام: رستوران نیلوفر
+    دسته‌بندی: رستوران
+    توضیحات: غذای ایرانی اصیل ...
+    مکان: 15 Green Lane، London، SW4 7HQ
+    ناحیهٔ کدپستی: South West London / جنوب غرب لندن
+    ساعات کاری: شنبه: 12:00–22:00، ...
+    روش‌های پرداخت: VISA، نقدی
+    برچسب‌های خدماتی: halal, Farsi speaking, free delivery
+
+Key design decisions:
+- Bilingual region names: "London / لندن", "North London / شمال لندن" — so Farsi queries
+  like "شمال لندن" hit the same vector space as English
+- UK postcode → region mapping: SW4 → "South West London / جنوب غرب لندن"
+- Content hash guards idempotency: re-running the job is always safe — unchanged rows skipped
+
+
+Online: The Search Pipeline (aiSearchRoutes.js)
+------------------------------------------------
+Every POST to /api/ai-search runs 3 steps:
+
+--- Step 1: Query Parsing (GPT-4o-mini, JSON mode) ---
+
+Parses the raw user query into structured intent:
+
+    {
+      "category": "رستوران",
+      "city": "London",
+      "price_range": null,
+      "is_exchange_query": false,
+      "is_job_query": false,
+      "is_promo_query": false,
+      "name_contains": null,
+      "is_off_topic": false,
+      "keywords_en": "Iranian restaurant London",
+      "search_text": "رستوران ایرانی در لندن با غذای اصیل"
+    }
+
+Notable details:
+- Real category list injected into the prompt: categories are fetched from DB (cached 6h)
+  so the LLM classifies into exact existing category values, not hallucinated ones
+- City normalisation: "باکنی" → "Hackney", "هیلینگدون" → "Hillingdon"
+- search_text is a rewritten, expanded version of the query used for embedding —
+  abbreviations expanded, slang normalised
+- is_off_topic: if the query is about news, recipes, politics, etc., the pipeline
+  short-circuits immediately
+
+--- Step 2: Hybrid Candidate Retrieval (PostgreSQL) ---
+
+Four parallel retrieval strategies merged by slug deduplication:
+
+  Strategy              | Method                                         | When used
+  ----------------------|------------------------------------------------|------------------------
+  Vector search         | embedding <=> $query_vec::vector (cosine, top 30) | Always (semantic)
+  Name search           | name_fa ILIKE '%keyword%'                      | Always
+  Category search       | category ILIKE '%category%'                    | When AI parsed category
+  Literal keyword search| description + ai_tags_json ILIKE              | Acronyms (DSS, NHS, FCA)
+
+City fallback: If vector search with a city filter returns < 3 results, retries without
+the city filter (since the directory is mostly London-based).
+
+Final fallback: If total candidates = 0 and city/category were active filters, drops both
+and runs a pure vector search.
+
+Merge order (priority): literal keywords → direct name hits → vector → category.
+Max 35 candidates passed forward.
+
+--- Step 3: Re-ranking + Response Generation (GPT-4o-mini) ---
+
+The 35 candidates are serialised into a slim JSON list:
+
+    {
+      "slug": "nilufar-restaurant",
+      "name": "رستوران نیلوفر",
+      "category": "رستوران",
+      "city": "London",
+      "tags": "halal, Farsi speaking",
+      "about": "رستوران ایرانی اصیل — غذاهای سنتی — 15 Green Lane SW4..."
+    }
+
+GPT picks max 8 and returns:
+
+    {
+      "answer_fa": "چند رستوران ایرانی در لندن پیدا کردم:",
+      "businesses": [
+        { "slug": "nilufar-restaurant", "reason_fa": "رستوران حلال با منوی اصیل..." }
+      ]
+    }
+
+Slug whitelist validation (security): Any slug the LLM returns is checked against the
+candidate set. Invented slugs are silently dropped — the LLM cannot surface businesses
+that were not retrieved.
+
+
+Security & Reliability
+----------------------
+  Layer               | Mechanism
+  --------------------|-----------------------------------------------------------
+  CAPTCHA             | Cloudflare Turnstile token verified server-side per request
+  Rate limiting       | In-memory sliding window: 10 req/min per IP
+  Input validation    | Max 300 Unicode codepoints, non-empty check
+  Hallucination guard | Slug whitelist — LLM can only select from retrieved candidates
+  Category accuracy   | Real DB category list injected into parse prompt
+
+
+Logging & Feedback
+------------------
+Every search is logged to ai_search_logs:
+  - query, parsed_json, search_text, returned_slugs, result_count, duration_ms
+
+A separate /feedback endpoint accepts:
+  - clicked_slug: which result the user tapped
+  - feedback: thumbs up (1) or down (-1)
+
+This creates a dataset for future fine-tuning or re-ranking model evaluation.
+
+
+Data Flow Summary
+-----------------
+
+  User query (Farsi/mixed)
+          |
+          v
+  [Turnstile CAPTCHA + Rate limit]
+          |
+          v
+  GPT-4o-mini: parse intent → {category, city, is_job, search_text, ...}
+          |
+          |-- is_off_topic? → early return
+          |
+          v
+  text-embedding-3-small: embed search_text → vector(1536)
+          |
+          v
+  PostgreSQL/pgvector:
+    |-- cosine ANN search (HNSW)
+    |-- name ILIKE
+    |-- category ILIKE
+    └-- literal keyword ILIKE on description + ai_tags_json
+          |
+          v
+  Merge + deduplicate → 35 candidates
+          |
+          v
+  GPT-4o-mini: pick top 8, write Farsi reason per business
+          |
+          v
+  Slug whitelist validation
+          |
+          v
+  Response: { answer_fa, businesses[], search_id }

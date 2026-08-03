@@ -7,21 +7,42 @@ export default function AdminSystemLogsPage({ embedded = false }) {
   const [err, setErr] = useState("");
   const [level, setLevel] = useState("");
   const [actorType, setActorType] = useState("");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [limit, setLimit] = useState("300");
 
   const load = () => {
     setErr("");
     const qp = new URLSearchParams();
-    qp.set("limit", "300");
+    qp.set("limit", limit);
     if (level) qp.set("level", level);
     if (actorType) qp.set("actor_type", actorType);
+    if (search.trim()) qp.set("search", search.trim());
+    if (dateFrom) qp.set("from", dateFrom);
+    if (dateTo) qp.set("to", dateTo);
     apiGet(`/api/admin/system-logs?${qp.toString()}`)
       .then(setRows)
-      .catch(() => setErr("بارگذاری لاگ سیستم ناموفق بود."));
+      .catch((e) => setErr(e?.message || "بارگذاری لاگ سیستم ناموفق بود."));
   };
 
   useEffect(() => {
     load();
-  }, [level, actorType]);
+  }, [level, actorType, dateFrom, dateTo, limit]);
+
+  const submitSearch = (e) => {
+    e.preventDefault();
+    load();
+  };
+
+  const clearFilters = () => {
+    setLevel("");
+    setActorType("");
+    setSearch("");
+    setDateFrom("");
+    setDateTo("");
+    setLimit("300");
+  };
 
   return (
     <>
@@ -42,32 +63,82 @@ export default function AdminSystemLogsPage({ embedded = false }) {
       <section className="dashboard-panel">
         <h2>لاگ سیستم و تغییرات پروفایل</h2>
         <p className="field-hint">تاریخچه تغییرات مدیر/ادمین و خطاهای سرور با زمان ثبت می‌شود.</p>
-        <div className="dashboard-actions" style={{ marginBottom: "0.75rem" }}>
-          <label className="field-label" htmlFor="syslog-level">
-            سطح
-          </label>
-          <select id="syslog-level" className="field-input" value={level} onChange={(e) => setLevel(e.target.value)}>
-            <option value="">همه</option>
-            <option value="info">info</option>
-            <option value="warn">warn</option>
-            <option value="error">error</option>
-          </select>
-          <label className="field-label" htmlFor="syslog-actor">
-            نقش
-          </label>
-          <select
-            id="syslog-actor"
-            className="field-input"
-            value={actorType}
-            onChange={(e) => setActorType(e.target.value)}
-          >
-            <option value="">همه</option>
-            <option value="superadmin">superadmin</option>
-            <option value="manager">manager</option>
-            <option value="system">system</option>
-          </select>
-        </div>
-        {err && <p className="field-hint">{err}</p>}
+        <form onSubmit={submitSearch} className="dashboard-actions" style={{ marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.6rem" }}>
+          <div className="field field--block" style={{ minWidth: "14rem" }}>
+            <label className="field-label" htmlFor="syslog-search">
+              جستجو (پیام، عملیات، هدف)
+            </label>
+            <input
+              id="syslog-search"
+              className="field-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="مثلاً نام مدیر یا شناسهٔ آگهی…"
+            />
+          </div>
+          <div className="field field--block">
+            <label className="field-label" htmlFor="syslog-level">
+              سطح
+            </label>
+            <select id="syslog-level" className="field-input" value={level} onChange={(e) => setLevel(e.target.value)}>
+              <option value="">همه</option>
+              <option value="info">info</option>
+              <option value="warn">warn</option>
+              <option value="error">error</option>
+            </select>
+          </div>
+          <div className="field field--block">
+            <label className="field-label" htmlFor="syslog-actor">
+              نقش
+            </label>
+            <select
+              id="syslog-actor"
+              className="field-input"
+              value={actorType}
+              onChange={(e) => setActorType(e.target.value)}
+            >
+              <option value="">همه</option>
+              <option value="superadmin">superadmin</option>
+              <option value="manager">manager</option>
+              <option value="exchange_manager">exchange_manager</option>
+              <option value="system">system</option>
+            </select>
+          </div>
+          <div className="field field--block">
+            <label className="field-label" htmlFor="syslog-from">
+              از تاریخ
+            </label>
+            <input id="syslog-from" type="date" className="field-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="field field--block">
+            <label className="field-label" htmlFor="syslog-to">
+              تا تاریخ
+            </label>
+            <input id="syslog-to" type="date" className="field-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          <div className="field field--block">
+            <label className="field-label" htmlFor="syslog-limit">
+              تعداد
+            </label>
+            <select id="syslog-limit" className="field-input" value={limit} onChange={(e) => setLimit(e.target.value)}>
+              <option value="100">۱۰۰</option>
+              <option value="300">۳۰۰</option>
+              <option value="500">۵۰۰</option>
+              <option value="1000">۱۰۰۰</option>
+            </select>
+          </div>
+          <div className="field field--block" style={{ alignSelf: "end" }}>
+            <button type="submit" className="btn btn--primary">
+              اعمال جستجو
+            </button>
+          </div>
+          <div className="field field--block" style={{ alignSelf: "end" }}>
+            <button type="button" className="btn btn--ghost" onClick={clearFilters}>
+              پاک‌کردن فیلترها
+            </button>
+          </div>
+        </form>
+        {err && <p className="field-hint" style={{ color: "#b71c1c" }}>{err}</p>}
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -104,7 +175,7 @@ export default function AdminSystemLogsPage({ embedded = false }) {
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan={6}>لاگی ثبت نشده است.</td>
+                  <td colSpan={6}>لاگی با این فیلترها پیدا نشد.</td>
                 </tr>
               )}
             </tbody>

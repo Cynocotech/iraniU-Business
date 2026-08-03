@@ -44,6 +44,26 @@ export default function AdminSecurityPage({ embedded = false }) {
   const [twilioModuleBusy, setTwilioModuleBusy] = useState(false);
   const [twilioModuleMsg, setTwilioModuleMsg] = useState(null);
 
+  const [careersModule, setCareersModule] = useState({ enabled: true });
+  const [careersModuleBusy, setCareersModuleBusy] = useState(false);
+  const [careersModuleMsg, setCareersModuleMsg] = useState(null);
+
+  const [desktopGate, setDesktopGate] = useState({ enabled: true });
+  const [desktopGateBusy, setDesktopGateBusy] = useState(false);
+  const [desktopGateMsg, setDesktopGateMsg] = useState(null);
+
+  const [s3Config, setS3Config] = useState(null);
+  const [s3Form, setS3Form] = useState({
+    access_key_id: "",
+    secret_access_key: "",
+    region: "us-east-1",
+    bucket: "",
+  });
+  const [s3SaveBusy, setS3SaveBusy] = useState(false);
+  const [s3SaveMsg, setS3SaveMsg] = useState(null);
+  const [s3TestBusy, setS3TestBusy] = useState(false);
+  const [s3TestMsg, setS3TestMsg] = useState(null);
+
   const loadTelegramConfig = useCallback(() => {
     apiGet("/api/admin/telegram-config")
       .then((d) => {
@@ -64,6 +84,33 @@ export default function AdminSecurityPage({ embedded = false }) {
       .catch(() => setTwilioModule({ enabled: true }));
   }, []);
 
+  const loadCareersModule = useCallback(() => {
+    apiGet("/api/admin/careers-module")
+      .then((d) => setCareersModule(d && typeof d.enabled === "boolean" ? d : { enabled: true }))
+      .catch(() => setCareersModule({ enabled: true }));
+  }, []);
+
+  const loadDesktopGate = useCallback(() => {
+    apiGet("/api/admin/desktop-gate")
+      .then((d) => setDesktopGate(d && typeof d.enabled === "boolean" ? d : { enabled: true }))
+      .catch(() => setDesktopGate({ enabled: true }));
+  }, []);
+
+  const loadS3Config = useCallback(() => {
+    apiGet("/api/admin/s3-config")
+      .then((d) => {
+        setS3Config(d);
+        setS3Form((f) => ({
+          ...f,
+          access_key_id: d.access_key_id || "",
+          secret_access_key: d.secret_access_key_masked || "",
+          region: d.region || "us-east-1",
+          bucket: d.bucket || "",
+        }));
+      })
+      .catch(() => setS3Config({}));
+  }, []);
+
   useEffect(() => {
     if (mustEnroll2fa) return;
     loadTelegramConfig();
@@ -73,6 +120,21 @@ export default function AdminSecurityPage({ embedded = false }) {
     if (mustEnroll2fa) return;
     loadTwilioModule();
   }, [mustEnroll2fa, loadTwilioModule]);
+
+  useEffect(() => {
+    if (mustEnroll2fa) return;
+    loadCareersModule();
+  }, [mustEnroll2fa, loadCareersModule]);
+
+  useEffect(() => {
+    if (mustEnroll2fa) return;
+    loadDesktopGate();
+  }, [mustEnroll2fa, loadDesktopGate]);
+
+  useEffect(() => {
+    if (mustEnroll2fa) return;
+    loadS3Config();
+  }, [mustEnroll2fa, loadS3Config]);
 
   const setTwilioModuleEnabled = async (nextEnabled) => {
     setTwilioModuleMsg(null);
@@ -85,6 +147,56 @@ export default function AdminSecurityPage({ embedded = false }) {
       setTwilioModuleMsg(err.message || String(err));
     } finally {
       setTwilioModuleBusy(false);
+    }
+  };
+
+  const setCareersModuleEnabled = async (nextEnabled) => {
+    setCareersModuleMsg(null);
+    setCareersModuleBusy(true);
+    try {
+      const d = await apiPatchJson("/api/admin/careers-module", { enabled: nextEnabled });
+      setCareersModule(d);
+      setCareersModuleMsg(nextEnabled ? "ماژول Job Vacancies فعال شد." : "ماژول Job Vacancies غیرفعال شد؛ فیلدهای Careers در فرم ویرایش آگهی مخفی می‌شوند.");
+    } catch (err) {
+      setCareersModuleMsg(err.message || String(err));
+    } finally {
+      setCareersModuleBusy(false);
+    }
+  };
+
+  const setDesktopGateEnabled = async (nextEnabled) => {
+    setDesktopGateMsg(null);
+    setDesktopGateBusy(true);
+    try {
+      const d = await apiPatchJson("/api/admin/desktop-gate", { enabled: nextEnabled });
+      setDesktopGate(d);
+      setDesktopGateMsg(nextEnabled ? "حالت فقط موبایل/تبلت فعال شد." : "حالت فقط موبایل/تبلت غیرفعال شد؛ سایت روی دسکتاپ هم باز می‌شود.");
+    } catch (err) {
+      setDesktopGateMsg(err.message || String(err));
+    } finally {
+      setDesktopGateBusy(false);
+    }
+  };
+
+  const saveS3Config = async (e) => {
+    e.preventDefault();
+    setS3SaveMsg(null);
+    setS3SaveBusy(true);
+    try {
+      const patch = {
+        access_key_id: s3Form.access_key_id.trim(),
+        secret_access_key: s3Form.secret_access_key.trim(),
+        region: s3Form.region.trim(),
+        bucket: s3Form.bucket.trim(),
+      };
+      const d = await apiPatchJson("/api/admin/s3-config", patch);
+      setS3Config(d);
+      setS3SaveMsg("تنظیمات S3 ذخیره شد. سرور خودکار از S3 استفاده خواهد کرد.");
+      loadS3Config();
+    } catch (err) {
+      setS3SaveMsg(err.message || String(err));
+    } finally {
+      setS3SaveBusy(false);
     }
   };
 
@@ -536,6 +648,242 @@ export default function AdminSecurityPage({ embedded = false }) {
             {twilioModuleMsg}
           </p>
         ) : null}
+      </section>
+      ) : null}
+
+      {!mustEnroll2fa ? (
+      <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
+        <h2>ماژول Job Vacancies (Careers)</h2>
+        <p className="field-hint">
+          با غیرفعال کردن، فیلدهای Job Vacancies (careers_title و careers_text) در فرم ویرایش آگهی مخفی می‌شوند.
+          داده‌های ذخیره‌شده در دیتابیس پاک نمی‌شود.
+        </p>
+        <p className="field-hint" style={{ marginBottom: "0.75rem" }}>
+          وضعیت فعلی:{" "}
+          <strong>{careersModule.enabled ? "فعال" : "غیرفعال"}</strong>
+        </p>
+        <div className="dashboard-actions dashboard-actions--inline">
+          {careersModule.enabled ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={careersModuleBusy}
+              onClick={() => setCareersModuleEnabled(false)}
+            >
+              {careersModuleBusy ? "در حال ذخیره…" : "غیرفعال کردن ماژول Job Vacancies"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={careersModuleBusy}
+              onClick={() => setCareersModuleEnabled(true)}
+            >
+              {careersModuleBusy ? "در حال ذخیره…" : "فعال کردن ماژول Job Vacancies"}
+            </button>
+          )}
+        </div>
+        {careersModuleMsg ? (
+          <p
+            className="field-hint"
+            style={{ marginTop: "0.75rem", color: careersModuleMsg.includes("غیرفعال") || careersModuleMsg.includes("فعال") ? "var(--color-success, #2e7d32)" : "#b71c1c" }}
+          >
+            {careersModuleMsg}
+          </p>
+        ) : null}
+      </section>
+      ) : null}
+
+      {!mustEnroll2fa ? (
+      <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
+        <h2>Open this on mobile</h2>
+        <p className="field-hint">
+          با فعال بودن این حالت، سایت (به‌جز پنل مدیر/مدیر صرافی و صفحات ورود) روی دسکتاپ مسدود می‌شود و این پیام نمایش داده می‌شود:
+        </p>
+        <p className="field-hint" style={{ fontStyle: "italic" }}>
+          "This site is for phones and tablets only. Please open this address on your mobile device."
+          <br />
+          «این نسخه فقط برای موبایل و تبلت است. لطفاً با گوشی یا تبلت همان آدرس را باز کنید.»
+        </p>
+        <p className="field-hint" style={{ marginBottom: "0.75rem" }}>
+          وضعیت فعلی:{" "}
+          <strong>{desktopGate.enabled ? "فعال" : "غیرفعال"}</strong>
+        </p>
+        <div className="dashboard-actions dashboard-actions--inline">
+          {desktopGate.enabled ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={desktopGateBusy}
+              onClick={() => setDesktopGateEnabled(false)}
+            >
+              {desktopGateBusy ? "در حال ذخیره…" : "غیرفعال کردن (نمایش روی دسکتاپ هم)"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={desktopGateBusy}
+              onClick={() => setDesktopGateEnabled(true)}
+            >
+              {desktopGateBusy ? "در حال ذخیره…" : "فعال کردن (فقط موبایل/تبلت)"}
+            </button>
+          )}
+        </div>
+        {desktopGateMsg ? (
+          <p
+            className="field-hint"
+            style={{ marginTop: "0.75rem", color: desktopGateMsg.includes("غیرفعال") || desktopGateMsg.includes("فعال") ? "var(--color-success, #2e7d32)" : "#b71c1c" }}
+          >
+            {desktopGateMsg}
+          </p>
+        ) : null}
+      </section>
+      ) : null}
+
+      {!mustEnroll2fa ? (
+      <section className="dashboard-panel" style={{ marginTop: "1.5rem" }}>
+        <h2>تنظیمات Amazon S3</h2>
+        <p className="field-hint">
+          برای ذخیره‌سازی فایل‌های آپلود شده (تصاویر بنر صرافی، تصاویر آگهی) روی Amazon S3 به جای فضای دیسک سرور.
+          اگر خالی بگذارید، سیستم از فضای محلی سرور استفاده می‌کند.
+        </p>
+
+        {s3Config && (
+          <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--color-card-hover, #f5f5f5)", borderRadius: "4px" }}>
+            <p className="field-hint" style={{ marginBottom: "0.5rem" }}>
+              <strong>وضعیت فعلی:</strong> {s3Config.storage_mode === "s3" ? "✅ S3 فعال است" : "📂 فضای محلی"}
+            </p>
+            {s3Config.access_key_id_source !== "none" && (
+              <p className="field-hint" style={{ marginBottom: "0.25rem", fontSize: "0.85rem" }}>
+                منبع تنظیمات: {s3Config.access_key_id_source === "database" ? "دیتابیس (پنل ادمین)" : "فایل .env"}
+              </p>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={saveS3Config} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <label htmlFor="s3-access-key">AWS Access Key ID</label>
+            <input
+              id="s3-access-key"
+              type="text"
+              value={s3Form.access_key_id}
+              onChange={(e) => setS3Form((f) => ({ ...f, access_key_id: e.target.value }))}
+              placeholder="AKIAIOSFODNN7EXAMPLE"
+              dir="ltr"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="s3-secret-key">AWS Secret Access Key</label>
+            <input
+              id="s3-secret-key"
+              type="password"
+              value={s3Form.secret_access_key}
+              onChange={(e) => setS3Form((f) => ({ ...f, secret_access_key: e.target.value }))}
+              placeholder={s3Config?.secret_access_key_set ? "••••••••" : "wJalrXUtnFEMI/K7MDENG/..."}
+              dir="ltr"
+            />
+            {s3Config?.secret_access_key_set && (
+              <p className="field-hint" style={{ fontSize: "0.85rem", marginTop: "0.25rem" }}>
+                کلید فعلی: {s3Config.secret_access_key_masked} (برای تغییر، کلید جدید وارد کنید)
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="s3-region">AWS Region</label>
+            <select
+              id="s3-region"
+              value={s3Form.region}
+              onChange={(e) => setS3Form((f) => ({ ...f, region: e.target.value }))}
+              dir="ltr"
+            >
+              <option value="us-east-1">us-east-1 (N. Virginia)</option>
+              <option value="us-east-2">us-east-2 (Ohio)</option>
+              <option value="us-west-1">us-west-1 (N. California)</option>
+              <option value="us-west-2">us-west-2 (Oregon)</option>
+              <option value="eu-west-1">eu-west-1 (Ireland)</option>
+              <option value="eu-west-2">eu-west-2 (London)</option>
+              <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+              <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+              <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+              <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="s3-bucket">S3 Bucket Name</label>
+            <input
+              id="s3-bucket"
+              type="text"
+              value={s3Form.bucket}
+              onChange={(e) => setS3Form((f) => ({ ...f, bucket: e.target.value }))}
+              placeholder="my-bucket-name"
+              dir="ltr"
+            />
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+            <button type="submit" className="btn btn--primary" disabled={s3SaveBusy}>
+              {s3SaveBusy ? "در حال ذخیره…" : "ذخیرهٔ تنظیمات S3"}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={s3TestBusy}
+              onClick={async () => {
+                setS3TestMsg(null);
+                setS3TestBusy(true);
+                try {
+                  await apiPost("/api/admin/s3-test", {});
+                  setS3TestMsg("✅ تست موفق! اتصال به S3 کار می‌کند.");
+                } catch (e) {
+                  setS3TestMsg(`❌ ${e.message || String(e)}`);
+                } finally {
+                  setS3TestBusy(false);
+                }
+              }}
+            >
+              {s3TestBusy ? "در حال تست…" : "تست اتصال S3"}
+            </button>
+          </div>
+
+          {s3SaveMsg && (
+            <p
+              className="field-hint"
+              style={{
+                color: s3SaveMsg.includes("ذخیره") ? "var(--color-success, #2e7d32)" : "#b71c1c",
+              }}
+            >
+              {s3SaveMsg}
+            </p>
+          )}
+
+          {s3TestMsg && (
+            <p
+              className="field-hint"
+              style={{
+                color: s3TestMsg.includes("✅") ? "var(--color-success, #2e7d32)" : "#b71c1c",
+              }}
+            >
+              {s3TestMsg}
+            </p>
+          )}
+        </form>
+
+        <p className="field-hint" style={{ marginTop: "1rem", fontSize: "0.88rem" }}>
+          💡 <strong>راهنما:</strong> برای راه‌اندازی AWS S3، باکت ایجاد کنید، IAM user با دسترسی S3 بسازید و کلیدها را اینجا وارد کنید.
+          مستندات کامل: <code>S3_SETUP_GUIDE.md</code>
+        </p>
+
+        {s3Config?.is_configured && (
+          <p className="field-hint" style={{ color: "var(--color-success, #2e7d32)", marginTop: "0.5rem" }}>
+            ✅ S3 پیکربندی شده است. تمام آپلودهای جدید به S3 می‌روند.
+          </p>
+        )}
       </section>
       ) : null}
     </>

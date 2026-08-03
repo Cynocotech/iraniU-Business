@@ -34,6 +34,11 @@ import {
   setTwilioModuleEnabled,
   isTwilioModuleEnabled,
 } from "./twilioModuleSettings.js";
+import { isCareersModuleEnabled, setCareersModuleEnabled } from "./careersModuleSettings.js";
+import { getDesktopGateForAdmin, setDesktopGateEnabled } from "./desktopGateSettings.js";
+import { verifyTurnstileToken } from "./turnstileVerify.js";
+import { getBusinessBySignupToken, completeBusinessSignup } from "./businessSignupVerification.js";
+import { requestPasswordReset, resetPassword } from "./passwordReset.js";
 import {
   getSmtpSettingsForAdmin,
   applySmtpSettingsPatch,
@@ -42,6 +47,12 @@ import {
 import { wrapBrandedEmail, escapeHtml } from "./emailBranding.js";
 import { sendBroadcastToBusinesses } from "./emailBroadcast.js";
 import { actorFromAuth, writeSystemLog } from "./systemLog.js";
+import {
+  getS3ConfigForAdmin,
+  applyS3ConfigPatch,
+  clearS3ConfigFromDb,
+} from "./s3Settings.js";
+import { uploadToS3 } from "./s3Upload.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarDir = path.join(__dirname, "..", "uploads", "avatars");
@@ -156,6 +167,16 @@ export function registerAuthRoutes(app) {
   /** ثبت‌نام عمومی مدیر — نام کاربری + رمز + ایمیل */
   app.post("/api/auth/register/manager", asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
+
+    // Verify Cloudflare Turnstile captcha
+    const captchaToken = b.captcha_token;
+    if (captchaToken) {
+      const captchaValid = await verifyTurnstileToken(captchaToken, clientIp(req));
+      if (!captchaValid) {
+        return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود" });
+      }
+    }
+
     const email = String(b.email || "")
       .trim()
       .toLowerCase();
@@ -188,11 +209,18 @@ export function registerAuthRoutes(app) {
     if (!pwCheck.ok) {
       return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
     }
-    if (
+    const existingMgr =
       (await dbGet(`SELECT id FROM identity.managers WHERE email = $1`, [email])) ||
-      (await dbGet(`SELECT id FROM identity.exchange_managers WHERE email = $1`, [email]))
-    ) {
-      return res.status(409).json({ error: "email_taken", hint: "این ایمیل قبلاً ثبت شده" });
+      (await dbGet(`SELECT id FROM identity.exchange_managers WHERE email = $1`, [email]));
+    if (existingMgr) {
+      const linkedBiz = await dbGet(
+        `SELECT name_fa FROM businesses WHERE manager_id = $1 OR exchange_manager_id = $1`,
+        [existingMgr.id]
+      );
+      const hint = linkedBiz
+        ? `این ایمیل قبلاً برای آگهی «${linkedBiz.name_fa}» تأیید و ثبت شده است. برای ورود به پنل از صفحهٔ ورود استفاده کنید.`
+        : "این ایمیل قبلاً ثبت شده. برای ورود از صفحهٔ ورود استفاده کنید.";
+      return res.status(409).json({ error: "email_taken", hint });
     }
     if (
       (await dbGet(`SELECT id FROM identity.managers WHERE login_username = $1`, [login_username])) ||
@@ -244,6 +272,71 @@ export function registerAuthRoutes(app) {
     }
   }));
 
+  /** بررسی لینک تأیید ایمیل ثبت کسب‌وکار — فقط خواندنی */
+  app.get("/api/business-signup/verify", asyncHandler(async (req, res) => {
+    const token = String(req.query.token || "").trim();
+    const business = await getBusinessBySignupToken(token);
+    if (!business) {
+      return res.status(400).json({ error: "invalid_or_expired_token" });
+    }
+    res.json({
+      ok: true,
+      name_fa: business.name_fa,
+      listing_contact_email: business.listing_contact_email,
+    });
+  }));
+
+  /** تکمیل ثبت کسب‌وکار — ساخت رمز و ساخت/اتصال خودکار حساب مدیر */
+  app.post("/api/business-signup/complete", asyncHandler(async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+
+    const captchaToken = b.captcha_token;
+    const captchaValid = await verifyTurnstileToken(captchaToken, clientIp(req));
+    if (!captchaValid) {
+      return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود" });
+    }
+
+    const token = String(b.token || "").trim();
+    const login_username = String(b.login_username || b.username || "")
+      .trim()
+      .toLowerCase();
+    const password = String(b.password || "").trim();
+    if (!token || !login_username || !password) {
+      return res.status(400).json({ error: "missing_fields", hint: "نام کاربری و رمز الزامی است" });
+    }
+    if (!MANAGER_USERNAME_RE.test(login_username)) {
+      return res.status(400).json({
+        error: "invalid_username",
+        hint: "نام کاربری ۳ تا ۳۲ کاراکتر؛ فقط a-z، ۰-۹ و _",
+      });
+    }
+    const pwCheck = validatePasswordComplexity(password);
+    if (!pwCheck.ok) {
+      return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
+    }
+
+    try {
+      const result = await completeBusinessSignup({ token, login_username, password });
+      if (result.error) {
+        return res.status(400).json({ error: result.error });
+      }
+      writeSystemLog({
+        level: "info",
+        actorType: "system",
+        action: "business_signup_completed",
+        targetType: "manager",
+        targetId: String(result.managerId),
+        message: `Manager auto-created & linked after email verification: ${result.email}`,
+      });
+      res.json({ ok: true, email: result.email });
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        return res.status(409).json({ error: "username_or_email_taken" });
+      }
+      throw e;
+    }
+  }));
+
   app.post("/api/auth/login/manager", asyncHandler(async (req, res) => {
     const b = req.body && typeof req.body === "object" ? req.body : {};
     const identifier = String(b.email || b.login || "")
@@ -251,9 +344,20 @@ export function registerAuthRoutes(app) {
       .toLowerCase();
     const password = String(b.password || "");
     const totp = b.totp != null && b.totp !== "" ? String(b.totp).trim() : null;
+    const captchaToken = b.captcha_token;
+
     if (!identifier || !password) {
       return res.status(400).json({ error: "missing_credentials" });
     }
+
+    // Verify Cloudflare Turnstile captcha
+    if (captchaToken) {
+      const captchaValid = await verifyTurnstileToken(captchaToken, clientIp(req));
+      if (!captchaValid) {
+        return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود." });
+      }
+    }
+
     if (!(await assertLoginNotBlocked(req, res))) return;
 
     const mDir = await dbGet(
@@ -301,8 +405,18 @@ export function registerAuthRoutes(app) {
       .toLowerCase();
     const password = String(b.password || "");
     const totp = b.totp != null && b.totp !== "" ? String(b.totp).trim() : null;
+    const captchaToken = b.captcha_token;
+
     if (!email || !password) {
       return res.status(400).json({ error: "missing_credentials" });
+    }
+
+    // Verify Cloudflare Turnstile captcha
+    if (captchaToken) {
+      const captchaValid = await verifyTurnstileToken(captchaToken, clientIp(req));
+      if (!captchaValid) {
+        return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود." });
+      }
     }
     if (!(await assertLoginNotBlocked(req, res))) return;
 
@@ -339,6 +453,49 @@ export function registerAuthRoutes(app) {
       user: stripSuperAdminRow(a),
       role: "superadmin",
     });
+  }));
+
+  /** فراموشی رمز — برای مدیر، مدیر صرافی و سوپرادمین (ایمیل‌محور) */
+  app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const captchaToken = b.captcha_token;
+    const captchaValid = await verifyTurnstileToken(captchaToken, clientIp(req));
+    if (!captchaValid) {
+      return res.status(400).json({ error: "captcha_failed", hint: "تأیید امنیتی ناموفق بود" });
+    }
+    await requestPasswordReset(b.email);
+    res.json({ ok: true });
+  }));
+
+  app.post("/api/auth/reset-password", asyncHandler(async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const password = String(b.password || "").trim();
+    if (!b.token || !password) {
+      return res.status(400).json({ error: "missing_fields" });
+    }
+    const result = await resetPassword(b.token, password);
+    if (result.error) {
+      return res.status(400).json({ error: result.error, hint: result.hint });
+    }
+    res.json({ ok: true });
+  }));
+
+  /** Change own password (requires valid manager JWT) — clears must_change_password flag */
+  app.patch("/api/auth/me/password", asyncHandler(async (req, res) => {
+    const p = parseAuthHeader(req);
+    if (!p || (p.typ !== "mgr" && p.typ !== "mgrx")) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    const newPassword = String(b.new_password || b.password || "").trim();
+    const pwCheck = validatePasswordComplexity(newPassword);
+    if (!pwCheck.ok) {
+      return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
+    }
+    const table = p.typ === "mgrx" ? "identity.exchange_managers" : "identity.managers";
+    const hash = hashPassword(newPassword);
+    await dbRun(`UPDATE ${table} SET password_hash = $1, must_change_password = 0 WHERE id = $2`, [hash, p.sub]);
+    res.json({ ok: true });
   }));
 
   app.get("/api/auth/me", asyncHandler(async (req, res) => {
@@ -573,6 +730,49 @@ export function registerAuthRoutes(app) {
     res.json(next);
   }));
 
+  app.get("/api/admin/careers-module", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    const enabled = await isCareersModuleEnabled();
+    res.json({ enabled });
+  }));
+
+  app.patch("/api/admin/careers-module", requireSuperAdmin, asyncHandler(async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    if (!("enabled" in b)) {
+      return res.status(400).json({ error: "missing_enabled", hint: "enabled: true|false" });
+    }
+    const enabled = b.enabled === true || b.enabled === 1 || b.enabled === "1" || b.enabled === "true";
+    await setCareersModuleEnabled(enabled);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_careers_module_toggled",
+      targetType: "settings",
+      targetId: "careers_module",
+      message: `Careers module ${enabled ? "enabled" : "disabled"}`,
+    });
+    res.json({ enabled });
+  }));
+
+  app.get("/api/admin/desktop-gate", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getDesktopGateForAdmin());
+  }));
+
+  app.patch("/api/admin/desktop-gate", requireSuperAdmin, asyncHandler(async (req, res) => {
+    const b = req.body && typeof req.body === "object" ? req.body : {};
+    if (!("enabled" in b)) {
+      return res.status(400).json({ error: "missing_enabled", hint: "enabled: true|false" });
+    }
+    const enabled = b.enabled === true || b.enabled === 1 || b.enabled === "1" || b.enabled === "true";
+    const next = await setDesktopGateEnabled(enabled);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "admin_desktop_gate_toggled",
+      targetType: "settings",
+      targetId: "desktop_gate",
+      message: `Desktop gate (mobile-only mode) ${enabled ? "enabled" : "disabled"}`,
+    });
+    res.json(next);
+  }));
+
   app.get("/api/admin/smtp-settings", requireSuperAdmin, asyncHandler(async (_req, res) => {
     res.json(await getSmtpSettingsForAdmin());
   }));
@@ -624,6 +824,80 @@ export function registerAuthRoutes(app) {
       });
     }
     res.json({ ok: true });
+  }));
+
+  /** AWS S3 Configuration */
+  app.get("/api/admin/s3-config", requireSuperAdmin, asyncHandler(async (_req, res) => {
+    res.json(await getS3ConfigForAdmin());
+  }));
+
+  app.patch("/api/admin/s3-config", requireSuperAdmin, asyncHandler(async (req, res) => {
+    try {
+      const next = await applyS3ConfigPatch(req.body || {});
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "admin_s3_config_updated",
+        targetType: "settings",
+        targetId: "s3",
+        message: "Super admin updated S3 configuration",
+      });
+      res.json(next);
+    } catch (e) {
+      console.error("s3-config patch", e);
+      res.status(500).json({ error: "server_error", hint: String(e.message || e) });
+    }
+  }));
+
+  app.post("/api/admin/s3-config/clear", requireSuperAdmin, asyncHandler(async (req, res) => {
+    try {
+      const next = await clearS3ConfigFromDb();
+      writeSystemLog({
+        ...actorFromAuth(req.auth),
+        action: "admin_s3_config_cleared",
+        targetType: "settings",
+        targetId: "s3",
+        message: "Super admin cleared S3 config from database (reverted to .env)",
+      });
+      res.json(next);
+    } catch (e) {
+      console.error("s3-config clear", e);
+      res.status(500).json({ error: "server_error", hint: String(e.message || e) });
+    }
+  }));
+
+  app.post("/api/admin/s3-test", requireSuperAdmin, asyncHandler(async (req, res) => {
+    try {
+      const testKey = `test/connection-test-${Date.now()}.txt`;
+      const testContent = Buffer.from(`S3 test from Iraniu at ${new Date().toISOString()}`);
+
+      const result = await uploadToS3(testContent, testKey, "text/plain");
+
+      // Try to delete the test file
+      try {
+        const { deleteFromS3 } = await import("./s3Upload.js");
+        await deleteFromS3(testKey);
+      } catch (deleteErr) {
+        console.warn("S3 test cleanup failed:", deleteErr);
+      }
+
+      res.json({
+        ok: true,
+        message: "تست موفق بود! فایل آزمایشی آپلود و حذف شد.",
+        test_url: result.url
+      });
+    } catch (e) {
+      console.error("s3-test", e);
+      const hint = String(e.message || e).includes("not configured")
+        ? "لطفاً ابتدا تنظیمات AWS S3 را کامل کنید"
+        : String(e.message || e).includes("Access Denied")
+        ? "دسترسی رد شد. مجوزهای IAM را بررسی کنید"
+        : String(e.message || e);
+      res.status(400).json({
+        ok: false,
+        error: "s3_test_failed",
+        hint
+      });
+    }
   }));
 
   app.post("/api/admin/email/broadcast", requireSuperAdmin, asyncHandler(async (req, res) => {
@@ -690,8 +964,9 @@ export function registerAuthRoutes(app) {
     const id = parseInt(String(req.params.id || ""), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
     const password = String((req.body && req.body.password) || "").trim();
-    if (password.length < 8) {
-      return res.status(400).json({ error: "password_too_short", hint: "حداقل ۸ کاراکتر" });
+    const pwCheck = validatePasswordComplexity(password);
+    if (!pwCheck.ok) {
+      return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
     }
     const m = await dbGet(`SELECT id FROM identity.managers WHERE id = $1`, [id]);
     if (!m) return res.status(404).json({ error: "not_found" });
@@ -703,6 +978,29 @@ export function registerAuthRoutes(app) {
       targetType: "manager",
       targetId: id,
       message: `Manager password reset for manager #${id}`,
+    });
+    res.json({ ok: true });
+  }));
+
+  /** سوپرادمین: تعیین/تغییر رمز مدیر صرافی */
+  app.patch("/api/admin/exchange-managers/:id/password", requireSuperAdmin, asyncHandler(async (req, res) => {
+    const id = parseInt(String(req.params.id || ""), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "bad_id" });
+    const password = String((req.body && req.body.password) || "").trim();
+    const pwCheck = validatePasswordComplexity(password);
+    if (!pwCheck.ok) {
+      return res.status(400).json({ error: pwCheck.code || "weak_password", hint: pwCheck.hint });
+    }
+    const m = await dbGet(`SELECT id FROM identity.exchange_managers WHERE id = $1`, [id]);
+    if (!m) return res.status(404).json({ error: "not_found" });
+    const hash = hashPassword(password);
+    await dbRun(`UPDATE identity.exchange_managers SET password_hash = $1 WHERE id = $2`, [hash, id]);
+    writeSystemLog({
+      ...actorFromAuth(req.auth),
+      action: "exchange_manager_password_reset",
+      targetType: "exchange_manager",
+      targetId: id,
+      message: `Exchange manager password reset for exchange manager #${id}`,
     });
     res.json({ ok: true });
   }));

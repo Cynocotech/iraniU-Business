@@ -12,6 +12,16 @@ function filterRows(rows, searchParams) {
   return filterListingsByCategoryParams(rows, searchParams);
 }
 
+function hashSlug(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
+  return h;
+}
+
+function getDailySeed() {
+  return Number(new Date().toISOString().slice(0, 10).replace(/-/g, "")) % 9973;
+}
+
 function dailyBannerSeenKey(scope) {
   const d = new Date();
   const y = d.getFullYear();
@@ -124,9 +134,7 @@ export default function ListingsPage() {
 
   const featuredRows = useMemo(() => {
     const boosted = rows.filter((b) => b.active_boost_plan === "diamond" || b.active_boost_plan === "platinum");
-    // daily shuffle within each tier so all businesses get fair rotation
-    const seed = Number(new Date().toISOString().slice(0, 10).replace(/-/g, "")) % 9973;
-    function hashSlug(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff; return h; }
+    const seed = getDailySeed();
     const diamond  = boosted.filter((b) => b.active_boost_plan === "diamond").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
     const platinum = boosted.filter((b) => b.active_boost_plan === "platinum").sort((a, b) => ((hashSlug(a.slug) + seed) % 100) - ((hashSlug(b.slug) + seed) % 100));
     return [...diamond, ...platinum];
@@ -135,8 +143,18 @@ export default function ListingsPage() {
   const filtered = useMemo(() => filterRows(rows, searchParams), [rows, searchParams]);
   const sortedFiltered = useMemo(() => {
     const arr = [...filtered];
-    if (sortBy === "rating") arr.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
-    if (sortBy === "name") arr.sort((a, b) => (a.name_fa || "").localeCompare(b.name_fa || "", "fa"));
+    if (sortBy === "rating") {
+      arr.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    } else if (sortBy === "name") {
+      arr.sort((a, b) => (a.name_fa || "").localeCompare(b.name_fa || "", "fa"));
+    } else {
+      // Default: promoted businesses first, then daily shuffle for the rest (fair rotation)
+      const seed = getDailySeed();
+      const promoted = arr.filter((b) => b.active_boost_plan);
+      const regular  = arr.filter((b) => !b.active_boost_plan);
+      regular.sort((a, b) => ((hashSlug(a.slug) + seed) % 1000) - ((hashSlug(b.slug) + seed) % 1000));
+      return [...promoted, ...regular];
+    }
     return arr;
   }, [filtered, sortBy]);
   const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
@@ -262,6 +280,7 @@ export default function ListingsPage() {
           <div className="listings-hero__actions">
             <Link to="/exchanges" className="demo-btn demo-btn--outline">صرافی‌ها</Link>
             <Link to="/onboarding" className="demo-btn demo-btn--accent">ثبت کسب‌وکار رایگان</Link>
+            <Link to="/create-ad" className="demo-btn demo-btn--outline">📣 ثبت آگهی تبلیغاتی</Link>
           </div>
         </div>
       </div>

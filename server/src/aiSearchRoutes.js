@@ -6,6 +6,7 @@ import { clientIp } from "./telegramNotify.js";
 const router = express.Router();
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const MOBILE_APP_KEY = process.env.MOBILE_APP_KEY || "";
 const GPT_MODEL = "gpt-4o-mini";
 const EMBED_MODEL = "text-embedding-3-small";
 
@@ -122,16 +123,17 @@ const BUSINESS_COLS = `id, slug, name_fa, listing_title, subtitle, description,
 async function retrieveByName(nameKeyword, { city, isExchange, isJob, isPromo }) {
   // Search only name_fa — listing_title is auto-generated ("X ایرانی در Y لندن") and
   // would falsely match "ایران" for every business in the directory.
+  // Uses pg_trgm word-similarity ($1 <% name_fa) so typos and partial Farsi names match.
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
        FROM public.businesses
       WHERE listing_approval = 'approved'
-        AND name_fa ILIKE '%' || $1 || '%'
+        AND $1::text <% name_fa
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
         AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
         AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
-      ORDER BY rating DESC NULLS LAST
+      ORDER BY word_similarity($1::text, name_fa) DESC, rating DESC NULLS LAST
       LIMIT 20`,
     [nameKeyword, city || null, !!isExchange, !!isJob, !!isPromo]
   );
@@ -153,9 +155,10 @@ function extractLiteralKeywords(query) {
 
 async function retrieveByDescriptionKeyword(keywords, { city, isExchange, isJob, isPromo }) {
   if (!keywords.length) return [];
-  // Match keywords in description OR ai_tags_json
+  // Match acronyms/brand terms (e.g. DSS, NHS) in description OR ai_tags_json.
+  // Uses word-similarity ($kw <% field) so short English tokens match robustly.
   const conditions = keywords.map((_, i) =>
-    `(description ILIKE '%' || $${i + 6} || '%' OR ai_tags_json ILIKE '%' || $${i + 6} || '%')`
+    `($${i + 6}::text <% description OR $${i + 6}::text <% ai_tags_json)`
   ).join(" OR ");
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
@@ -190,36 +193,86 @@ function bestExcerpt(text, keywords, maxLen = 400) {
 }
 
 async function retrieveByCategory(category, { city, isExchange, isJob, isPromo }) {
+  // category is a short controlled-vocabulary string — plain similarity (%) is appropriate.
   const { rows } = await pool.query(
     `SELECT ${BUSINESS_COLS}
        FROM public.businesses
       WHERE listing_approval = 'approved'
-        AND category ILIKE '%' || $1 || '%'
+        AND category % $1::text
         AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
         AND (NOT $3 OR exchange_manager_id IS NOT NULL)
         AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
         AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
-      ORDER BY rating DESC NULLS LAST
+      ORDER BY similarity(category, $1::text) DESC, rating DESC NULLS LAST
       LIMIT 15`,
     [category, city || null, !!isExchange, !!isJob, !!isPromo]
   );
   return rows;
 }
 
-async function retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo }) {
+// Reciprocal Rank Fusion of vector cosine distance and pg_trgm text similarity.
+// RRF_Score = 1/(60+vec_rank) + 1/(60+text_rank)
+// A business only in one leg still contributes via that leg; text_rank/vec_rank
+// defaults to 9999 when the business is absent from the other leg.
+async function retrieveByRRF(queryVec, searchQuery, { city, isExchange, isJob, isPromo }) {
   const vecStr = `[${queryVec.join(",")}]`;
   const { rows } = await pool.query(
-    `SELECT ${BUSINESS_COLS}
-       FROM public.businesses
-      WHERE listing_approval = 'approved'
-        AND embedding IS NOT NULL
-        AND ($1::text IS NULL OR city ILIKE '%' || $1 || '%' OR address ILIKE '%' || $1 || '%')
-        AND (NOT $2 OR exchange_manager_id IS NOT NULL)
-        AND (NOT $3 OR (careers_title IS NOT NULL AND careers_title != ''))
-        AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
-      ORDER BY embedding <=> $4::vector
-      LIMIT 30`,
-    [city || null, !!isExchange, !!isJob, vecStr, !!isPromo]
+    `WITH vector_leg AS (
+       SELECT id,
+              ROW_NUMBER() OVER (ORDER BY embedding <=> $1::vector) AS vec_rank
+         FROM public.businesses
+        WHERE listing_approval = 'approved'
+          AND embedding IS NOT NULL
+          AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
+          AND (NOT $3 OR exchange_manager_id IS NOT NULL)
+          AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
+          AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
+        ORDER BY embedding <=> $1::vector
+        LIMIT 60
+     ),
+     text_leg AS (
+       SELECT id, ROW_NUMBER() OVER (ORDER BY text_sim DESC) AS text_rank
+         FROM (
+           SELECT id,
+                  GREATEST(
+                    COALESCE(similarity(name_fa,    $6::text), 0),
+                    COALESCE(similarity(category,   $6::text), 0),
+                    COALESCE(word_similarity($6::text, description),  0),
+                    COALESCE(word_similarity($6::text, ai_tags_json), 0)
+                  ) AS text_sim
+             FROM public.businesses
+            WHERE listing_approval = 'approved'
+              AND (
+                    name_fa  % $6::text
+                 OR category % $6::text
+                 OR $6::text <% description
+                 OR $6::text <% ai_tags_json
+              )
+              AND ($2::text IS NULL OR city ILIKE '%' || $2 || '%' OR address ILIKE '%' || $2 || '%')
+              AND (NOT $3 OR exchange_manager_id IS NOT NULL)
+              AND (NOT $4 OR (careers_title IS NOT NULL AND careers_title != ''))
+              AND (NOT $5 OR (promo_title IS NOT NULL AND promo_title != ''))
+            ORDER BY text_sim DESC
+            LIMIT 60
+         ) sub
+     ),
+     rrf_merged AS (
+       SELECT
+         COALESCE(v.id, t.id) AS id,
+         (1.0 / (60 + COALESCE(v.vec_rank,  9999))) +
+         (1.0 / (60 + COALESCE(t.text_rank, 9999))) AS rrf_score
+         FROM vector_leg v
+         FULL OUTER JOIN text_leg t ON v.id = t.id
+     )
+     SELECT b.id, b.slug, b.name_fa, b.listing_title, b.subtitle, b.description,
+            b.category, b.city, b.address, b.postcode, b.rating, b.price_range,
+            b.phone, b.reservation_link, b.cover_image_url, b.promo_title,
+            b.careers_title, b.exchange_manager_id, b.ai_tags_json
+       FROM rrf_merged r
+       JOIN public.businesses b ON b.id = r.id
+      ORDER BY r.rrf_score DESC
+      LIMIT 35`,
+    [vecStr, city || null, !!isExchange, !!isJob, !!isPromo, searchQuery]
   );
   return rows;
 }
@@ -262,7 +315,9 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const captchaValid = await verifyTurnstileToken(String(turnstileToken || ""), ip);
+  const mobileKey = req.headers["x-mobile-key"] || "";
+  const isMobile = MOBILE_APP_KEY && mobileKey === MOBILE_APP_KEY;
+  const captchaValid = isMobile || await verifyTurnstileToken(String(turnstileToken || ""), ip);
   if (!captchaValid) {
     return res.status(400).json({
       error: "captcha_failed",
@@ -292,7 +347,7 @@ router.post("/", async (req, res) => {
 - name_contains: پر کنید اگر کاربر به دنبال کسب‌وکارهایی با کلمه‌ای خاص در نامشان است (مثلاً «نامشان ایران دارد» → «ایران»).
 - keywords_en: ترجمه انگلیسی کلیدواژه‌های اصلی جستجو برای بهبود جستجوی معنایی.
 - search_text: درخواست کاربر را به یک جمله توصیفی فارسی روشن بازنویسی کنید — اختصارات را گسترش دهید، اصطلاحات عامیانه را به کلمات رسمی تبدیل کنید، نام‌های مکانی را نگه‌دارید. این متن برای بردار-جستجوی معنایی استفاده می‌شود.
-- city: همیشه به انگلیسی (London نه لندن، Manchester نه منچستر).${categoryEnum}`,
+- city: همیشه به انگلیسی. شهرها و محله‌های لندن را نیز ترجمه کنید — مثال: لندن→London، منچستر→Manchester، بارنت→Barnet، هرو→Harrow، ایلینگ→Ealing، وستمینستر→Westminster، انفیلد→Enfield، کرویدون→Croydon، برنت→Brent، هکنی→Hackney، ایزلینگتون→Islington، لوییشام→Lewisham، ساوت‌وارک→Southwark، لمبث→Lambeth، نیوهام→Newham، ردبریج→Redbridge، والتام فارست→Waltham Forest، هاورینگ→Havering، کینگستون→Kingston، ریچموند→Richmond، ساتن→Sutton، مرتون→Merton، کنزینگتون→Kensington، همرسمیت→Hammersmith، هیلینگدون→Hillingdon، هاونزلو→Hounslow، کیمبریج→Cambridge، برمینگام→Birmingham.${categoryEnum}`,
       },
       { role: "user", content: q },
     ]);
@@ -351,11 +406,19 @@ router.post("/", async (req, res) => {
   let queryVec = null;
 
   try {
+    // Always run a direct name search with the raw query — catches exact/partial name
+    // entries (e.g. "ایرانیو-1") even when the AI doesn't set name_contains and even
+    // when the business has no embedding stored.
+    const directNameHits = await retrieveByName(q, { city, isExchange, isJob, isPromo });
+
     if (nameContains) {
-      // Name-keyword query: direct name_fa text search
-      candidates = await retrieveByName(nameContains, { city, isExchange, isJob, isPromo });
+      // AI detected a name-keyword query — prioritise name matches
+      const nameHits = nameContains !== q
+        ? await retrieveByName(nameContains, { city, isExchange, isJob, isPromo })
+        : [];
+      candidates = mergeCandidates(directNameHits, nameHits);
     } else {
-      // Semantic query: embed → vector search → city fallback → category hybrid
+      // Semantic query: embed → RRF(vector + trigram) → city fallback → category hybrid
       try {
         queryVec = await openaiEmbed(embeddingInput);
       } catch (e) {
@@ -365,9 +428,10 @@ router.post("/", async (req, res) => {
           answer_fa: "سرویس هوش مصنوعی موقتاً در دسترس نیست. لطفاً دوباره امتحان کنید.",
         });
       }
-      candidates = await retrieveCandidates(queryVec, { city, isExchange, isJob, isPromo });
+      const trgmQuery = searchText || q;
+      candidates = await retrieveByRRF(queryVec, trgmQuery, { city, isExchange, isJob, isPromo });
       if (candidates.length < 3 && city) {
-        const broader = await retrieveCandidates(queryVec, { city: null, isExchange, isJob, isPromo });
+        const broader = await retrieveByRRF(queryVec, trgmQuery, { city: null, isExchange, isJob, isPromo });
         if (broader.length > candidates.length) {
           candidates = broader;
           cityFallback = true;
@@ -383,12 +447,14 @@ router.post("/", async (req, res) => {
         const kwRows = await retrieveByDescriptionKeyword(literalKeywords, { city, isExchange, isJob, isPromo });
         if (kwRows.length) candidates = mergeCandidates(kwRows, candidates);
       }
+      // Merge direct name hits at the front so exact name matches always surface
+      if (directNameHits.length) candidates = mergeCandidates(directNameHits, candidates);
     }
 
     // Final retry: if 0 candidates and city/category were restrictive filters,
-    // drop both and run a single pure semantic vector search.
+    // drop both and run RRF without geographic constraint.
     if (candidates.length === 0 && queryVec && (city || category)) {
-      const fallback = await retrieveCandidates(queryVec, { city: null, isExchange, isJob, isPromo });
+      const fallback = await retrieveByRRF(queryVec, searchText || q, { city: null, isExchange, isJob, isPromo });
       if (fallback.length > 0) {
         candidates = fallback;
         if (city) cityFallback = true;
@@ -425,19 +491,20 @@ router.post("/", async (req, res) => {
   const slim = candidates.map((c) => {
     let tags = [];
     try { tags = JSON.parse(c.ai_tags_json || "[]"); } catch {}
+    const about = [
+      c.listing_title,
+      c.subtitle,
+      bestExcerpt(c.description, excerptKeywords, 120),
+      c.careers_title && `استخدام: ${c.careers_title}`,
+      c.promo_title && `تخفیف: ${c.promo_title}`,
+    ].filter(Boolean).join(" — ").slice(0, 150);
     return {
       slug: c.slug,
       name: c.name_fa,
-      category: c.category || "",
-      city: c.city || "",
+      category: c.category || undefined,
+      city: c.city || undefined,
       tags: tags.length ? tags.join(", ") : undefined,
-      about: [
-        c.listing_title,
-        c.subtitle,
-        bestExcerpt(c.description, excerptKeywords, 400),
-        c.careers_title && `استخدام: ${c.careers_title}`,
-        c.promo_title && `تخفیف: ${c.promo_title}`,
-      ].filter(Boolean).join(" — ").slice(0, 500),
+      about: about || undefined,
     };
   });
 
@@ -453,12 +520,14 @@ router.post("/", async (req, res) => {
         role: "system",
         content: `شما یک دستیار راهنمای کسب‌وکار ایرانی در بریتانیا (ایرانیو) هستید. فقط از لیست ارائه‌شده انتخاب کنید — هیچ slug دیگری را اختراع نکنید. حداکثر ۸ کسب‌وکار. خروجی JSON:
 {"answer_fa": string, "businesses": [{"slug": string, "reason_fa": string}]}
-- همه گزینه‌های مرتبط را انتخاب کنید؛ محدودیت سختگیرانه‌ای نداشته باشید.
+- فقط کسب‌وکارهایی را انتخاب کنید که واقعاً با درخواست کاربر مرتبط هستند.
+- اگر کاربر دنبال نوع خاصی از کسب‌وکار است (مثلاً آژانس املاک)، وکلا و مشاوران غیرمرتبط را حذف کنید.
+- به فیلد «tags» توجه کنید — کسب‌وکاری که دقیقاً برچسب درخواست‌شده دارد اولویت بیشتری دارد.
 - اگر هیچ‌کدام واقعاً مناسب نبودند، businesses را خالی بگذارید و در answer_fa توضیح دهید.${cityFallbackNote}`,
       },
       {
         role: "user",
-        content: `جستجو: "${q}"\n\nکسب‌وکارهای کاندید:\n${JSON.stringify(slim, null, 2)}`,
+        content: `جستجو: "${q}"\n\nکسب‌وکارهای کاندید:\n${JSON.stringify(slim)}`,
       },
     ]);
   } catch (e) {

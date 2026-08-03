@@ -22,6 +22,17 @@ const CATEGORY_OPTIONS = [
   "دکتر","مشاور","آموزش","طراحی","بیمه","حمل و نقل","تعمیرات",
 ];
 
+function fmtDate(str) {
+  if (!str) return null;
+  try {
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return null;
+  }
+}
+
 function sortBusinessRows(list) {
   list.sort((a, b) => {
     const pa = a.listing_approval === "pending" ? 0 : 1;
@@ -536,6 +547,18 @@ export default function AdminBusinessesPage() {
                     <p className="panel-biz-item__meta" dir="ltr">
                       {[r.slug, r.category, r.city].filter(Boolean).join(" · ")}
                     </p>
+                    {fmtDate(r.created_at) && (
+                      <p className="panel-biz-item__meta" style={{ color: "#94a3b8", marginTop: "0.1rem" }}>
+                        افزوده: {fmtDate(r.created_at)}
+                      </p>
+                    )}
+                    {r.postcode_admin_ward && (
+                      <p className="panel-biz-item__meta" dir="ltr" style={{ color: "#0369a1", marginTop: "0.1rem" }}>
+                        📍 {r.postcode_admin_ward}
+                        {r.postcode_primary_care_trust ? ` · ${r.postcode_primary_care_trust}` : ""}
+                        {r.postcode_latitude ? ` (${Number(r.postcode_latitude).toFixed(4)}, ${Number(r.postcode_longitude).toFixed(4)})` : ""}
+                      </p>
+                    )}
                   </div>
                   <div className="panel-biz-item__badges">
                     {r.listing_approval === "pending" && (

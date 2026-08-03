@@ -4,6 +4,27 @@ import Seo from "../components/Seo.jsx";
 import ListingCard from "../components/ListingCard.jsx";
 import { apiPost } from "../api.js";
 
+const CACHE_KEY = "ai_search_cache";
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+function saveCache(q, answer, results, searchId) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ q, answer, results, searchId, ts: Date.now() }));
+  } catch {}
+}
+
+function loadCache(q) {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.q !== q || Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function sendSearchFeedback(searchId, payload) {
   if (!searchId) return;
   const body = JSON.stringify({ search_id: searchId, ...payload });
@@ -139,6 +160,37 @@ const STYLES = `
   }
   .ai-page__error { color: #f87171; }
 
+  /* ── Guide ── */
+  .ai-page__guide {
+    max-width: 720px; margin: 2.5rem auto 0;
+    padding: 0 1.5rem;
+    text-align: right;
+    direction: rtl;
+  }
+  .ai-page__guide-title {
+    color: rgba(200,160,255,0.7); font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.05em; margin: 0 0 0.85rem;
+  }
+  .ai-page__guide-chips {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .ai-page__guide-chip {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(160,80,255,0.22);
+    border-radius: 50px;
+    color: rgba(255,255,255,0.65);
+    font-family: inherit; font-size: 0.85rem;
+    padding: 0.35rem 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    text-align: right;
+  }
+  .ai-page__guide-chip:hover {
+    background: rgba(160,80,255,0.15);
+    border-color: rgba(160,80,255,0.5);
+    color: #fff;
+  }
+
   /* Back nav */
   .ai-page__nav {
     display: flex; gap: 1rem; justify-content: center;
@@ -214,16 +266,18 @@ export default function AiSearchPage() {
   const [searchParams] = useSearchParams();
 
   const initialQ = (searchParams.get("q") || "").trim();
+  const cached = initialQ ? loadCache(initialQ) : null;
+
   const [inputValue, setInputValue] = useState(initialQ);
   const [captchaToken, setCaptchaToken] = useState("");
   const [loading, setLoading] = useState(false);
-  const [answer, setAnswer] = useState(null);
-  const [results, setResults] = useState(null);
-  const [searchId, setSearchId] = useState(null);
+  const [answer, setAnswer] = useState(cached?.answer ?? null);
+  const [results, setResults] = useState(cached?.results ?? null);
+  const [searchId, setSearchId] = useState(cached?.searchId ?? null);
   const [error, setError] = useState(null);
 
   const widgetIdRef = useRef(null);
-  const pendingAutoSearch = useRef(!!initialQ);
+  const pendingAutoSearch = useRef(!!initialQ && !cached);
 
   // Load Turnstile script (idempotent)
   useEffect(() => {
@@ -278,9 +332,13 @@ export default function AiSearchPage() {
     setSearchId(null);
     try {
       const data = await apiPost("/api/ai-search", { query: q, turnstileToken: token });
-      setAnswer(typeof data.answer_fa === "string" ? data.answer_fa : "");
-      setResults(Array.isArray(data.businesses) ? data.businesses : []);
-      setSearchId(data.search_id ?? null);
+      const ans = typeof data.answer_fa === "string" ? data.answer_fa : "";
+      const res = Array.isArray(data.businesses) ? data.businesses : [];
+      const sid = data.search_id ?? null;
+      setAnswer(ans);
+      setResults(res);
+      setSearchId(sid);
+      saveCache(q, ans, res, sid);
     } catch (e) {
       const code = e.code || "";
       if (code === "captcha_failed") {
@@ -369,6 +427,36 @@ export default function AiSearchPage() {
           <Link to="/">صفحه اصلی</Link>
         </nav>
       </div>
+
+      {/* ── Guide (shown before first search) ── */}
+      {!hasResults && !loading && !error && (
+        <div className="ai-page__guide">
+          <p className="ai-page__guide-title">چند نمونه جستجو</p>
+          <div className="ai-page__guide-chips">
+            {[
+              "وکیل مهاجرت در لندن",
+              "صرافی با بهترین نرخ",
+              "رستوران ایرانی در بارنت",
+              "پزشک فارسی زبان در هرو",
+              "دنبال کار در لندن هستم",
+              "آرایشگاه در ایلینگ",
+              "خدمات حسابداری در وستمینستر",
+              "تخفیف ویژه این هفته",
+              "دندانپزشک در کرویدون",
+              "مدرسه رانندگی در انفیلد",
+            ].map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className="ai-page__guide-chip"
+                onClick={() => setInputValue(ex)}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Results ── */}
       <div className="ai-page__body">

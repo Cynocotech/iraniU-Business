@@ -1,8 +1,114 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardBusinessForm from "../../components/DashboardBusinessForm.jsx";
-import { apiGet, apiPost } from "../../api.js";
+import MediaEditor from "../../components/MediaEditor.jsx";
+import BiolinkEditor from "../../components/BiolinkEditor.jsx";
+import { apiGet, apiPost, apiPatchJson } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
+
+function GeoInfoPanel({ slug }) {
+  const [loading, setLoading] = useState(true);
+  const [fields, setFields] = useState({
+    postcode_latitude: "",
+    postcode_longitude: "",
+    postcode_admin_ward: "",
+    postcode_primary_care_trust: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    setMsg(null);
+    apiGet(`/api/businesses/${encodeURIComponent(slug)}`).then((b) => {
+      setFields({
+        postcode_latitude:           b?.postcode_latitude           ?? "",
+        postcode_longitude:          b?.postcode_longitude          ?? "",
+        postcode_admin_ward:         b?.postcode_admin_ward         ?? "",
+        postcode_primary_care_trust: b?.postcode_primary_care_trust ?? "",
+      });
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [slug]);
+
+  const set = (key) => (e) => {
+    setFields((f) => ({ ...f, [key]: e.target.value }));
+    setMsg(null);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      await apiPatchJson(`/api/admin/businesses/${encodeURIComponent(slug)}/geo`, {
+        postcode_latitude:           fields.postcode_latitude           === "" ? null : fields.postcode_latitude,
+        postcode_longitude:          fields.postcode_longitude          === "" ? null : fields.postcode_longitude,
+        postcode_admin_ward:         fields.postcode_admin_ward         || null,
+        postcode_primary_care_trust: fields.postcode_primary_care_trust || null,
+      });
+      setMsg({ ok: true, text: "ذخیره شد." });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message || "خطا در ذخیره‌سازی" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!slug) return null;
+
+  const lat = parseFloat(fields.postcode_latitude);
+  const lng = parseFloat(fields.postcode_longitude);
+  const mapsUrl = Number.isFinite(lat) && Number.isFinite(lng)
+    ? `https://maps.google.com/?q=${lat},${lng}`
+    : null;
+
+  return (
+    <section className="dashboard-panel" style={{ marginBottom: "var(--space-md)" }}>
+      <h2 className="field-hint" style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", fontWeight: 600 }}>
+        موقعیت جغرافیایی (سوپرادمین)
+      </h2>
+      {loading ? (
+        <p className="field-hint">در حال بارگذاری…</p>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(14rem, 1fr))", gap: "0.6rem 1.25rem" }}>
+            <div className="field field--block" style={{ margin: 0 }}>
+              <label htmlFor="geo-lat">عرض جغرافیایی (Latitude)</label>
+              <input id="geo-lat" type="number" step="any" dir="ltr" value={fields.postcode_latitude} onChange={set("postcode_latitude")} placeholder="e.g. 51.5074" />
+            </div>
+            <div className="field field--block" style={{ margin: 0 }}>
+              <label htmlFor="geo-lng">طول جغرافیایی (Longitude)</label>
+              <input id="geo-lng" type="number" step="any" dir="ltr" value={fields.postcode_longitude} onChange={set("postcode_longitude")} placeholder="e.g. -0.1278" />
+            </div>
+            <div className="field field--block" style={{ margin: 0 }}>
+              <label htmlFor="geo-ward">ناحیه اداری (Admin Ward)</label>
+              <input id="geo-ward" type="text" value={fields.postcode_admin_ward} onChange={set("postcode_admin_ward")} placeholder="e.g. West Hampstead" />
+            </div>
+            <div className="field field--block" style={{ margin: 0 }}>
+              <label htmlFor="geo-pct">ناحیه بهداشت (Primary Care Trust)</label>
+              <input id="geo-pct" type="text" value={fields.postcode_primary_care_trust} onChange={set("postcode_primary_care_trust")} placeholder="e.g. Camden" />
+            </div>
+          </div>
+          <div style={{ marginTop: "0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+            <button type="button" className="btn btn--primary" onClick={save} disabled={saving}>
+              {saving ? "در حال ذخیره…" : "ذخیره موقعیت"}
+            </button>
+            {mapsUrl && (
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="btn btn--ghost" style={{ fontSize: "0.85rem" }}>
+                📍 نمایش در Google Maps
+              </a>
+            )}
+            {msg && (
+              <span className="field-hint" style={{ color: msg.ok ? "var(--color-success,#2e7d32)" : "#b71c1c", margin: 0 }}>
+                {msg.text}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 function rowIsActive(r) {
   const s = r.status;
@@ -19,11 +125,16 @@ export default function AdminEditBusinessPage() {
   const [query, setQuery] = useState("");
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramMsg, setTelegramMsg] = useState(null);
-
+  const [biz, setBiz] = useState(null);
 
   useEffect(() => {
     apiGet("/api/businesses").then(setList).catch(() => setList([]));
   }, []);
+
+  useEffect(() => {
+    if (!slug) { setBiz(null); return; }
+    apiGet(`/api/businesses/${encodeURIComponent(slug)}`).then(setBiz).catch(() => setBiz(null));
+  }, [slug]);
 
 
   const onSlugChange = useCallback(
@@ -150,15 +261,21 @@ export default function AdminEditBusinessPage() {
         </div>
       </section>
 
+      {slug && <GeoInfoPanel slug={slug} />}
+
       {slug ? (
-        <DashboardBusinessForm
-          slug={slug}
-          onSlugChange={onSlugChange}
-          sectionTitle="ویرایش آگهی (سوپرادمین)"
-          hideSlugPicker
-          allowEditName
-          showTagsPanel
-        />
+        <>
+          <DashboardBusinessForm
+            slug={slug}
+            onSlugChange={onSlugChange}
+            sectionTitle="ویرایش آگهی (سوپرادمین)"
+            hideSlugPicker
+            allowEditName
+            showTagsPanel
+          />
+          <MediaEditor slug={slug} biz={biz} setBiz={setBiz} />
+          <BiolinkEditor slug={slug} biz={biz} setBiz={setBiz} />
+        </>
       ) : (
         <p className="field-hint">برای نمایش فرم ویرایش، ابتدا یک آگهی را از بالا انتخاب کنید.</p>
       )}

@@ -1,9 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDashboard } from "../../context/DashboardContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import DashboardPanelHead, { dashboardIcons } from "../../components/DashboardPanelHead.jsx";
 import DashboardMain from "../../components/DashboardMain.jsx";
 import { isExchangeBusiness, parseExchangeRatesJson, parseLocalizedNumber } from "../../lib/exchangeRates.js";
+import { apiGet } from "../../api.js";
 
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
@@ -30,14 +31,27 @@ function formatToman(raw) {
   return `${n.toLocaleString("fa-IR", { maximumFractionDigits: 2 })} تومان`;
 }
 
+function daysLeft(ends_at) {
+  if (!ends_at) return 0;
+  return Math.max(0, Math.ceil((new Date(ends_at) - Date.now()) / 86_400_000));
+}
+
+const PLAN_LABELS = { bronze: "برنز", silver: "نقره‌ای", gold: "طلایی", platinum: "پلاتینیوم" };
+
 export default function DashboardOverviewPage() {
-  const { dashSlug, biz, heroQr, phoneClickCount } = useDashboard();
+  const { dashSlug, biz, heroQr, phoneClickCount, impersonation } = useDashboard();
   const { me } = useAuth();
   const show2faPrompt = !me?.totp_enabled;
   const isExchange = isExchangeBusiness(biz);
   const exchangeRows = parseExchangeRatesJson(biz?.exchange_rates_json);
   const featuredRate = exchangeRows.find((r) => r.code === "GBP") || exchangeRows.find((r) => r.code === "USD") || exchangeRows[0] || null;
   const statusText = biz?.status && biz.status !== "active" ? "غیرفعال" : "فعال";
+
+  const [wallet, setWallet] = useState(null);
+  useEffect(() => {
+    const url = impersonation ? `/api/wallet?slug=${encodeURIComponent(dashSlug)}` : "/api/wallet";
+    apiGet(url).then(setWallet).catch(() => {});
+  }, [impersonation?.managerId, dashSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <DashboardMain>
@@ -116,101 +130,183 @@ export default function DashboardOverviewPage() {
       ) : null}
 
       {!isExchange ? (
-      <>
-      <div className="app-shell__widgets">
-        <div className="app-shell__hero-card">
-          <svg className="app-shell__hero-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M22 11.08V12a10 10 0 1 1-5.93-9.14"
-            />
-            <polyline
-              points="22 4 12 14.01 9 11.01"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <p className="app-shell__hero-label">وضعیت آگهی</p>
-          <p className="app-shell__hero-value">منتشر شده</p>
-          <p className="app-shell__hero-meta">
-            در فهرست عمومی دیده می‌شود
-          </p>
-          <Link className="app-shell__hero-btn" to="/dashboard/edit">
-            مدیریت آگهی
-          </Link>
-        </div>
-        <div className="app-shell__metrics">
-          <div className="app-shell__metric app-shell__metric--teal">
-            <svg className="app-shell__metric-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path stroke="#fff" strokeWidth="2" d="M4 4h5v5H4V4zm11 0h5v5h-5V4zM4 15h5v5H4v-5zm11 0h5v5h-5v-5z" />
-              <path stroke="#fff" strokeWidth="2" d="M9 9h6v6H9z" />
-            </svg>
-            <p className="app-shell__metric-label">اسکن QR نظر Google</p>
-            <p className="app-shell__metric-value" id="dash-metric-qr-scans" dir="ltr">
-              {heroQr}
-            </p>
-            <p className="app-shell__metric-hint">جزئیات در بخش «QR نظر Google»</p>
+        <>
+          <div className="panel-welcome">
+            <div>
+              <p className="panel-welcome__title">
+                {biz?.name_fa ? `خوش آمدید — ${biz.name_fa}` : "پنل کسب‌وکار شما"}
+              </p>
+              <p className="panel-welcome__sub">مدیریت آگهی، تبلیغات، لینک‌ها و ابزارها</p>
+            </div>
+            <div className="panel-welcome__actions">
+              <Link to="/dashboard/edit" className="panel-welcome__btn panel-welcome__btn--white">
+                <i className="fa-solid fa-pen" /> ویرایش آگهی
+              </Link>
+              <Link to={`/business?slug=${encodeURIComponent(dashSlug)}`} className="panel-welcome__btn panel-welcome__btn--outline">
+                <i className="fa-solid fa-eye" /> پیش‌نمایش
+              </Link>
+            </div>
           </div>
-          <div className="app-shell__metric app-shell__metric--blue">
-            <svg className="app-shell__metric-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-              />
-            </svg>
-            <p className="app-shell__metric-label">تماس</p>
-            <p className="app-shell__metric-value" id="dash-metric-phone-clicks" dir="ltr">
-              {phoneClickCount === null ? "—" : toFaDigits(String(phoneClickCount))}
-            </p>
-            <p className="app-shell__metric-hint">کلیک روی شماره در صفحهٔ عمومی</p>
-          </div>
-          <div className="app-shell__metric app-shell__metric--coral">
-            <svg className="app-shell__metric-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-              />
-            </svg>
-            <p className="app-shell__metric-label">امتیاز آگهی</p>
-            <p className="app-shell__metric-value" dir="ltr">
-              {formatRatingDisplay(biz?.rating)}
-            </p>
-            <p className="app-shell__metric-hint">از ویرایش آگهی</p>
-          </div>
-        </div>
-      </div>
 
-      <section className="dashboard-panel" id="panel-overview" aria-labelledby="overview-heading">
-        <DashboardPanelHead headingId="overview-heading" title="نمای کلی" icon={dashboardIcons.overview} />
-        <p className="field-hint" style={{ margin: 0 }}>
-          {biz?.name_fa ? (
-            <>
-              آگهی فعال: <strong>{biz.name_fa}</strong>
-              {" — "}
-              نامک: <strong lang="en">{dashSlug}</strong>
-              {" — "}
-            </>
-          ) : (
-            <>
-              نامک فعال: <strong lang="en">{dashSlug}</strong>
-              {" — "}
-            </>
-          )}
-          از منوی کنار به هر بخش بروید؛ مثلاً <Link to="/dashboard/edit">ویرایش آگهی</Link> یا{" "}
-          <Link to="/dashboard/careers">فرصت‌های شغلی</Link>.
-        </p>
-      </section>
-      </>
+          <div className="panel-stats">
+            <div className="panel-stat panel-stat--blue">
+              <div className="panel-stat__icon"><i className="fa-solid fa-qrcode" /></div>
+              <div>
+                <p className="panel-stat__value">{heroQr}</p>
+                <p className="panel-stat__label">اسکن QR</p>
+              </div>
+            </div>
+            <div className="panel-stat panel-stat--green">
+              <div className="panel-stat__icon"><i className="fa-solid fa-phone" /></div>
+              <div>
+                <p className="panel-stat__value">{phoneClickCount === null ? "—" : toFaDigits(String(phoneClickCount))}</p>
+                <p className="panel-stat__label">کلیک تماس</p>
+              </div>
+            </div>
+            <div className="panel-stat panel-stat--orange">
+              <div className="panel-stat__icon"><i className="fa-solid fa-star" /></div>
+              <div>
+                <p className="panel-stat__value">{formatRatingDisplay(biz?.rating)}</p>
+                <p className="panel-stat__label">امتیاز</p>
+              </div>
+            </div>
+            <div className="panel-stat panel-stat--purple">
+              <div className="panel-stat__icon"><i className="fa-solid fa-circle-check" /></div>
+              <div>
+                <p className="panel-stat__value">{statusText}</p>
+                <p className="panel-stat__label">وضعیت آگهی</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="panel-cols" style={{ marginTop: "0.25rem" }}>
+            <div className="panel-card">
+              <div className="panel-card__head">
+                <h3 className="panel-card__title">
+                  <i className="fa-solid fa-bolt" style={{ marginInlineEnd: "0.5rem", color: "#818cf8" }} />
+                  اقدام سریع
+                </h3>
+              </div>
+              <div className="panel-card__body">
+                <div className="panel-quick-grid">
+                  <Link to="/dashboard/edit" className="panel-quick-btn">
+                    <i className="fa-solid fa-pen" />ویرایش آگهی
+                  </Link>
+                  <Link to="/dashboard/media" className="panel-quick-btn">
+                    <i className="fa-solid fa-images" />تصاویر
+                  </Link>
+                  <Link to="/dashboard/wallet" className="panel-quick-btn">
+                    <i className="fa-solid fa-coins" />کیف توکن
+                  </Link>
+                  <Link to="/dashboard/qr" className="panel-quick-btn">
+                    <i className="fa-solid fa-qrcode" />کد QR
+                  </Link>
+                  <Link to="/dashboard/biolink" className="panel-quick-btn">
+                    <i className="fa-solid fa-link" />Biolink
+                  </Link>
+                  <Link to={`/business?slug=${encodeURIComponent(dashSlug)}`} target="_blank" className="panel-quick-btn">
+                    <i className="fa-solid fa-arrow-up-right-from-square" />مشاهده آگهی
+                  </Link>
+                  <Link to="/guide" className="panel-quick-btn">
+                    <i className="fa-solid fa-book-open" />راهنما
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel-card">
+              <div className="panel-card__head">
+                <h3 className="panel-card__title">
+                  <i className="fa-solid fa-coins" style={{ marginInlineEnd: "0.5rem", color: "#f59e0b" }} />
+                  کیف توکن
+                </h3>
+                <Link to="/dashboard/wallet" className="pact-btn pact-btn--ghost" style={{ fontSize: "0.78rem" }}>مشاهده کامل</Link>
+              </div>
+              <div className="panel-card__body" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+                {/* Balance row */}
+                <div style={{ display: "flex", gap: "1rem" }}>
+                  {/* Big balance */}
+                  <div style={{
+                    flex: 1, background: "linear-gradient(135deg,#1e1b4b,#4f46e5)",
+                    borderRadius: 14, padding: "1rem 1.25rem", color: "#fff",
+                    display: "flex", alignItems: "center", gap: "0.75rem",
+                  }}>
+                    <i className="fa-solid fa-coins" style={{ fontSize: "1.5rem", color: "#fcd34d" }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: "2rem", fontWeight: 900, lineHeight: 1 }}>
+                        {toFaDigits(String(wallet?.wallet?.balance ?? "—"))}
+                      </p>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.7)" }}>موجودی توکن</p>
+                    </div>
+                  </div>
+                  {/* Earned / Spent */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", justifyContent: "center" }}>
+                    <div style={{ background: "#dcfce7", borderRadius: 10, padding: "0.45rem 0.85rem", textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#166534" }}>+{toFaDigits(String(wallet?.wallet?.total_earned ?? 0))}</p>
+                      <p style={{ margin: 0, fontSize: "0.68rem", color: "#16a34a" }}>دریافتی</p>
+                    </div>
+                    <div style={{ background: "#fee2e2", borderRadius: 10, padding: "0.45rem 0.85rem", textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#991b1b" }}>-{toFaDigits(String(wallet?.wallet?.total_spent ?? 0))}</p>
+                      <p style={{ margin: 0, fontSize: "0.68rem", color: "#dc2626" }}>مصرف</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active boost */}
+                {wallet?.activeBoost ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "0.65rem",
+                    background: "#eef2ff", borderRadius: 12, padding: "0.65rem 0.85rem",
+                    border: "1.5px solid #c7d2fe",
+                  }}>
+                    <i className="fa-solid fa-rocket" style={{ color: "#6366f1", fontSize: "1.1rem" }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 700, color: "#3730a3" }}>
+                        تبلیغ فعال — پلن {PLAN_LABELS[wallet.activeBoost.plan_id] || wallet.activeBoost.plan_id}
+                      </p>
+                      <p style={{ margin: 0, fontSize: "0.72rem", color: "#6366f1" }}>
+                        {toFaDigits(String(daysLeft(wallet.activeBoost.ends_at)))} روز باقی‌مانده
+                      </p>
+                    </div>
+                    <span className="pbadge pbadge--blue">فعال</span>
+                  </div>
+                ) : null}
+
+                {/* Milestone progress */}
+                {wallet?.milestones ? (() => {
+                  const earned = wallet.milestones.filter(m => m.earned).length;
+                  const total  = wallet.milestones.length;
+                  const pct    = Math.round((earned / total) * 100);
+                  return (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569" }}>
+                          پیشرفت کسب توکن
+                        </span>
+                        <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                          {toFaDigits(String(earned))}/{toFaDigits(String(total))}
+                        </span>
+                      </div>
+                      <div style={{ height: 8, background: "#f1f5f9", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 99,
+                          background: "linear-gradient(90deg,#6366f1,#a78bfa)",
+                          width: `${pct}%`, transition: "width 0.6s ease",
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })() : null}
+
+                <Link to="/dashboard/wallet" className="pbtn pbtn--primary" style={{ justifyContent: "center" }}>
+                  <i className="fa-solid fa-rocket" /> پلن‌های تبلیغاتی
+                </Link>
+              </div>
+            </div>
+          </div>
+        </>
       ) : null}
     </DashboardMain>
   );

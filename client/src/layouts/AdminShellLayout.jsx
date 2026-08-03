@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Outlet, Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import Seo from "../components/Seo.jsx";
 import { AdminPanelSearchProvider, useAdminPanelSearch } from "../context/AdminPanelSearchContext.jsx";
@@ -6,38 +6,77 @@ import { useAuth } from "../context/AuthContext.jsx";
 import AdminIdleSessionGuard from "../components/AdminIdleSessionGuard.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 import { adminShellNavIcons } from "../components/AdminShellNavIcons.jsx";
+import "../panel-redesign.css";
 
 /** OpenAPI / Swagger — default matches production panel docs */
 const API_DOCS_URL = (import.meta.env.VITE_API_DOCS_URL || "").trim() || "https://panel.iraniu.uk/docs/api/";
 
-/** دایرکتوری عمومی — جدا از بخش صرافی در منو */
-const adminNavDirectory = [
-  { to: "/admin", label: "داشبورد", end: true, icon: "dashboard" },
-  { to: "/admin-notes", label: "یادداشت و کارها", icon: "notes" },
-  { to: "/admin-businesses", label: "همه آگهی‌ها", icon: "businesses" },
-  { to: "/admin-edit", label: "ویرایش آگهی", icon: "edit" },
-  { to: "/admin-add", label: "افزودن آگهی", icon: "add" },
-  { to: "/admin-import", label: "ورود دسته‌ای CSV", icon: "importCsv" },
-  { to: "/admin-categories", label: "دسته‌بندی‌ها", icon: "categories" },
-  { to: "/admin-qr-export", label: "خروجی QR", icon: "qrExport" },
-  { to: "/admin-claims", label: "درخواست‌های ادعا", icon: "claims" },
-  { to: "/admin-business-reports", label: "گزارش‌های آگهی", icon: "report" },
-  { to: "/admin-link", label: "لینک آگهی ↔ مدیر", icon: "link" },
-  { to: "/admin-billing", label: "صورت‌حساب", icon: "billing" },
-  { to: "/admin-managers", label: "حساب‌های مدیر", icon: "managers" },
-  { to: "/admin-chat-log", label: "گفتگو و لاگ سایت", icon: "chatLog" },
-  { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
-  { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
-];
-
-const adminNavExchange = [
-  { to: "/admin/exchanges", label: "دپارتمان صرافی", icon: "exchanges" },
-  { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
-];
-
 const adminNavSections = [
-  { id: "directory", title: "دایرکتوری", items: adminNavDirectory },
-  { id: "exchange", title: "خدمات ارزی", items: adminNavExchange },
+  {
+    id: "overview",
+    title: "عمومی",
+    items: [
+      { to: "/admin", label: "داشبورد", end: true, icon: "dashboard" },
+      { to: "/admin-notes", label: "یادداشت و کارها", icon: "notes" },
+      { to: "/admin-blog", label: "مدیریت وبلاگ", icon: "notes" },
+      { to: "/admin-blog/new", label: "نوشته جدید", icon: "add" },
+    ],
+  },
+  {
+    id: "listings",
+    title: "مدیریت آگهی‌ها",
+    items: [
+      { to: "/admin-businesses", label: "همه آگهی‌ها", icon: "businesses" },
+      { to: "/admin-add", label: "افزودن آگهی", icon: "add" },
+      { to: "/admin-edit", label: "ویرایش آگهی", icon: "edit" },
+      { to: "/admin-import", label: "ورود CSV", icon: "importCsv" },
+      { to: "/admin-categories", label: "دسته‌بندی‌ها", icon: "categories" },
+      { to: "/admin-home-sections", label: "بخش‌های صفحه اصلی", icon: "notes" },
+      { to: "/admin-qr-export", label: "خروجی QR", icon: "qrExport" },
+    ],
+  },
+  {
+    id: "users",
+    title: "کاربران و درخواست‌ها",
+    items: [
+      { to: "/admin-managers", label: "حساب‌های مدیر", icon: "managers" },
+      { to: "/admin-link", label: "لینک آگهی ↔ مدیر", icon: "link" },
+      { to: "/admin-claims", label: "درخواست‌های ادعا", icon: "claims" },
+      { to: "/admin-business-reports", label: "گزارش‌های آگهی", icon: "report" },
+    ],
+  },
+  {
+    id: "blog",
+    title: "وبلاگ",
+    items: [
+      { to: "/admin-blog", label: "مدیریت مطالب", icon: "notes" },
+      { to: "/admin-blog/new", label: "نوشته جدید", icon: "add" },
+    ],
+  },
+  {
+    id: "tokens",
+    title: "توکن و تبلیغات",
+    items: [
+      { to: "/admin-tokens", label: "توکن‌ها و بوست", icon: "billing" },
+      { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
+    ],
+  },
+  {
+    id: "tools",
+    title: "ابزارها",
+    items: [
+      { to: "/admin-chat-log", label: "گفتگو و لاگ", icon: "chatLog" },
+      { to: "/admin-settings", label: "تنظیمات", icon: "settings" },
+    ],
+  },
+  {
+    id: "exchange",
+    title: "خدمات ارزی",
+    items: [
+      { to: "/admin/exchanges", label: "دپارتمان صرافی", icon: "exchanges" },
+      { to: "/admin/exchanges/banners", label: "بنرهای تبلیغاتی", icon: "ads" },
+    ],
+  },
 ];
 
 function AdminShellSearchInput() {
@@ -73,6 +112,8 @@ function AdminShellSearchInput() {
 export default function AdminShellLayout() {
   const { logout, me } = useAuth();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState({});
+  const toggleSection = (id) => setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
   const location = useLocation();
   const onExchangeHub =
     location.pathname === "/admin/exchanges" || location.pathname.startsWith("/admin/exchanges/");
@@ -123,23 +164,36 @@ export default function AdminShellLayout() {
           </Link>
           <p className="app-shell__nav-title">سوپرادمین</p>
           <ul className="app-shell__nav">
-            {adminNavSections.map((section) => (
-              <Fragment key={section.id}>
-                <li className="app-shell__nav-heading" aria-hidden="true">
-                  <span className="app-shell__nav-heading-text">{section.title}</span>
-                </li>
-                {section.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink to={item.to} end={item.end === true}>
-                      <span className="app-shell__nav-icon" aria-hidden="true">
-                        {adminShellNavIcons[item.icon]}
+            {adminNavSections.map((section) => {
+              const isCollapsed = !!collapsed[section.id];
+              return (
+                <Fragment key={section.id}>
+                  <li className="app-shell__nav-heading">
+                    <button
+                      type="button"
+                      className="app-shell__nav-heading-btn"
+                      onClick={() => toggleSection(section.id)}
+                      aria-expanded={!isCollapsed}
+                    >
+                      <span className="app-shell__nav-heading-text">{section.title}</span>
+                      <span className="app-shell__nav-heading-toggle" aria-hidden="true">
+                        {isCollapsed ? "+" : "−"}
                       </span>
-                      <span>{item.label}</span>
-                    </NavLink>
+                    </button>
                   </li>
-                ))}
-              </Fragment>
-            ))}
+                  {!isCollapsed && section.items.map((item) => (
+                    <li key={item.to}>
+                      <NavLink to={item.to} end={item.end === true}>
+                        <span className="app-shell__nav-icon" aria-hidden="true">
+                          {adminShellNavIcons[item.icon]}
+                        </span>
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </Fragment>
+              );
+            })}
           </ul>
           <div className="app-shell__sidebar-foot app-shell__sidebar-foot--stack">
             <Link to="/">

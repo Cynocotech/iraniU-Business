@@ -47,6 +47,7 @@ import AdminLinkPage from "./pages/admin/AdminLinkPage.jsx";
 import AdminManagersPage from "./pages/admin/AdminManagersPage.jsx";
 import AdminChatLogPage from "./pages/admin/AdminChatLogPage.jsx";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage.jsx";
+import AdminHomeSectionsPage from "./pages/admin/AdminHomeSectionsPage.jsx";
 import AdminNotesTasksPage from "./pages/admin/AdminNotesTasksPage.jsx";
 import AdminTokensPage from "./pages/admin/AdminTokensPage.jsx";
 import DashboardWalletPage from "./pages/dashboard/DashboardWalletPage.jsx";
@@ -64,8 +65,13 @@ import AdminBlogPage from "./pages/admin/AdminBlogPage.jsx";
 import AdminBlogEditPage from "./pages/admin/AdminBlogEditPage.jsx";
 import TflPage from "./pages/TflPage.jsx";
 import AiSearchPage from "./pages/AiSearchPage.jsx";
+import GuidePage from "./pages/GuidePage.jsx";
 import { RequireManager, RequireSuperAdmin } from "./components/RequireAuth.jsx";
 import DesktopGate from "./components/DesktopGate.jsx";
+import { PublicAuthProvider } from "./context/PublicAuthContext.jsx";
+import PublicAccountPage from "./pages/PublicAccountPage.jsx";
+import CreateAdPage from "./pages/CreateAdPage.jsx";
+import MyAdsPage from "./pages/MyAdsPage.jsx";
 
 export default function App() {
   const [showPreloader, setShowPreloader] = useState(true);
@@ -93,7 +99,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <PublicAuthProvider>
       <DesktopGate />
       <Routes>
       <Route path="/" element={<HomePageDemo />} />
@@ -112,6 +118,7 @@ export default function App() {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/tfl" element={<TflPage />} />
         <Route path="/ai-search" element={<AiSearchPage />} />
+        <Route path="/guide" element={<GuidePage />} />
         <Route path="/onboarding" element={<BusinessOnboardingPage />} />
       </Route>
       <Route element={<MainLayout />}>
@@ -187,13 +194,19 @@ export default function App() {
         <Route path="/admin-blog" element={<AdminBlogPage />} />
         <Route path="/admin-blog/:id" element={<AdminBlogEditPage />} />
         <Route path="/admin-settings" element={<AdminSettingsPage />} />
+        <Route path="/admin-home-sections" element={<AdminHomeSectionsPage />} />
         <Route path="/admin-system-logs" element={<Navigate to="/admin-settings#logs" replace />} />
         <Route path="/admin-security" element={<Navigate to="/admin-settings#security" replace />} />
         <Route path="/admin-super-admins" element={<Navigate to="/admin-settings#super-admins" replace />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
+
+      {/* حساب کاربری عمومی و آگهی‌ها */}
+      <Route path="/account" element={<PublicAccountPage />} />
+      <Route path="/create-ad" element={<CreateAdPage />} />
+      <Route path="/my-ads" element={<MyAdsPage />} />
     </Routes>
-    </>
+    </PublicAuthProvider>
   );
 }

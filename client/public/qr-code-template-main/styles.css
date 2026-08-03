@@ -23,6 +23,15 @@ body {
   border-radius: 10px;
   box-shadow: 0 0 8px hsl(219, 40%, 82%);
 }
+.logo-top {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+.iraniu-logo {
+  max-width: 120px;
+  height: auto;
+}
 .qrImage {
   width: 90%;
   margin: auto;

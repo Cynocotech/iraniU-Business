@@ -234,21 +234,17 @@
                   <div class="field">
                     <label for="link-business">آگهی</label>
                     <select id="link-business" name="business_id">
-                      <option value="safereh">رستوران نمونه (بدون مالک)</option>
-                      <option value="barakat">سوپرمارکت برکت (بدون مالک)</option>
-                      <option value="pars">کلینیک پارس (قبلاً لینک شده — نمونه)</option>
+                      <option value="">در حال بارگذاری…</option>
                     </select>
                   </div>
                   <div class="field">
                     <label for="link-manager">حساب مدیر</label>
                     <select id="link-manager" name="manager_user_id">
-                      <option value="ali">ali.manager@example.com</option>
-                      <option value="sara">sara.k@example.com</option>
-                      <option value="m">m.jafari@example.com</option>
+                      <option value="">در حال بارگذاری…</option>
                     </select>
                   </div>
                 </div>
-                <button type="submit" class="btn btn--primary">ذخیره لینک (نمونه)</button>
+                <button type="submit" class="btn btn--primary">ذخیره لینک</button>
               </form>
             </section>
           </div>
@@ -309,5 +305,139 @@
 
     <script src="js/app-shell.js" defer></script>
     <script src="js/admin-detail-modal.js" defer></script>
+    <script>
+    (function () {
+      "use strict";
+
+      function getToken() {
+        try { return sessionStorage.getItem("iraniu_jwt") || ""; } catch (_) { return ""; }
+      }
+
+      function authHeaders() {
+        var t = getToken();
+        return t ? { Authorization: "Bearer " + t } : {};
+      }
+
+      function showToast(msg, isError) {
+        var existing = document.getElementById("link-toast");
+        if (existing) existing.remove();
+        var el = document.createElement("p");
+        el.id = "link-toast";
+        el.setAttribute("role", "status");
+        el.setAttribute("aria-live", "polite");
+        el.style.cssText =
+          "margin-top:1rem;padding:.75rem 1rem;border-radius:.5rem;font-size:.875rem;" +
+          (isError
+            ? "background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;"
+            : "background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;");
+        el.textContent = msg;
+        var form = document.querySelector("#admin-link form");
+        if (form) form.after(el);
+        setTimeout(function () { el.remove(); }, 5000);
+      }
+
+      function populateSelect(selectEl, items, valKey, labelFn, emptyLabel) {
+        selectEl.innerHTML = "";
+        var empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = emptyLabel;
+        selectEl.appendChild(empty);
+        items.forEach(function (item) {
+          var opt = document.createElement("option");
+          opt.value = item[valKey];
+          opt.textContent = labelFn(item);
+          selectEl.appendChild(opt);
+        });
+      }
+
+      function loadData() {
+        var bizSelect = document.getElementById("link-business");
+        var mgrSelect = document.getElementById("link-manager");
+        if (!bizSelect || !mgrSelect) return;
+
+        var headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
+
+        Promise.all([
+          fetch("/api/businesses", { headers: headers }).then(function (r) { return r.json(); }),
+          fetch("/api/managers", { headers: headers }).then(function (r) { return r.json(); }),
+        ])
+          .then(function (results) {
+            var businesses = Array.isArray(results[0]) ? results[0] : [];
+            var managers = Array.isArray(results[1]) ? results[1] : (Array.isArray(results[1]?.managers) ? results[1].managers : []);
+
+            populateSelect(
+              bizSelect,
+              businesses,
+              "slug",
+              function (b) {
+                var label = b.name_fa || b.listing_title || b.slug || "—";
+                if (b.manager_id) label += " (لینک شده)";
+                return label;
+              },
+              "— انتخاب آگهی —"
+            );
+
+            populateSelect(
+              mgrSelect,
+              managers,
+              "id",
+              function (m) {
+                return (m.email || m.login_username || String(m.id));
+              },
+              "— انتخاب مدیر —"
+            );
+          })
+          .catch(function (err) {
+            showToast("خطا در بارگذاری داده‌ها: " + (err.message || err), true);
+          });
+      }
+
+      function handleFormSubmit(e) {
+        e.preventDefault();
+        var bizSelect = document.getElementById("link-business");
+        var mgrSelect = document.getElementById("link-manager");
+        if (!bizSelect || !mgrSelect) return;
+
+        var slug = String(bizSelect.value || "").trim();
+        var managerId = String(mgrSelect.value || "").trim();
+
+        if (!slug) {
+          showToast("لطفاً یک آگهی انتخاب کنید.", true);
+          return;
+        }
+
+        var submitBtn = e.target.querySelector('[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "در حال ذخیره…"; }
+
+        var headers = Object.assign({ "Content-Type": "application/json" }, authHeaders());
+
+        fetch("/api/admin/businesses/" + encodeURIComponent(slug) + "/manager", {
+          method: "PATCH",
+          headers: headers,
+          body: JSON.stringify(managerId ? { manager_id: Number(managerId) } : { manager_id: null }),
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error(res.data.hint || res.data.error || "خطای سرور");
+            }
+            showToast("لینک با موفقیت ذخیره شد.", false);
+            loadData();
+          })
+          .catch(function (err) {
+            showToast("خطا: " + (err.message || err), true);
+          })
+          .finally(function () {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "ذخیره لینک"; }
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        loadData();
+        var form = document.querySelector("#admin-link form");
+        if (form) form.addEventListener("submit", handleFormSubmit);
+      });
+    })();
+    </script>
   </body>
 </html>

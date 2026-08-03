@@ -132,29 +132,6 @@ export default function BiolinkPublicView({ slug, businessName = "", coverFallba
           })}
         </ul>
 
-        {socialOrdered.length > 0 ? (
-          <nav className="biolink-public__socials" aria-label="شبکه‌های اجتماعی و تماس">
-            <p className="biolink-public__socials-label">در ارتباط باشید</p>
-            <div className="biolink-public__socials-inner">
-              {socialOrdered.map((s) => {
-                const href = resolveBiolinkHref(s);
-                const ic = (s.iconClass || "").trim() || iconForPreset(s.preset);
-                const local = /^tel:|^mailto:/i.test(href);
-                return (
-                  <a
-                    key={s.id || href + ic}
-                    className="biolink-public__social"
-                    href={href}
-                    {...(local ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-                    aria-label={labelForPreset(s.preset)}
-                  >
-                    <i className={ic} aria-hidden="true" />
-                  </a>
-                );
-              })}
-            </div>
-          </nav>
-        ) : null}
 
         <footer className="biolink-public__footer">
           {slug ? (

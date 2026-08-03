@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#3a0b47" />
+    <title>ایرانیو — فهرست کسب‌وکارهای ایرانی در بریتانیا</title>
+    <link rel="stylesheet" crossorigin href="/assets/index-Cv1iiHoW.css">
+  </head>
+  <body class="page-home">
+    <script src="js/require-mobile.js"></script>
+    <a class="skip-link" href="#main">پرش به محتوا</a>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="logo" href="index.html" title="ایرانیو — صفحهٔ اصلی">
+          <img
+            class="logo__img"
+            src="images/iraniu-logo-header.png"
+            alt=""
+            width="200"
+            height="52"
+            decoding="async"
+          />
+          <span class="visually-hidden">ایرانیو — صفحهٔ اصلی</span>
+        </a>
+        <input type="checkbox" id="site-nav-toggle" class="site-nav-cb" />
+        <label for="site-nav-toggle" class="nav-toggle" aria-label="باز و بسته کردن منو">
+          <span></span>
+          <span></span>
+          <span></span>
+        </label>
+        <nav class="nav" id="site-nav" aria-label="اصلی">
+          <ul class="nav__links">
+            <li><a href="index.html">خانه</a></li>
+            <li><a href="listings.html">لیست کسب‌وکارها</a></li>
+            <li><a href="advertise.html">تبلیغات و بسته‌ها</a></li>
+            <li><a href="dashboard.html">پنل کسب‌وکار</a></li>
+          </ul>
+          <div class="nav__cta">
+            <a class="btn btn--ghost" href="advertise.html">ثبت کسب‌وکار</a>
+            <a class="btn btn--primary" href="listings.html">جستجو</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero hero--home" aria-labelledby="hero-title">
+        <div class="hero__bg" aria-hidden="true"></div>
+        <div class="hero__inner">
+          <header class="hero__intro">
+            <p class="hero__eyebrow">فهرست کسب‌وکارهای ایرانی در بریتانیا</p>
+            <h1 id="hero-title" class="hero__display">کسب‌وکار ایرانی را پیدا کنید</h1>
+            <p class="hero__tagline">
+              نام، شهر یا دسته را انتخاب کنید؛ نتیجه در لیست دیده می‌شود.
+            </p>
+          </header>
+          <form
+            id="hero-search-form"
+            class="hero__form hero__panel"
+            action="listings.html"
+            method="get"
+            role="search"
+            aria-label="جستجو و فیلتر کسب‌وکار"
+          >
+            <input type="hidden" name="adv" value="" id="hero-adv-flag" />
+            <div class="search-bar hero__search search-bar--home">
+              <input
+                type="search"
+                name="q"
+                id="hero-search-q"
+                placeholder="نام کسب‌وکار، رستوران، وکیل، آرایشگاه…"
+                autocomplete="off"
+              />
+              <label for="hero-search-city" class="visually-hidden">شهر</label>
+              <select id="hero-search-city" name="city" aria-label="شهر">
+                <option value="">همه شهرها</option>
+                <option value="london">لندن</option>
+                <option value="manchester">منچستر</option>
+                <option value="birmingham">برمنگام</option>
+                <option value="glasgow">گلاسگو</option>
+              </select>
+              <label for="hero-search-cat" class="visually-hidden">دسته</label>
+              <select id="hero-search-cat" name="cat" aria-label="دسته">
+                <option value="">همه دسته‌ها</option>
+                <option value="food">غذا و رستوران</option>
+                <option value="market">سوپرمارکت و مواد غذایی</option>
+                <option value="health">سلامت و پزشکی</option>
+                <option value="legal">حقوقی و مهاجرت</option>
+                <option value="beauty">زیبایی و آرایشگاه</option>
+                <option value="auto">خودرو و سرویس</option>
+              </select>
+              <button type="submit" class="btn btn--accent">جستجو</button>
+            </div>
+            <div class="hero__filters-extra hero__filters-extra--home">
+              <label class="hero__filter-check">
+                <input type="checkbox" name="featured" id="hero-featured" value="1" />
+                <span>فقط آگهی‌های ویژه (تبلیغاتی)</span>
+              </label>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <div class="container home-ad-wrap">
+        <div class="ad-slot ad-slot--leaderboard ad-slot--home" role="complementary" aria-label="جای تبلیغ">
+          بنر تبلیغاتی — Leaderboard (۷۲۸×۹۰)
+        </div>
+      </div>
+
+      <section class="section section--home container" aria-labelledby="cat-title">
+        <header class="section__head section__head--home">
+          <h2 id="cat-title" class="section__title section__title--home">دسته‌بندی‌های پرطرفدار</h2>
+          <p class="section__lead section__lead--home">
+            سریع به حوزه مورد نظر برسید؛ برای صاحبان کسب‌وکار، نمایش در دسته ویژه در بسته‌های تبلیغاتی
+            موجود است.
+          </p>
+        </header>
+        <div class="category-grid category-grid--home">
+          <a class="category-card category-card--home" href="listings.html?cat=food">
+            <div class="category-card__icon" aria-hidden="true">🍽</div>
+            <div class="category-card__label">غذا و رستوران</div>
+          </a>
+          <a class="category-card category-card--home" href="listings.html?cat=market">
+            <div class="category-card__icon" aria-hidden="true">🛒</div>
+            <div class="category-card__label">سوپرمارکت و مواد غذایی</div>
+          </a>
+          <a class="category-card category-card--home" href="listings.html?cat=health">
+            <div class="category-card__icon" aria-hidden="true">🩺</div>
+            <div class="category-card__label">سلامت و پزشکی</div>
+          </a>
+          <a class="category-card category-card--home" href="listings.html?cat=legal">
+            <div class="category-card__icon" aria-hidden="true">⚖</div>
+            <div class="category-card__label">حقوقی و مهاجرت</div>
+          </a>
+          <a class="category-card category-card--home" href="listings.html?cat=beauty">
+            <div class="category-card__icon" aria-hidden="true">✨</div>
+            <div class="category-card__label">زیبایی و آرایشگاه</div>
+          </a>
+          <a class="category-card category-card--home" href="listings.html?cat=auto">
+            <div class="category-card__icon" aria-hidden="true">🚗</div>
+            <div class="category-card__label">خودرو و سرویس</div>
+          </a>
+        </div>
+      </section>
+
+      <section class="section section--home section--featured-strip container" aria-labelledby="feat-title">
+        <header class="section__head section__head--home">
+          <h2 id="feat-title" class="section__title section__title--home">کسب‌وکارهای ویژه</h2>
+          <p class="section__lead section__lead--home">
+            نمونه‌هایی با جایگاه آگهی ویژه — در صفحه اصلی با برچسب طلایی دیده می‌شوند.
+          </p>
+        </header>
+        <div class="card-grid card-grid--home">
+          <article class="card card--promoted card--home">
+            <div class="card__media">
+              <span class="badge badge--promoted">ویژه</span>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">رستوران نمونه</h3>
+              <p class="card__meta">غذای ایرانی — London، نزدیک کنزینگتون</p>
+              <p class="card__meta">۴٫۸ ⭐ · ارسال و حضوری</p>
+              <div class="card__actions">
+                <a class="btn btn--primary" href="business.html">مشاهده پروفایل</a>
+                <a class="btn btn--ghost" href="advertise.html">ارتقا مثل این</a>
+              </div>
+            </div>
+          </article>
+          <article class="card card--promoted card--home">
+            <div class="card__media">
+              <span class="badge badge--promoted">ویژه</span>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">کلینیک پارس</h3>
+              <p class="card__meta">پزشک عمومی و واکسن — Manchester</p>
+              <p class="card__meta">بیمه معتبر · نوبت آنلاین</p>
+              <div class="card__actions">
+                <a class="btn btn--primary" href="business-claimed.html">مشاهده پروفایل</a>
+                <a class="btn btn--ghost" href="advertise.html">ارتقا مثل این</a>
+              </div>
+            </div>
+          </article>
+          <article class="card card--home">
+            <div class="card__media"></div>
+            <div class="card__body">
+              <h3 class="card__title">فروشگاه زعفران آلپ</h3>
+              <p class="card__meta">مواد غذایی و ادویه — Birmingham</p>
+              <span class="badge">لیست استاندارد</span>
+              <div class="card__actions">
+                <a class="btn btn--primary" href="business.html">مشاهده پروفایل</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="container home-ad-wrap">
+        <div class="ad-slot ad-slot--inline ad-slot--home" role="complementary" aria-label="جای تبلیغ">
+          بنر میان‌متن — Medium Rectangle یا سایز دلخواه
+        </div>
+      </div>
+    </main>
+
+
+  </body>
+</html>

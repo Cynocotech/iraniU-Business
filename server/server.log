@@ -1,0 +1,383 @@
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+TypeError: Cannot read properties of undefined (reading 'x-forwarded-for')
+    at clientIp (file:///root/directory-iraniu-uk/server/src/telegramNotify.js:34:26)
+    at ipKey (file:///root/directory-iraniu-uk/server/src/bruteForce.js:25:14)
+    at assertLoginNotBlocked (file:///root/directory-iraniu-uk/server/src/bruteForce.js:33:14)
+    at file:///root/directory-iraniu-uk/server/src/api/v1/auth.js:153:11
+    at Layer.handle [as handle_request] (/root/directory-iraniu-uk/server/node_modules/express/lib/router/layer.js:95:5)
+    at next (/root/directory-iraniu-uk/server/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/root/directory-iraniu-uk/server/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/root/directory-iraniu-uk/server/node_modules/express/lib/router/layer.js:95:5)
+    at /root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:346:12)
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+ReferenceError: dbAll is not defined
+    at file:///root/directory-iraniu-uk/server/src/api/v1/claims.js:126:18
+    at Layer.handle [as handle_request] (/root/directory-iraniu-uk/server/node_modules/express/lib/router/layer.js:95:5)
+    at next (/root/directory-iraniu-uk/server/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/root/directory-iraniu-uk/server/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/root/directory-iraniu-uk/server/node_modules/express/lib/router/layer.js:95:5)
+    at /root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:346:12)
+    at next (/root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:175:3)
+    at router (/root/directory-iraniu-uk/server/node_modules/express/lib/router/index.js:47:12)
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+[ai-search] category cache refreshed: 50 categories
+WebSocket server error: Port is already in use
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+10:40:27 AM [vite] hmr update /src/pages/ListingsPage.jsx
+10:40:35 AM [vite] hmr update /src/pages/ListingsPage.jsx
+10:40:42 AM [vite] hmr update /src/pages/ListingsPage.jsx
+[ai-search] category cache refreshed: 50 categories
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+WebSocket server error: Port is already in use
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+[ai-search] category cache refreshed: 50 categories
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+WebSocket server error: Port is already in use
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+file:///root/directory-iraniu-uk/server/src/api/swagger.js:271
+    tags: [
+    ^^^^
+
+SyntaxError: Missing initializer in const declaration
+    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:146:18)
+    at #translate (node:internal/modules/esm/loader:497:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:544:27)
+
+Node.js v20.20.1
+file:///root/directory-iraniu-uk/server/src/api/swagger.js:271
+    tags: [
+    ^^^^
+
+SyntaxError: Missing initializer in const declaration
+    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:146:18)
+    at #translate (node:internal/modules/esm/loader:497:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:544:27)
+
+Node.js v20.20.1
+[ai-search] category cache refreshed: 50 categories
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+WebSocket server error: Port is already in use
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3001 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+node:events:502
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:3002
+    at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+    at listenInCluster (node:net:1965:12)
+    at doListen (node:net:2139:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1944:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 3002
+}
+
+Node.js v20.20.1
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+12:52:49 PM [vite] hmr update /src/pages/BusinessPage.jsx
+12:52:55 PM [vite] hmr update /src/pages/BusinessPage.jsx
+12:53:02 PM [vite] hmr update /src/pages/BusinessPage.jsx
+12:53:17 PM [vite] hmr update /src/pages/BusinessPage.jsx
+12:53:45 PM [vite] hmr update /src/pages/BusinessPage.jsx
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+2:18:21 PM [vite] hmr update /src/App.jsx
+2:18:24 PM [vite] hmr update /src/App.jsx
+2:18:30 PM [vite] hmr update /src/App.jsx
+2:18:38 PM [vite] hmr update /src/pages/ListingsPage.jsx
+[ai-search] category cache refreshed: 50 categories
+WebSocket server error: Port is already in use
+Vite middleware (SPA dev) enabled
+node:events:502
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:3002
+    at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+    at listenInCluster (node:net:1965:12)
+    at doListen (node:net:2139:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1944:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 3002
+}
+
+Node.js v20.20.1
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+node:events:502
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:3002
+    at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+    at listenInCluster (node:net:1965:12)
+    at doListen (node:net:2139:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1944:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 3002
+}
+
+Node.js v20.20.1
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[telegram] photo+caption sent ok
+[telegram] photo+caption sent ok
+7:16:36 PM [vite] hmr update /src/App.jsx
+7:16:38 PM [vite] hmr update /src/App.jsx
+7:16:51 PM [vite] hmr update /src/pages/HomePageDemo.jsx
+7:17:42 PM [vite] hmr update /src/pages/HomePageDemo.jsx
+7:17:48 PM [vite] hmr update /src/pages/HomePageDemo.jsx
+7:18:03 PM [vite] hmr update /src/pages/HomePageDemo.jsx
+7:18:14 PM [vite] hmr update /src/layouts/AdminShellLayout.jsx
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[careersModuleSettings] read error error: relation "system_settings" does not exist
+    at /root/directory-iraniu-uk/server/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async dbGet (file:///root/directory-iraniu-uk/server/src/db.js:28:15)
+    at async isCareersModuleEnabled (file:///root/directory-iraniu-uk/server/src/careersModuleSettings.js:17:17)
+    at async file:///root/directory-iraniu-uk/server/src/authRoutes.js:734:21 {
+  length: 114,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '19',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+[careersModuleSettings] read error error: relation "system_settings" does not exist
+    at /root/directory-iraniu-uk/server/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async dbGet (file:///root/directory-iraniu-uk/server/src/db.js:28:15)
+    at async isCareersModuleEnabled (file:///root/directory-iraniu-uk/server/src/careersModuleSettings.js:17:17)
+    at async file:///root/directory-iraniu-uk/server/src/authRoutes.js:734:21 {
+  length: 114,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '19',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+[telegram] photo+caption sent ok
+[telegram] photo+caption sent ok
+9:08:59 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:07 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:12 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:22 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:27 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:31 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+9:09:40 PM [vite] hmr update /src/pages/admin/AdminExchangeBannersPage.jsx
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[cron] nightly embed job starting…
+[cron] nightly embed job starting…
+[embed] 894 approved businesses
+[embed] 894 approved businesses
+[embed] 329 to process, 565 unchanged (skipped)
+[embed] Generating tags in batches of 10…
+[embed] 329 to process, 565 unchanged (skipped)
+[embed] Generating tags in batches of 10…
+[embed] Tag batch 1 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 1 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 2 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 2 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 3 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 3 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 4 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 4 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 5 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 5 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 6 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 6 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 7 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 7 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 8 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 8 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 9 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 9 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 10 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 100/329
+[embed] Tag batch 10 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 100/329
+[embed] Tag batch 11 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 11 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 12 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 12 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 13 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 13 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 14 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 14 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 15 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 15 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 16 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 16 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 17 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 17 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 18 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 18 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 19 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 19 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 20 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 200/329
+[embed] Tag batch 20 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 200/329
+[embed] Tag batch 21 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 21 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 22 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 22 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 23 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 23 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 24 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 24 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 25 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 25 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 26 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 26 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 27 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 27 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 28 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 28 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 29 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 29 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 30 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 300/329
+[embed] Tag batch 30 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 300/329
+[embed] Tag batch 31 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 31 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 32 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 32 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tag batch 33 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 329/329
+[embed] Embedding 329 blobs…
+[embed] Tag batch 33 failed: GPT tags 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Tags: 329/329
+[embed] Embedding 329 blobs…
+[embed] Embed batch 1 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 1 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 2 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 3 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 2 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 3 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+[embed] Embed batch 4 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+
+[embed] Summary — total: 894, processed: 329, skipped: 565, embedded: 0, failed: 329, tag_errors: 329
+[cron] nightly embed job complete.
+[embed] Embed batch 4 failed: OpenAI embeddings 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+
+[embed] Summary — total: 894, processed: 329, skipped: 565, embedded: 0, failed: 329, tag_errors: 329
+[cron] nightly embed job complete.
+[ai-search] category cache refreshed: 50 categories
+Vite middleware (SPA dev) enabled
+Iraniu development — http://0.0.0.0:3002 (site + /api + /go on one port)
+[ai-search] parse step failed: OpenAI chat 429: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.
+
+warn - The `content` option in your Tailwind CSS configuration is missing or empty.
+warn - Configure your content sources or your generated CSS will be missing styles.
+warn - https://tailwindcss.com/docs/content-configuration
+[telegram] photo+caption sent ok

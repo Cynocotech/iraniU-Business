@@ -15,7 +15,7 @@ function readImpersonation() {
   }
 }
 
-const DashboardContext = createContext(null);
+export const DashboardContext = createContext(null);
 
 export function DashboardProvider({ children }) {
   const { me, loading: authLoading } = useAuth();

@@ -15,7 +15,7 @@ export default function AdminBulkImportPage() {
   const downloadTemplate = async (p) => {
     setMsg(null);
     try {
-      const t = sessionStorage.getItem("iraniu_jwt");
+      const t = localStorage.getItem("iraniu_jwt");
       const r = await fetch(`/api/admin/businesses/csv-template?preset=${encodeURIComponent(p)}`, {
         credentials: "include",
         headers: t ? { Authorization: `Bearer ${t}` } : {},
@@ -36,7 +36,7 @@ export default function AdminBulkImportPage() {
   const downloadFullExport = async () => {
     setMsg(null);
     try {
-      const t = sessionStorage.getItem("iraniu_jwt");
+      const t = localStorage.getItem("iraniu_jwt");
       const r = await fetch("/api/admin/businesses/export-csv?preset=iraniu", {
         credentials: "include",
         headers: t ? { Authorization: `Bearer ${t}` } : {},
@@ -58,7 +58,7 @@ export default function AdminBulkImportPage() {
   const downloadSqliteDb = async () => {
     setMsg(null);
     try {
-      const t = sessionStorage.getItem("iraniu_jwt");
+      const t = localStorage.getItem("iraniu_jwt");
       const r = await fetch("/api/admin/database/sqlite", {
         credentials: "include",
         headers: t ? { Authorization: `Bearer ${t}` } : {},

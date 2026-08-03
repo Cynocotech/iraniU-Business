@@ -4,7 +4,7 @@ const TOKEN_KEY = "iraniu_jwt";
 
 function readToken() {
   try {
-    return sessionStorage.getItem(TOKEN_KEY) || "";
+    return localStorage.getItem(TOKEN_KEY) || "";
   } catch {
     return "";
   }
@@ -12,8 +12,8 @@ function readToken() {
 
 function writeToken(t) {
   try {
-    if (t) sessionStorage.setItem(TOKEN_KEY, t);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch (_) {}
 }
 
@@ -74,12 +74,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loginManager = useCallback(
-    async (email, password, totp) => {
+    async (email, password, totp, captchaToken) => {
       const r = await fetch("/api/auth/login/manager", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, totp: totp || undefined }),
+        body: JSON.stringify({
+          email,
+          password,
+          totp: totp || undefined,
+          captcha_token: captchaToken || undefined
+        }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -98,12 +103,17 @@ export function AuthProvider({ children }) {
   );
 
   const loginAdmin = useCallback(
-    async (email, password, totp) => {
+    async (email, password, totp, captchaToken) => {
       const r = await fetch("/api/auth/login/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, totp: totp || undefined }),
+        body: JSON.stringify({
+          email,
+          password,
+          totp: totp || undefined,
+          captcha_token: captchaToken || undefined
+        }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {

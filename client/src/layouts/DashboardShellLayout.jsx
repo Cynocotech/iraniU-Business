@@ -6,9 +6,11 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { dashboardIcons } from "../components/DashboardPanelHead.jsx";
 import ProfileAvatarUploader from "../components/ProfileAvatarUploader.jsx";
 import { isExchangeBusiness } from "../lib/exchangeRates.js";
+import "../panel-redesign.css";
 
 const NAV_BASE = [
   { to: "/dashboard", label: "نمای کلی", end: true, iconKey: "overview" },
+  { to: "/dashboard/wallet", label: "کیف توکن و تبلیغات", iconKey: "billing" },
   { to: "/dashboard/careers", label: "فرصت‌های شغلی", iconKey: "careers" },
   { to: "/dashboard/media", label: "تصاویر", iconKey: "media" },
   { to: "/dashboard/twilio", label: "تنظیمات Twilio", twilioOnly: true, iconKey: "twilio" },
@@ -155,6 +157,12 @@ function DashboardChrome() {
             </li>
           </ul>
           <div className="app-shell__sidebar-foot">
+            <Link to="/guide">
+              <span className="app-shell__nav-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              </span>
+              <span>راهنمای کامل</span>
+            </Link>
             <Link to="/listings">
               <span className="app-shell__nav-icon" aria-hidden="true">
                 {dashboardIcons.listings}

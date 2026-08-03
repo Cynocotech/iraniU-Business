@@ -5,6 +5,7 @@ import { HelmetProvider } from "react-helmet-async";
 /** استایل اصلی پروژه — یک فایل در ریشهٔ مخزن (هم‌خوان با ویرایش دستی css/styles.css) */
 import "../../css/styles.css";
 import "./tailwind.css";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 

@@ -7,7 +7,7 @@ export default function DashboardEditPage() {
 
   return (
     <DashboardMain>
-      <DashboardBusinessForm slug={dashSlug} onSlugChange={onSlugChange} onLoaded={setBiz} />
+      <DashboardBusinessForm slug={dashSlug} onSlugChange={onSlugChange} onLoaded={setBiz} hideSlugPicker />
     </DashboardMain>
   );
 }

@@ -1,0 +1,2338 @@
+{
+  "done": [
+    "il-hafez",
+    "il-northwest-supermarket",
+    "il-savalan-mini-market",
+    "il-carizmo",
+    "il-farima-perry",
+    "il-reza-autos-mobile-mechanic",
+    "il-saray-banqueting-suite",
+    "il-zaffa-wedding-event-planners",
+    "il-nama-studio",
+    "il-nawroz-supermarket",
+    "il-jahans-photography",
+    "il-pardes-wishnitz-banqueting-hall",
+    "il-persia-lounge-brighton-hove",
+    "il-iranian-wedding-photography",
+    "il-sowilo-24-studios",
+    "il-azizam",
+    "il-sayeh-and-galton-flowers",
+    "il-persian-arabic-iranian-dj",
+    "il-bakhtar-market",
+    "il-taste-of-persia",
+    "il-ariana-banqueting",
+    "il-walnut-persian-restaurant",
+    "il-artas-flowers-liverpool",
+    "il-persian-kebab",
+    "il-yaz-s-flower-gallery",
+    "il-saffron-events-uk",
+    "il-noorani-events",
+    "il-barok",
+    "il-dr-aziz-y-anzabi",
+    "il-shiraz-supermarket",
+    "il-dr-shaharyar-alikhan",
+    "il-salaam-counselling-services",
+    "il-dr-behzad-boroumand-basit",
+    "il-hadi-s-halal-meat",
+    "il-yaran-northwest",
+    "il-dr-shadi-shahnavaz",
+    "il-bahar-boostani-coaching-holistic-services",
+    "il-dr-nadia-kheirabi-counselling-psychologist",
+    "il-farsophone-association",
+    "il-masood-butchers-ltd",
+    "il-dr-mariam-majid-clinical-psychologist",
+    "il-ali-motors-birmingham",
+    "il-auto-persia-ltd",
+    "il-behzad-auto",
+    "il-yazeb-ltd",
+    "il-masr-motors",
+    "il-elite-persia-autos",
+    "il-sina-auto-repairs-limited",
+    "il-automak",
+    "il-sirwan-auto-services",
+    "il-kavkaz-motors",
+    "il-hassan-garage-ltd",
+    "il-pars-motors-finchley-ltd",
+    "il-tehran-motors",
+    "il-institute-of-persian-language-and-literature-studies",
+    "il-leeds-persian-school",
+    "il-kamran-driving-school",
+    "il-oliver-hasani-solicitors",
+    "il-iranian-cultural-society-of-liverpool",
+    "il-arab-and-irani-lawyers",
+    "il-kamran-co-solicitors",
+    "il-hakim-driving-school",
+    "il-akbar-immigration-law-chambers",
+    "il-kayani-legal",
+    "il-iranian-association",
+    "il-rayan-automatic-driving-school-coventry",
+    "il-sahba-academy-ltd",
+    "il-iranian-legal-services",
+    "il-shoresh-nursery-at-bnjc",
+    "il-salam-immigration-solicitors",
+    "il-kanoon-persian-school",
+    "il-virtual-persian-academy",
+    "il-harrow-iranian-community-association",
+    "il-azarmi-law",
+    "il-reeshe-persian-school-cambridge",
+    "il-kabir-family-law-oxford",
+    "il-hedayat-centre",
+    "il-behbahani-co-solicitors",
+    "il-persian-advice-bureau-pab",
+    "il-nazemi-private-letting",
+    "il-belyani-estate-agents",
+    "il-elaahi-co-solicitors",
+    "il-nejat-immigration",
+    "il-kamrans-solicitors",
+    "il-saatnia-legal-services",
+    "il-nasim-co-solicitors",
+    "il-ariya-property-services",
+    "il-chaboun-constructions-ltd",
+    "il-kabir-family-law-newcastle",
+    "il-studio-sidika",
+    "il-zidouri-architecture",
+    "il-isteni-design-and-build",
+    "il-paniz-bastani-interiors",
+    "il-caspian-construction",
+    "il-bazko-beauty-studio-academy",
+    "il-diwan-properties-ltd",
+    "il-sepi-s-unisex-hair-and-beauty-salon",
+    "il-second-eye-cctv",
+    "il-soli-hair-club",
+    "il-peter-ghaziri",
+    "il-the-persian-spa",
+    "il-emani-plumbing-heating",
+    "il-bahar-fitness-personal-trainer",
+    "il-rimi-beauty",
+    "il-khalil-properties",
+    "il-barrain-london-canary-wharf-estate-agents",
+    "il-modarasi",
+    "il-the-persian-room-belfast",
+    "il-pazdro-training",
+    "il-aya-estates",
+    "il-amir-salon-park-rd",
+    "il-hamshahri-estate-agent",
+    "il-browz-by-sonia",
+    "il-noor-electrical-services-ltd",
+    "il-dalton-salon",
+    "il-bahar-salon",
+    "il-royas-salon",
+    "il-shervon-s-personal-training-services",
+    "il-farzana-s-beauty",
+    "il-the-mr-barbers",
+    "il-thee-norah-hair-beauty-salon",
+    "il-alavi-travel",
+    "il-pomegranate-consulting",
+    "il-tiara-jewellery",
+    "il-pashto-dari-translation",
+    "il-interpreting-translation-farsi-english",
+    "il-seneh-carpets",
+    "il-the-british-iranian-chamber-of-commerce",
+    "il-my-language-connection",
+    "il-aram-travel",
+    "il-caspian-seagull-travel-ltd",
+    "il-tehran-travel"
+  ],
+  "failed": [
+    {
+      "slug": "il-pomegranate-consulting",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-tiara-jewellery",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-pashto-dari-translation",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-interpreting-translation-farsi-english",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-seneh-carpets",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-the-british-iranian-chamber-of-commerce",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-my-language-connection",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-aram-travel",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-land-languages-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-global-language-services-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-caspian-seagull-travel-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-tehran-travel",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-arya-travel-london",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-business-2",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-akbani-financial-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sam-co-accountants-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sarafi-ok",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sarafi-pardis",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-transfer-direct-ltd-afghan-sarafi",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-aria-accountants",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-aretian-wealth-management",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-business",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-superprime-ltd-money-exchange",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-caspian-insurance",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sarafi-etebar",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-khoob-accountancy-of-kensington-and-harrow",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-fallahi-exchange",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sarafi-bahmani-uk",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-alburz-tech",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-hasani-digital",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sharif-tech",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-wbb-app-developer",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-yaran-tech-repairs-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-agency",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sheherazada-mobile",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-niva-medical-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-gholami-dr-m",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-k-pirayesh",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-monir-opticians",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-saraskinology",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-imperial-dermal-solutions-london",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-safarian-simon-opticians",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-korosh-majidi-smile-tailor-2",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-wimpole-street-smiles-dr-amir-ataei-kachooei",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-majid-saeed",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-ali-yagan-sharp-vision-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-karim-s-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-mr-kasra-saeb-parsy",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-beyzade-dr-d",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-babak-karimi",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-ak-smile-lab-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-matlock-pharmacy",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-kamran-rasul-the-dental-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-brows-beauty-by-faaz",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-nails-by-parva",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-simin-salimi-beauty-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-reflection-beauty-at-shadi-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-mahin-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-avesta-hair-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-rozita-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sadaf-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-nas-hair-beauty-and-aesthetics-and-skin-car",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-maryam-hair-beauty-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-tehran-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-vida-hair-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-karim-wellness-cambridge-massage",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sadaf-s-hair-beauty-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-hadis-beauty-bar",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-replay-cardiff",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-irana-nailart",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-hair-desire-by-azi",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-reza-abbasi-rl-fitness",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-stockport-barber",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-daryas-touch-unisex-hair-beauty-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-massage-therapy",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-imis-hair-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-the-royal-salon-kensington-by-hamdan",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-elaje-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-shiraz-nails",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-fifi-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-ma-riahhair-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-maandli-hair-salon",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-pari-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-replay-swansea",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-crush-studio",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-cos-male-image",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-afsoo-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dinaz-hair-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-pink-club-nail-beauty",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-trustmed-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-cathedral-dental-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-the-harwood-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dermal-aesthetic-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-maassarani-partners",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-y-heidari-fitzrovia-medical-centre",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-espinas-clinic",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-dr-azadeh-ovaici",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-parnosa",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-nia-abrishami",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-bashtan-construction",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-missiato-design-build",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-refresh-renovations-west-london-ali-irteza",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-rayyan-renovations-ltd",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-aryan-driving-school",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sornai-music-school",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-shiraz-driving-school",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-azad-university-ir-in-oxford",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-care-centre",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-iranian-ferdowsi-school",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-flame-restaurant",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-fanoos-persian-grill",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-truck-food",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-haftsin",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-joon-cafe",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-lavash-north-street-brighton",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-burger-8-blyth",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-berenjak-soho",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-pamir-halal-butcher-supermarket",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-the-hayfield-deli",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-the-persian",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-gandom-persian-bakery-supermarket",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-berenjak-borough",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-abad-supermarket",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-yaass-bakery",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-shahan-halal-foodstores",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-avachia-fastfood",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-zaffran",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-naroon-fitzrovia",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-khayyam-restaurant-birmingham",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-diyar-persian-grill-house",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-pars-supermarket",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-darya-restaurant",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-shiraz-persian-cuisine",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-persian-rose-cakes",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-chello-restaurant-wine-bar",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-y2-cafe",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-polow-restaurant-persian-fine-dining",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-mazandaran-supermarket",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-kandoo-pastry",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-gishniz",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-shiraz-grill",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-sharif-halal-meat",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-healthypersia",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-qashqai-kitchen",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-my-persian-kitchen",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-erfan-bakery",
+      "error": "Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}"
+    },
+    {
+      "slug": "il-land-languages-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-global-language-services-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-arya-travel-london",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-business-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-akbani-financial-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sam-co-accountants-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-ok",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-pardis",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-transfer-direct-ltd-afghan-sarafi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aria-accountants",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aretian-wealth-management",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-business",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-superprime-ltd-money-exchange",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-caspian-insurance",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-etebar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khoob-accountancy-of-kensington-and-harrow",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fallahi-exchange",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-bahmani-uk",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-alburz-tech",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hasani-digital",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sharif-tech",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-wbb-app-developer",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yaran-tech-repairs-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-agency",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sheherazada-mobile",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-niva-medical-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gholami-dr-m",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-k-pirayesh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-monir-opticians",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-saraskinology",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-imperial-dermal-solutions-london",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-safarian-simon-opticians",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-korosh-majidi-smile-tailor-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-wimpole-street-smiles-dr-amir-ataei-kachooei",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-majid-saeed",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ali-yagan-sharp-vision-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-karim-s-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mr-kasra-saeb-parsy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-beyzade-dr-d",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-babak-karimi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ak-smile-lab-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-matlock-pharmacy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kamran-rasul-the-dental-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-brows-beauty-by-faaz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nails-by-parva",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-simin-salimi-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reflection-beauty-at-shadi-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mahin-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-avesta-hair-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rozita-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sadaf-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nas-hair-beauty-and-aesthetics-and-skin-car",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-maryam-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-vida-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-karim-wellness-cambridge-massage",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sadaf-s-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hadis-beauty-bar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-replay-cardiff",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-irana-nailart",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hair-desire-by-azi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reza-abbasi-rl-fitness",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-stockport-barber",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-daryas-touch-unisex-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-massage-therapy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-imis-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-royal-salon-kensington-by-hamdan",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-elaje-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-nails",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fifi-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ma-riahhair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-maandli-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pari-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-replay-swansea",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-crush-studio",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cos-male-image",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-afsoo-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dinaz-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pink-club-nail-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-trustmed-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cathedral-dental-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-harwood-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dermal-aesthetic-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-maassarani-partners",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-y-heidari-fitzrovia-medical-centre",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-espinas-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-azadeh-ovaici",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-parnosa",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nia-abrishami",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-bashtan-construction",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-missiato-design-build",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-refresh-renovations-west-london-ali-irteza",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rayyan-renovations-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aryan-driving-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sornai-music-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-driving-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-azad-university-ir-in-oxford",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-care-centre",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-iranian-ferdowsi-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-flame-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fanoos-persian-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-truck-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-haftsin",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-joon-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-lavash-north-street-brighton",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-burger-8-blyth",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berenjak-soho",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pamir-halal-butcher-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-hayfield-deli",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-persian",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gandom-persian-bakery-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berenjak-borough",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-abad-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yaass-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shahan-halal-foodstores",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-avachia-fastfood",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-zaffran",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-naroon-fitzrovia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khayyam-restaurant-birmingham",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-diyar-persian-grill-house",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pars-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-darya-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-persian-cuisine",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-rose-cakes",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-chello-restaurant-wine-bar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-y2-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-polow-restaurant-persian-fine-dining",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mazandaran-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kandoo-pastry",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gishniz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sharif-halal-meat",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-healthypersia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-qashqai-kitchen",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-my-persian-kitchen",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-erfan-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-istanbul-supermarket-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gandom-charcoal-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-farahzad-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-afghan-palace-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aran-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-logma",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-persian-stop",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kiani-tea",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-asa-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-paradise-restaurant-shisha-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-super-farbod-iranian-foods",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dana-superstore",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sumac-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-vishta",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reza-caviar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mehr-o-mah",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sabalan-persian-grill-kitchen-halal",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kandou-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-meze-meze",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cafe-wargeh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sahar-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-konj-modern-persian-cuisine",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shemron-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dubai-restaurant-shisha-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-counter-by-naroon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tavazo-persian-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-manchester-superstore",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-homemade-persianfood",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shandiz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rustik-bites",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-art-of-persia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-k-u-c-h",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-cottage",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ashkadeh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pomegranate-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shandiz-persian-bbq-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-apadana-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ziba",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-biya2-leeds",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kalavvara-supermarrt",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kourosh-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-alma-turkish-persian-bbq-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berkeh-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mevlana-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pamir-food-store",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-watan-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-azadi-mini-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mah-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nayeb-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-paprika-grill-cafe-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pars-scotland-iranian-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yalda-kebabs-taste-of-persia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khatoon-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-baron-84",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-station-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-zafron-crawley",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-chaye-khana",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-qamariyah-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-logma-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yafa-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-melo-persian-restaurant-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-land-languages-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-global-language-services-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-arya-travel-london",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-business-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-akbani-financial-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sam-co-accountants-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-ok",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-pardis",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-transfer-direct-ltd-afghan-sarafi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aria-accountants",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aretian-wealth-management",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-business",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-superprime-ltd-money-exchange",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-caspian-insurance",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-etebar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khoob-accountancy-of-kensington-and-harrow",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fallahi-exchange",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sarafi-bahmani-uk",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-alburz-tech",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hasani-digital",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sharif-tech",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-wbb-app-developer",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yaran-tech-repairs-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-agency",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sheherazada-mobile",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-niva-medical-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gholami-dr-m",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-k-pirayesh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-monir-opticians",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-saraskinology",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-imperial-dermal-solutions-london",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-safarian-simon-opticians",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-korosh-majidi-smile-tailor-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-wimpole-street-smiles-dr-amir-ataei-kachooei",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-majid-saeed",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ali-yagan-sharp-vision-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-karim-s-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mr-kasra-saeb-parsy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-beyzade-dr-d",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-babak-karimi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ak-smile-lab-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-matlock-pharmacy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kamran-rasul-the-dental-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-brows-beauty-by-faaz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nails-by-parva",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-simin-salimi-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reflection-beauty-at-shadi-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mahin-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-avesta-hair-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rozita-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sadaf-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nas-hair-beauty-and-aesthetics-and-skin-car",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-maryam-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-vida-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-karim-wellness-cambridge-massage",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sadaf-s-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hadis-beauty-bar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-replay-cardiff",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-irana-nailart",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-hair-desire-by-azi",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reza-abbasi-rl-fitness",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-stockport-barber",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-daryas-touch-unisex-hair-beauty-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-massage-therapy",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-imis-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-royal-salon-kensington-by-hamdan",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-elaje-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-nails",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fifi-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ma-riahhair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-maandli-hair-salon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pari-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-replay-swansea",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-crush-studio",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cos-male-image",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-afsoo-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dinaz-hair-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pink-club-nail-beauty",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-trustmed-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cathedral-dental-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-harwood-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dermal-aesthetic-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-maassarani-partners",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-y-heidari-fitzrovia-medical-centre",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-espinas-clinic",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dr-azadeh-ovaici",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-parnosa",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nia-abrishami",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-bashtan-construction",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-missiato-design-build",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-refresh-renovations-west-london-ali-irteza",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rayyan-renovations-ltd",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aryan-driving-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sornai-music-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-driving-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-azad-university-ir-in-oxford",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-care-centre",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-iranian-ferdowsi-school",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-flame-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-fanoos-persian-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-truck-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-haftsin",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-joon-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-lavash-north-street-brighton",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-burger-8-blyth",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berenjak-soho",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pamir-halal-butcher-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-hayfield-deli",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-persian",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gandom-persian-bakery-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berenjak-borough",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-abad-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yaass-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shahan-halal-foodstores",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-avachia-fastfood",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-zaffran",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-naroon-fitzrovia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khayyam-restaurant-birmingham",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-diyar-persian-grill-house",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pars-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-darya-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-persian-cuisine",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-rose-cakes",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-chello-restaurant-wine-bar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-y2-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-polow-restaurant-persian-fine-dining",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mazandaran-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kandoo-pastry",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gishniz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sharif-halal-meat",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-healthypersia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-qashqai-kitchen",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-my-persian-kitchen",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-erfan-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-istanbul-supermarket-2",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-gandom-charcoal-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-farahzad-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-afghan-palace-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-aran-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-logma",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-the-persian-stop",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kiani-tea",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-asa-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-paradise-restaurant-shisha-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-super-farbod-iranian-foods",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dana-superstore",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sumac-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-vishta",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-reza-caviar",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mehr-o-mah",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sabalan-persian-grill-kitchen-halal",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kandou-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-meze-meze",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-cafe-wargeh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-sahar-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-konj-modern-persian-cuisine",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shemron-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-dubai-restaurant-shisha-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-counter-by-naroon",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tavazo-persian-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-manchester-superstore",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-homemade-persianfood",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shandiz",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-rustik-bites",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-art-of-persia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-k-u-c-h",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-persian-cottage",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ashkadeh",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pomegranate-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shandiz-persian-bbq-grill",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-apadana-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-ziba",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-biya2-leeds",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kalavvara-supermarrt",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-kourosh-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-alma-turkish-persian-bbq-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-berkeh-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mevlana-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pamir-food-store",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-watan-bakery",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-azadi-mini-market",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-mah-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-nayeb-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-paprika-grill-cafe-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-pars-scotland-iranian-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yalda-kebabs-taste-of-persia",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-khatoon-food",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-baron-84",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-tehran-station-cafe",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-zafron-crawley",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-chaye-khana",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-qamariyah-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-shiraz-persian-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-logma-restaurant",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-yafa-supermarket",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    },
+    {
+      "slug": "il-melo-persian-restaurant-lounge",
+      "error": "429 Client Error: Too Many Requests for url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    }
+  ]
+}

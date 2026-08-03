@@ -738,6 +738,7 @@ export default function BusinessOnboardingPage() {
                   }}
                   onBlur={() => setNameFaTouched(true)}
                   required
+                  maxLength={100}
                 />
                 {nameFaTouched && !nameFa.trim() && (
                   <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
@@ -782,6 +783,7 @@ export default function BusinessOnboardingPage() {
                   }}
                   onBlur={() => setNameEnTouched(true)}
                   required
+                  maxLength={100}
                 />
                 {nameEnTouched && !nameEn.trim() && (
                   <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
@@ -837,6 +839,7 @@ export default function BusinessOnboardingPage() {
                   onBlur={() => setPostcodeTouched(true)}
                   dir="ltr"
                   placeholder="e.g. SW1A 1AA"
+                  maxLength={12}
                 />
                 {postcodeStatus === "checking" && (
                   <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی کد پستی…</span>
@@ -891,6 +894,7 @@ export default function BusinessOnboardingPage() {
                   dir="ltr"
                   placeholder="e.g. 10 Downing Street, London"
                   required
+                  maxLength={300}
                 />
               </div>
 
@@ -910,6 +914,7 @@ export default function BusinessOnboardingPage() {
                   dir="ltr"
                   placeholder="e.g. 020 7946 0958"
                   required
+                  maxLength={30}
                 />
                 {phoneTouched && !isPhoneOk(phone) && (
                   <span className="field-hint" style={{ marginTop: "0.25rem", display: "block", color: "#dc2626" }}>
@@ -936,6 +941,7 @@ export default function BusinessOnboardingPage() {
                   autoComplete="email"
                   placeholder="you@example.com"
                   required
+                  maxLength={200}
                 />
                 {emailStatus === "checking" && (
                   <span className="field-hint" style={{ marginTop: "0.25rem", display: "block" }}>بررسی ایمیل…</span>
@@ -997,6 +1003,7 @@ export default function BusinessOnboardingPage() {
                     setListingTitle(e.target.value);
                     clearFieldInvalid("listingTitle");
                   }}
+                  maxLength={160}
                   placeholder="مثلاً غذای خانگی ایرانی در منچستر"
                   required
                 />
@@ -1026,6 +1033,7 @@ export default function BusinessOnboardingPage() {
                   dir="ltr"
                   placeholder="https://maps.google.com/maps?cid=..."
                   required
+                  maxLength={500}
                 />
                 <span className="field-hint" style={{ color: "#6b5f75" }}>
                   مثال: <span dir="ltr" style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>https://g.page/r/XXXXXXXXXXXX/review</span>

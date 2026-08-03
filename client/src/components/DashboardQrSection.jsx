@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { apiGet } from "../api.js";
+import { apiGet, apiPatch } from "../api.js";
 import DashboardPanelHead, { dashboardIcons } from "./DashboardPanelHead.jsx";
 import {
   THEME_QR_COLORS,
@@ -43,10 +43,12 @@ function buildGoUrl(googleReviewUrl, bid) {
   return u.href;
 }
 
-function buildFlyerHtml(themeNum, name, logoSrc) {
+function buildFlyerHtml(themeNum, name, logoSrc, settings = {}) {
   const t = clampThemeNum(themeNum);
+  const logoW = Number(settings.logoWidth) || 150;
+  const qrS = Number(settings.qrSize) || 220;
   const logoBlock = logoSrc
-    ? `<div class="qr-tpl__logo"><img src="${logoSrc}" alt="" width="120" height="120" /></div>`
+    ? `<div class="qr-tpl__logo"><img src="${logoSrc}" alt="" style="max-width:${logoW}px;max-height:76px;width:auto;height:auto;object-fit:contain;" /></div>`
     : "";
   const safeName = (name || "نام کسب‌وکار").replace(/</g, "&lt;");
   return (
@@ -54,13 +56,14 @@ function buildFlyerHtml(themeNum, name, logoSrc) {
     `<div class="qr-tpl__frame">` +
     `<div class="qr-tpl__ribbon" dir="ltr" lang="en">` +
     `<span class="qr-tpl__deco qr-tpl__deco--tl" aria-hidden="true"></span>` +
-    `<p class="qr-tpl__ribbon-title">Review us on Google</p>` +
+    `<img src="/qr-code-template-main/images/iraniu-logo.png" alt="Iraniu" style="display:block;margin:0 auto 14px;width:${logoW}px;height:auto;object-fit:contain;padding:0 1px;box-sizing:border-box;" crossOrigin="anonymous" />` +
+    `<img src="/google-reviews-logo.png" alt="Google Reviews" style="display:block;margin:0 auto 4px;max-width:160px;height:auto;filter:brightness(0) invert(1);" crossOrigin="anonymous" />` +
     `<p class="qr-tpl__ribbon-sub">Scan the QR code to leave a review</p>` +
     `<span class="qr-tpl__deco qr-tpl__deco--br" aria-hidden="true"></span>` +
     `</div>` +
     `<div class="qr-tpl__body">` +
     logoBlock +
-    `<div class="qr-tpl__qr"><canvas class="qr-tpl__qr-canvas" width="220" height="220" aria-hidden="true"></canvas></div>` +
+    `<div class="qr-tpl__qr" style="display:inline-block;line-height:0;"><canvas class="qr-tpl__qr-canvas" width="${qrS}" height="${qrS}" style="display:block;width:${qrS}px;height:${qrS}px;min-width:${qrS}px;min-height:${qrS}px;" aria-hidden="true"></canvas></div>` +
     `<p class="qr-tpl__headline">از حمایت شما سپاسگزاریم</p>` +
     `<p class="qr-tpl__hint">با اسکن کد به صفحهٔ نظرات Google هدایت می‌شوید.</p>` +
     `<p class="qr-tpl__biz">${safeName}</p>` +
@@ -140,12 +143,19 @@ function patchFlyerCloneForCanvas(_doc, clonedRoot, themeNum) {
   }
   const qrWrap = clonedRoot.querySelector(".qr-tpl__qr");
   if (qrWrap) {
+    qrWrap.style.display = "inline-block";
+    qrWrap.style.lineHeight = "0";
     qrWrap.style.position = "relative";
     qrWrap.style.zIndex = "3";
     qrWrap.style.isolation = "isolate";
   }
   const qrCv = clonedRoot.querySelector(".qr-tpl__qr-canvas");
   if (qrCv) {
+    qrCv.style.display = "block";
+    qrCv.style.width = "220px";
+    qrCv.style.height = "220px";
+    qrCv.style.minWidth = "220px";
+    qrCv.style.minHeight = "220px";
     qrCv.style.position = "relative";
     qrCv.style.zIndex = "1";
     qrCv.style.background = "#ffffff";
@@ -186,7 +196,7 @@ function patchFlyerCloneForCanvas(_doc, clonedRoot, themeNum) {
   }
 }
 
-export default function DashboardQrSection({ onScanCount, businessSlug, syncedGoogleReviewUrl, syncedBusinessName }) {
+export default function DashboardQrSection({ onScanCount, businessSlug, syncedGoogleReviewUrl, syncedBusinessName, syncedQrTrackingUrl }) {
   const [bid, setBid] = useState("safra-demo");
   const [reviewUrl, setReviewUrl] = useState("");
   const [bizName, setBizName] = useState("");
@@ -197,9 +207,15 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
   const [previewOpen, setPreviewOpen] = useState(false);
   const [canExportPdf, setCanExportPdf] = useState(false);
   const [pdfWorking, setPdfWorking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [tplSettings, setTplSettings] = useState({ logoWidth: 150, qrSize: 220, previewScale: 0.55 });
+  const [logoKey, setLogoKey] = useState(0);
   const canvasRef = useRef(null);
   const logoRef = useRef(null);
   const logoObjectUrl = useRef(null);
+  const previewRef = useRef(null);
+  const previewOuterRef = useRef(null);
   const skipBizNamePersistFirst = useRef(true);
 
   const refreshStats = useCallback(async () => {
@@ -215,6 +231,30 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
       setHint("شمارش در دسترس نیست.");
     }
   }, [bid, onScanCount]);
+
+  useEffect(() => {
+    apiGet("/api/qr-template-settings").then(s => setTplSettings(s)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const container = previewRef.current;
+    const outer = previewOuterRef.current;
+    if (!container || !outer || !previewOpen) return;
+    const html = buildFlyerHtml(theme, bizName, logoObjectUrl.current || "", tplSettings);
+    container.innerHTML = html;
+    const scale = tplSettings.previewScale || 0.55;
+    const qrS = Number(tplSettings.qrSize) || 220;
+    const colors = THEME_QR_COLORS[theme] || THEME_QR_COLORS[1];
+    const cv = container.querySelector(".qr-tpl__qr-canvas");
+    if (cv && trackingUrl) {
+      QRCode.toCanvas(cv, trackingUrl, { width: qrS, margin: 2, color: colors }).catch(() => {});
+    }
+    requestAnimationFrame(() => {
+      if (container && outer) {
+        outer.style.height = `${Math.round(container.scrollHeight * scale)}px`;
+      }
+    });
+  }, [previewOpen, trackingUrl, theme, bizName, tplSettings, logoKey]);
 
   useEffect(() => {
     try {
@@ -266,7 +306,38 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
   }, [syncedBusinessName]);
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_QR_ACTIVE) === "1") return;
+    } catch (_) {
+      return;
+    }
+    const saved = String(syncedQrTrackingUrl || "").trim();
+    if (saved) {
+      setTrackingUrl(saved);
+      setPreviewOpen(true);
+      setCanExportPdf(true);
+    }
+  }, [syncedQrTrackingUrl]);
+
+  useEffect(() => {
     refreshStats();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshStats();
+    };
+    const onFocus = () => refreshStats();
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+
+    /* Poll every 30 s as hard fallback (catches mobile where visibilitychange is unreliable) */
+    const poll = setInterval(refreshStats, 30_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+      clearInterval(poll);
+    };
   }, [refreshStats]);
 
   useEffect(() => {
@@ -298,6 +369,32 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
     }
     logoObjectUrl.current = URL.createObjectURL(f);
     if (logoRef.current) logoRef.current.src = logoObjectUrl.current;
+    setLogoKey(k => k + 1);
+  };
+
+  const saveTracking = async () => {
+    if (!businessSlug) {
+      setSaveMsg("شناسهٔ کسب‌وکار موجود نیست — ابتدا لاگین کنید.");
+      return;
+    }
+    const urlToSave = trackingUrl.trim();
+    if (!urlToSave) {
+      setSaveMsg("ابتدا QR را بسازید.");
+      return;
+    }
+    setSaving(true);
+    setSaveMsg("");
+    try {
+      await apiPatch(`/api/businesses/${encodeURIComponent(businessSlug)}`, {
+        qr_tracking_url: urlToSave,
+        ...(reviewUrl.trim() ? { google_review_url: reviewUrl.trim() } : {}),
+      });
+      setSaveMsg("ذخیره شد.");
+    } catch (e) {
+      setSaveMsg(e.message || "خطا در ذخیره‌سازی");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const generate = async () => {
@@ -350,7 +447,7 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
     if (!trackingUrl?.trim()) return;
     const colors = THEME_QR_COLORS[theme] || THEME_QR_COLORS[1];
     const logoSrc = logoObjectUrl.current || "";
-    const html = buildFlyerHtml(theme, bizName, logoSrc);
+    const html = buildFlyerHtml(theme, bizName, logoSrc, tplSettings);
 
     const outer = document.createElement("div");
     outer.setAttribute("dir", "rtl");
@@ -372,7 +469,7 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
       const pdfQrCanvas = el.querySelector(".qr-tpl__qr-canvas");
       if (pdfQrCanvas) {
         await QRCode.toCanvas(pdfQrCanvas, trackingUrl, {
-          width: 220,
+          width: Number(tplSettings.qrSize) || 220,
           margin: 2,
           color: colors,
         });
@@ -435,23 +532,11 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
       });
 
       const imgData = snap.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 12;
-      const maxW = pageW - 2 * margin;
-      const maxH = pageH - 2 * margin;
-      const iw = snap.width;
-      const ih = snap.height;
-      let w = maxW;
-      let h = (ih * w) / iw;
-      if (h > maxH) {
-        h = maxH;
-        w = (iw * h) / ih;
-      }
-      const x = (pageW - w) / 2;
-      const y = margin + (maxH - h) / 2;
-      pdf.addImage(imgData, "PNG", x, y, w, h);
+      /* A6 = 105 × 148 mm — full bleed, no margin, no radius */
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+      const pageW = pdf.internal.pageSize.getWidth();  /* 105 */
+      const pageH = pdf.internal.pageSize.getHeight(); /* 148 */
+      pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
       const safeBid = sanitizeBid(bid).replace(/[^a-z0-9_-]/g, "-") || "qr";
       pdf.save(`iraniu-qr-${safeBid}.pdf`);
     } catch (e) {
@@ -540,10 +625,71 @@ export default function DashboardQrSection({ onScanCount, businessSlug, syncedGo
           </div>
           <label className="dashboard-qr-tracking-label" htmlFor="qr-tracking-url">
             لینک ردیابی (درون کد QR)
+            <span className="field-hint" style={{ display: "block", fontWeight: 400, fontSize: "0.78rem", marginTop: "0.15rem" }}>
+              اگر لینک Google را مستقیم جایگذاری کنید، به‌طور خودکار از مسیر <code>/go</code> (ردیابی) عبور داده می‌شود.
+            </span>
           </label>
-          <input readOnly className="dashboard-qr-tracking-url" id="qr-tracking-url" value={trackingUrl} />
+          <input
+            className="dashboard-qr-tracking-url"
+            id="qr-tracking-url"
+            value={trackingUrl}
+            dir="ltr"
+            onChange={(e) => {
+              const trimmed = e.target.value.trim();
+              /* Always route through /go so scans are counted — use businessSlug (not bid state) to avoid stale closure */
+              const effectiveBid = sanitizeBid(businessSlug || bid);
+              let val = trimmed;
+              if (trimmed && !trimmed.includes("/go?")) {
+                try {
+                  const u = new URL(trimmed);
+                  if (u.protocol === "https:" || u.protocol === "http:") {
+                    val = buildGoUrl(trimmed, effectiveBid);
+                  }
+                } catch (_) {}
+              }
+              setTrackingUrl(val);
+              setPreviewOpen(true);
+              setCanExportPdf(!!val);
+              try { localStorage.setItem(STORAGE_QR_ACTIVE, val ? "1" : "0"); } catch (_) {}
+            }}
+          />
+          {trackingUrl && !trackingUrl.includes("/go?") && (
+            <p className="field-hint" style={{ marginTop: "0.3rem", color: "#b45309", fontWeight: 600 }}>
+              ⚠️ این لینک از مسیر ردیابی عبور نمی‌کند — اسکن‌ها شمارش نخواهند شد.
+            </p>
+          )}
+          <div className="dashboard-actions dashboard-actions--inline" style={{ marginTop: "0.6rem" }}>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={saving || !trackingUrl.trim()}
+              onClick={saveTracking}
+            >
+              {saving ? "در حال ذخیره…" : "ذخیره لینک ردیابی"}
+            </button>
+          </div>
+          {saveMsg && (
+            <p className="field-hint" style={{ marginTop: "0.4rem", color: saveMsg === "ذخیره شد." ? "#15803d" : "#b71c1c" }}>
+              {saveMsg}
+            </p>
+          )}
           <div className="dashboard-qr-canvas-wrap">
             <canvas ref={canvasRef} aria-label="کد QR" />
+          </div>
+
+          <div className="dashboard-qr-tpl-preview-outer">
+            <p className="dashboard-qr-tpl-preview-label">پیش‌نمایش قالب چاپ</p>
+            <div
+              ref={previewOuterRef}
+              className="dashboard-qr-tpl-preview-scroll"
+            >
+              <div
+                ref={previewRef}
+                className="dashboard-qr-tpl-preview-inner"
+                style={{ transform: `scale(${tplSettings.previewScale || 0.55})`, transformOrigin: "top center" }}
+                aria-hidden="true"
+              />
+            </div>
           </div>
         </div>
       )}

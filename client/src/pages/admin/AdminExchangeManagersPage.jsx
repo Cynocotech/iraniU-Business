@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { apiDelete, apiGet, apiPatchUrl, apiPost } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 import { isExchangeBusiness } from "../../lib/exchangeRates.js";
+import { validatePasswordComplexity } from "../../lib/passwordPolicy.js";
+import PasswordRequirementsList from "../../components/PasswordRequirementsList.jsx";
 
 function isExchangeBusinessRow(b) {
   return isExchangeBusiness(b);
@@ -57,6 +59,8 @@ export default function AdminExchangeManagersPage() {
     link_slug: "",
   });
   const [createdCreds, setCreatedCreds] = useState(null);
+  const [rowPw, setRowPw] = useState({});
+  const [savingPwId, setSavingPwId] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -122,6 +126,10 @@ export default function AdminExchangeManagersPage() {
       };
       if (!payload.name || !payload.email || !payload.phone || !payload.login_username || !payload.password) {
         throw new Error("نام، ایمیل، تلفن، نام کاربری و رمز عبور الزامی است.");
+      }
+      const pwCheck = validatePasswordComplexity(payload.password);
+      if (!pwCheck.ok) {
+        throw new Error(pwCheck.hint);
       }
       const created = await apiPost("/api/exchange-managers", payload);
       const createdId = created?.id || created?.user?.id;
@@ -205,6 +213,26 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
         ? document.querySelector('input[name="exchange-manager-delete"]:checked')?.value || ""
         : "";
     await deleteManagerById(deletingId || selectedFromDom || "");
+  };
+
+  const saveRowPassword = async (id) => {
+    const p = (rowPw[id] || "").trim();
+    const pwCheck = validatePasswordComplexity(p);
+    if (!pwCheck.ok) {
+      setMsg(pwCheck.hint);
+      return;
+    }
+    setMsg("");
+    setSavingPwId(id);
+    try {
+      await apiPatchUrl(`/api/admin/exchange-managers/${id}/password`, { password: p });
+      setRowPw((prev) => ({ ...prev, [id]: "" }));
+      setMsg(`رمز مدیر ${id} به‌روز شد.`);
+    } catch (err) {
+      setMsg(err.message || String(err));
+    } finally {
+      setSavingPwId(null);
+    }
   };
 
   return (
@@ -320,6 +348,7 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
                   تولید رمز
                 </button>
               </div>
+              <PasswordRequirementsList password={newMgr.password} />
             </div>
             <div className="field field--block">
               <label htmlFor="ex-new-link-biz">لینک به آگهی صرافی (اختیاری)</label>
@@ -373,6 +402,7 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
                 <th>نام</th>
                 <th>ایمیل</th>
                 <th>نام کاربری</th>
+                <th>رمز عبور</th>
                 <th>تلفن</th>
                 <th>آگهی‌های صرافی</th>
                 <th>پنل</th>
@@ -398,6 +428,27 @@ ${createdCreds.link_slug ? `آگهی متصل: ${createdCreds.link_slug}` : ""}
                   <td>{r.name}</td>
                   <td dir="ltr">{r.email}</td>
                   <td dir="ltr">{r.login_username || "—"}</td>
+                  <td style={{ minWidth: "10rem" }}>
+                    <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <input
+                        type="password"
+                        placeholder="رمز جدید"
+                        dir="ltr"
+                        style={{ maxWidth: "9rem" }}
+                        value={rowPw[r.id] || ""}
+                        onChange={(e) => setRowPw((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        disabled={savingPwId === r.id}
+                        onClick={() => saveRowPassword(r.id)}
+                      >
+                        {savingPwId === r.id ? "…" : "ذخیره رمز"}
+                      </button>
+                    </div>
+                    {rowPw[r.id] ? <PasswordRequirementsList password={rowPw[r.id]} /> : null}
+                  </td>
                   <td dir="ltr">{r.phone || "—"}</td>
                   <td style={{ minWidth: "12rem", maxWidth: "22rem" }}>
                     <ul style={{ margin: 0, paddingInlineStart: "1.1rem" }}>

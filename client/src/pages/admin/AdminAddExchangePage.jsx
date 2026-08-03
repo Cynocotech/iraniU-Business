@@ -6,6 +6,7 @@ import { LISTING_TERMS_VERSION } from "../../lib/listingTerms.js";
 import { ListingTermsScrollBox, ListingTermsCheckbox } from "../../components/ListingTermsAgreement.jsx";
 import Seo from "../../components/Seo.jsx";
 import { normalizeBusinessSlugInput } from "../../lib/businessSlugInput.js";
+import { UK_CITIES } from "../../data/ukCities.js";
 
 const EXCHANGE_CATEGORY = "صرافی";
 
@@ -22,11 +23,10 @@ export default function AdminAddExchangePage() {
   const [listingTitle, setListingTitle] = useState("");
   const [listingContactEmail, setListingContactEmail] = useState("");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("https://www.google.com/maps");
-  const [cta, setCta] = useState("تماس با ما");
-  const [priceRange, setPriceRange] = useState("—");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [status, setStatus] = useState("active");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -65,6 +65,7 @@ export default function AdminAddExchangePage() {
         city: city.trim(),
         phone: phone.trim(),
         address: address.trim(),
+        postcode: postcode.trim(),
         status,
         hours_json,
         gallery_json,
@@ -73,8 +74,6 @@ export default function AdminAddExchangePage() {
         listing_contact_email: emailTrim,
         listing_title: titleTrim,
         google_review_url: googleReviewUrl.trim(),
-        cta: cta.trim(),
-        price_range: priceRange.trim(),
       };
       await apiPost("/api/businesses", payload);
       navigate(`/admin-edit?slug=${encodeURIComponent(payload.slug)}`);
@@ -156,7 +155,7 @@ export default function AdminAddExchangePage() {
               />
             </div>
             <div className="field field--block">
-              <label htmlFor="add-ex-gmaps">لینک صفحهٔ Google (نظر / نقشه)</label>
+              <label htmlFor="add-ex-gmaps">لینک صفحهٔ Google (نظر / نقشه) *</label>
               <input
                 id="add-ex-gmaps"
                 type="url"
@@ -164,15 +163,8 @@ export default function AdminAddExchangePage() {
                 onChange={(e) => setGoogleReviewUrl(e.target.value)}
                 dir="ltr"
                 placeholder="https://www.google.com/maps/..."
+                required
               />
-            </div>
-            <div className="field">
-              <label htmlFor="add-ex-cta">دکمهٔ فراخوان (CTA)</label>
-              <input id="add-ex-cta" value={cta} onChange={(e) => setCta(e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="add-ex-price">محدودهٔ قیمت (نمایشی)</label>
-              <input id="add-ex-price" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} dir="ltr" />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-cat">دسته</label>
@@ -183,7 +175,12 @@ export default function AdminAddExchangePage() {
             </div>
             <div className="field">
               <label htmlFor="add-ex-city">شهر</label>
-              <input id="add-ex-city" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" required />
+              <input id="add-ex-city" list="add-ex-cities-list" value={city} onChange={(e) => setCity(e.target.value)} lang="en" dir="ltr" required />
+              <datalist id="add-ex-cities-list">
+                {UK_CITIES.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
             <div className="field">
               <label htmlFor="add-ex-phone">تلفن</label>
@@ -192,6 +189,17 @@ export default function AdminAddExchangePage() {
             <div className="field field--block">
               <label htmlFor="add-ex-address">آدرس</label>
               <textarea id="add-ex-address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label htmlFor="add-ex-postcode">Postcode</label>
+              <input
+                id="add-ex-postcode"
+                value={postcode}
+                onChange={(e) => setPostcode(e.target.value)}
+                dir="ltr"
+                placeholder="SW1A 1AA"
+                style={{ textTransform: "uppercase" }}
+              />
             </div>
             <div className="field field--block">
               <label htmlFor="add-ex-status">وضعیت</label>

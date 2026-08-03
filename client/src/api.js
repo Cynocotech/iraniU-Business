@@ -1,6 +1,6 @@
 function authHeaders() {
   try {
-    const t = sessionStorage.getItem("iraniu_jwt");
+    const t = localStorage.getItem("iraniu_jwt");
     return t ? { Authorization: `Bearer ${t}` } : {};
   } catch {
     return {};
@@ -16,7 +16,10 @@ export async function apiGet(path) {
     ...fetchOpts,
     headers: { ...authHeaders() },
   });
-  if (!r.ok) throw new Error(String(r.status));
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.hint || data.error || String(r.status));
+  }
   return r.json();
 }
 
@@ -31,6 +34,9 @@ export async function apiPost(path, body) {
   if (!r.ok) {
     const err = new Error(data.hint || data.error || String(r.status));
     if (data.error) err.code = data.error;
+    if (data.next_available_at) err.next_available_at = data.next_available_at;
+    if (data.active_plan) err.active_plan = data.active_plan;
+    if (data.active_until) err.active_until = data.active_until;
     throw err;
   }
   return data;

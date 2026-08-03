@@ -57,6 +57,9 @@ export default function AdminClaimsPage() {
                 <th>آگهی</th>
                 <th>درخواست‌دهنده</th>
                 <th>ایمیل</th>
+                <th>موبایل / تلفن</th>
+                <th>تاریخ</th>
+                <th>مدیر خودکار</th>
                 <th>وضعیت</th>
                 <th>اقدام</th>
               </tr>
@@ -71,6 +74,17 @@ export default function AdminClaimsPage() {
                   </td>
                   <td>{r.applicant_name}</td>
                   <td dir="ltr">{r.email}</td>
+                  <td dir="ltr">{r.phone || "—"}</td>
+                  <td dir="ltr" style={{ whiteSpace: "nowrap", fontSize: "0.85rem" }}>
+                    {r.created_at ? String(r.created_at).slice(0, 10) : "—"}
+                  </td>
+                  <td style={{ fontSize: "0.82rem" }}>
+                    {r.claim_manager_id ? (
+                      <span style={{ color: "#2e7d32" }}>#{r.claim_manager_id} ✓</span>
+                    ) : (
+                      <span className="field-hint">—</span>
+                    )}
+                  </td>
                   <td>{r.status}</td>
                   <td>
                     {r.status === "pending" ? (

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
-import { apiGet } from "../../api.js";
+import { apiGet, apiPatch } from "../../api.js";
 import html2canvas from "html2canvas";
 import { clampThemeNum } from "../../data/qrPrintThemes.js";
 
@@ -36,7 +36,7 @@ function buildFlyerHtml(themeNum, name) {
     `<div class="qr-tpl__frame">` +
     `<div class="qr-tpl__ribbon" dir="ltr" lang="en">` +
     `<span class="qr-tpl__deco qr-tpl__deco--tl" aria-hidden="true"></span>` +
-    `<p class="qr-tpl__ribbon-title">Review us on Google</p>` +
+    `<img src="/google-reviews-logo.png" alt="Google Reviews" style="display:block;margin:0 auto 4px;max-width:160px;height:auto;filter:brightness(0) invert(1);" crossOrigin="anonymous" />` +
     `<p class="qr-tpl__ribbon-sub">Scan the QR code to leave a review</p>` +
     `<span class="qr-tpl__deco qr-tpl__deco--br" aria-hidden="true"></span>` +
     `</div>` +
@@ -92,15 +92,34 @@ function hasValidGoogleReviewUrl(b) {
 
 export default function AdminQrExportPage() {
   const [busy, setBusy] = useState(false);
-  /** null = idle؛ هنگام ساخت PDF: پیشرفت روی همهٔ آگهی‌های انتخاب‌شده (شامل ردشده بدون لینک) */
   const [pdfProgress, setPdfProgress] = useState(null);
   const [msg, setMsg] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [listErr, setListErr] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [filterText, setFilterText] = useState("");
-  /** ترتیب همان ترتیب انتخاب کاربر (slug) */
   const [selectedSlugs, setSelectedSlugs] = useState([]);
+  const [tplSettings, setTplSettings] = useState({ logoWidth: 150, qrSize: 220, previewScale: 0.55 });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState("");
+
+  useEffect(() => {
+    apiGet("/api/qr-template-settings").then(s => setTplSettings(s)).catch(() => {});
+  }, []);
+
+  const saveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsMsg("");
+    try {
+      const updated = await apiPatch("/api/admin/qr-template-settings", tplSettings);
+      setTplSettings(updated);
+      setSettingsMsg("ذخیره شد.");
+    } catch (e) {
+      setSettingsMsg(e.message || "خطا");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -180,13 +199,10 @@ export default function AdminQrExportPage() {
       const totalSteps = list.length;
       setPdfProgress({ current: 0, total: totalSteps });
 
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const pageMargin = 8;
-      const gap = 4;
-      const cellW = (pageW - pageMargin * 2 - gap) / 2;
-      const cellH = (pageH - pageMargin * 2 - gap) / 2;
+      /* A6 = 105 × 148 mm — one QR per page, no margin, edge-to-edge */
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+      const pageW = pdf.internal.pageSize.getWidth();  /* 105 */
+      const pageH = pdf.internal.pageSize.getHeight(); /* 148 */
       let printedCount = 0;
 
       for (let i = 0; i < list.length; i++) {
@@ -196,7 +212,7 @@ export default function AdminQrExportPage() {
           const target =
             reviewUrl && reviewUrl.startsWith("http") ? buildGoUrl(reviewUrl, b.slug || b.name_fa || "business") : null;
           if (!target) continue;
-          if (printedCount > 0 && printedCount % 4 === 0) {
+          if (printedCount > 0) {
             pdf.addPage();
           }
 
@@ -272,25 +288,8 @@ export default function AdminQrExportPage() {
           });
 
           const imgData = snap.toDataURL("image/png");
-          const slot = printedCount % 4;
-          const col = slot % 2;
-          const row = Math.floor(slot / 2);
-          const cellX = pageMargin + col * (cellW + gap);
-          const cellY = pageMargin + row * (cellH + gap);
-          const innerPad = 1.5;
-          const maxW = cellW - innerPad * 2;
-          const maxH = cellH - innerPad * 2;
-          const iw = snap.width;
-          const ih = snap.height;
-          let w = maxW;
-          let h = (ih * w) / iw;
-          if (h > maxH) {
-            h = maxH;
-            w = (iw * h) / ih;
-          }
-          const x = cellX + (cellW - w) / 2;
-          const y = cellY + (cellH - h) / 2;
-          pdf.addImage(imgData, "PNG", x, y, w, h);
+          /* Full bleed — image fills the A6 page edge-to-edge */
+          pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
           printedCount += 1;
 
           if (outer.parentNode) outer.parentNode.removeChild(outer);
@@ -311,7 +310,7 @@ export default function AdminQrExportPage() {
       const skippedNoUrl = list.length - printedCount;
       pdf.save("iraniu-qr-export.pdf");
       setMsg(
-        `فایل PDF ساخته شد (${printedCount} قالب QR، ۴ قالب در هر صفحه).` +
+        `فایل PDF ساخته شد (${printedCount} صفحهٔ A6، هر صفحه یک QR).` +
           (skippedNoUrl > 0 ? ` ${skippedNoUrl} آگهی بدون لینک Google رد شد.` : "")
       );
     } catch (e) {
@@ -328,11 +327,65 @@ export default function AdminQrExportPage() {
       <p className="field-hint" style={{ marginTop: 0, marginBottom: "var(--space-md)" }}>
         <Link to="/admin">← داشبورد</Link>
       </p>
+
+      <section className="dashboard-panel" style={{ marginBottom: "var(--space-lg)" }}>
+        <h2 style={{ marginBottom: "var(--space-md)" }}>تنظیمات اندازهٔ قالب QR</h2>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="tpl-logo-width">عرض لوگو (px)</label>
+            <input
+              id="tpl-logo-width"
+              type="number"
+              min="40"
+              max="600"
+              value={tplSettings.logoWidth}
+              onChange={e => setTplSettings(s => ({ ...s, logoWidth: Number(e.target.value) }))}
+            />
+            <span className="field-hint">{tplSettings.logoWidth}px — اندازهٔ لوگوی ایرانیو در بالای قالب</span>
+          </div>
+          <div className="field">
+            <label htmlFor="tpl-qr-size">اندازهٔ QR (px)</label>
+            <input
+              id="tpl-qr-size"
+              type="number"
+              min="80"
+              max="500"
+              value={tplSettings.qrSize}
+              onChange={e => setTplSettings(s => ({ ...s, qrSize: Number(e.target.value) }))}
+            />
+            <span className="field-hint">{tplSettings.qrSize}px — عرض و ارتفاع کد QR</span>
+          </div>
+          <div className="field">
+            <label htmlFor="tpl-preview-scale">مقیاس پیش‌نمایش داشبورد</label>
+            <input
+              id="tpl-preview-scale"
+              type="range"
+              min="0.2"
+              max="1.2"
+              step="0.05"
+              value={tplSettings.previewScale}
+              onChange={e => setTplSettings(s => ({ ...s, previewScale: Number(e.target.value) }))}
+              style={{ width: "100%" }}
+            />
+            <span className="field-hint">{Math.round((tplSettings.previewScale || 0.55) * 100)}% — بزرگنمایی پیش‌نمایش در پنل کسب‌وکار</span>
+          </div>
+        </div>
+        <div className="dashboard-actions dashboard-actions--inline" style={{ marginTop: "var(--space-md)" }}>
+          <button type="button" className="btn btn--primary" onClick={saveSettings} disabled={settingsSaving}>
+            {settingsSaving ? "در حال ذخیره…" : "ذخیره تنظیمات"}
+          </button>
+          {settingsMsg && (
+            <span className="field-hint" style={{ color: settingsMsg === "ذخیره شد." ? "#15803d" : "#b71c1c" }}>
+              {settingsMsg}
+            </span>
+          )}
+        </div>
+      </section>
+
       <section className="dashboard-panel">
         <h2>خروجی PDF QR آگهی‌ها</h2>
         <p className="field-hint">
-          ابتدا آگهی‌های مورد نظر را انتخاب کنید (جستجو نام، شهر، نامک یا IU-…). این ابزار یک فایل PDF می‌سازد که در هر
-          صفحهٔ A4 چهار قالب QR قرار می‌گیرد (۲×۲). برای چاپ QR باید در فیلد{" "}
+          ابتدا آگهی‌های مورد نظر را انتخاب کنید (جستجو نام، شهر، نامک یا IU-…). این ابزار یک فایل PDF می‌سازد که هر آگهی روی یک صفحهٔ A6 (۱۰۵×۱۴۸ میلیمتر) قرار می‌گیرد. برای چاپ QR باید در فیلد{" "}
           <strong>لینک صفحهٔ نظر Google</strong> مقدار معتبر ثبت شده باشد؛ آگهی بدون لینک در PDF نمی‌آید.
         </p>
 
