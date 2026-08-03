@@ -1410,18 +1410,9 @@ export default function BusinessPage() {
                         rel="noopener noreferrer"
                       >
                         <i className="fa-solid fa-calendar-check" aria-hidden="true" />
-                        رزرو آنلاین
+                        رزرو
                       </a>
                     )}
-                    <button
-                      type="button"
-                      className="biz-links__btn biz-links__btn--reservation"
-                      onClick={() => setResvOpen(true)}
-                      style={{ border: "none", cursor: "pointer" }}
-                    >
-                      <i className="fa-solid fa-utensils" aria-hidden="true" />
-                      رزرو میز
-                    </button>
                     {biolinkLinks.map((lnk) => {
                       const href = normalizeLinkUrl(lnk.url, lnk.preset);
                       const isLocal = /^(mailto:|tel:)/i.test(href);
