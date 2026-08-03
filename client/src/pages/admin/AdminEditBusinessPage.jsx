@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardBusinessForm from "../../components/DashboardBusinessForm.jsx";
 import MediaEditor from "../../components/MediaEditor.jsx";
 import BiolinkEditor from "../../components/BiolinkEditor.jsx";
-import { apiGet, apiPost, apiPatchJson } from "../../api.js";
+import { apiGet, apiPost, apiPatchJson, apiDelete } from "../../api.js";
 import { formatAdId } from "../../lib/businessIds.js";
 
 function GeoInfoPanel({ slug }) {
@@ -126,6 +126,11 @@ export default function AdminEditBusinessPage() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramMsg, setTelegramMsg] = useState(null);
   const [biz, setBiz] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const deleteInputRef = useRef(null);
 
   useEffect(() => {
     apiGet("/api/businesses").then(setList).catch(() => setList([]));
@@ -153,6 +158,31 @@ export default function AdminEditBusinessPage() {
 
   const RESULTS_CAP = 30;
   const visibleResults = filteredList.slice(0, RESULTS_CAP);
+
+  const openDeleteModal = () => {
+    setDeleteInput("");
+    setDeleteError(null);
+    setDeleteModal(true);
+    setTimeout(() => deleteInputRef.current?.focus(), 50);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteInput !== "DELETE") {
+      setDeleteError("لطفاً دقیقاً DELETE را تایپ کنید.");
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await apiDelete(`/api/admin/businesses/${encodeURIComponent(slug)}`);
+      setDeleteModal(false);
+      navigate("/admin-businesses", { replace: true });
+    } catch (e) {
+      setDeleteError(e.message || "خطا در حذف کسب‌وکار");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const sendToTelegramChannel = async () => {
     setTelegramMsg(null);
@@ -275,9 +305,90 @@ export default function AdminEditBusinessPage() {
           />
           <MediaEditor slug={slug} biz={biz} setBiz={setBiz} />
           <BiolinkEditor slug={slug} biz={biz} setBiz={setBiz} />
+
+          <section style={{
+            marginTop: "var(--space-md)",
+            border: "2px solid #b71c1c",
+            borderRadius: "0.75rem",
+            padding: "1.25rem 1.5rem",
+          }}>
+            <h2 style={{ margin: "0 0 0.4rem", color: "#b71c1c", fontSize: "1rem", fontWeight: 700 }}>
+              منطقه خطر
+            </h2>
+            <p className="field-hint" style={{ margin: "0 0 1rem" }}>
+              حذف کسب‌وکار برگشت‌ناپذیر است. تمام اطلاعات، تصاویر S3 و داده‌های وابسته برای همیشه پاک می‌شوند.
+            </p>
+            <button
+              type="button"
+              className="btn"
+              style={{ background: "#b71c1c", color: "#fff", border: "none" }}
+              onClick={openDeleteModal}
+            >
+              حذف کامل این کسب‌وکار
+            </button>
+          </section>
         </>
       ) : (
         <p className="field-hint">برای نمایش فرم ویرایش، ابتدا یک آگهی را از بالا انتخاب کنید.</p>
+      )}
+
+      {deleteModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setDeleteModal(false); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: "0.75rem", padding: "2rem",
+            width: "min(420px, 92vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
+            direction: "rtl",
+          }}>
+            <h2 style={{ margin: "0 0 0.5rem", color: "#b71c1c", fontSize: "1.1rem" }}>
+              حذف کامل کسب‌وکار
+            </h2>
+            <p className="field-hint" style={{ margin: "0 0 1rem" }}>
+              این عملیات <strong>برگشت‌ناپذیر</strong> است. تمام اطلاعات، تصاویر S3، و داده‌های وابسته این کسب‌وکار برای همیشه حذف می‌شوند.
+            </p>
+            <p className="field-hint" style={{ margin: "0 0 0.75rem" }}>
+              برای تأیید، کلمه <strong style={{ direction: "ltr", display: "inline-block" }}>DELETE</strong> را تایپ کنید:
+            </p>
+            <input
+              ref={deleteInputRef}
+              type="text"
+              dir="ltr"
+              value={deleteInput}
+              onChange={(e) => { setDeleteInput(e.target.value); setDeleteError(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmDelete(); if (e.key === "Escape") setDeleteModal(false); }}
+              placeholder="DELETE"
+              style={{ width: "100%", marginBottom: "0.75rem", fontFamily: "monospace", fontSize: "1rem" }}
+            />
+            {deleteError && (
+              <p style={{ color: "#b71c1c", margin: "0 0 0.75rem", fontSize: "0.875rem" }}>{deleteError}</p>
+            )}
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setDeleteModal(false)}
+                disabled={deleteBusy}
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "#b71c1c", color: "#fff", border: "none" }}
+                onClick={confirmDelete}
+                disabled={deleteBusy || deleteInput !== "DELETE"}
+              >
+                {deleteBusy ? "در حال حذف…" : "حذف دائمی"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

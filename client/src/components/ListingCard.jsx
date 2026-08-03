@@ -247,7 +247,7 @@ export default function ListingCard({ b, titleHeading: TitleTag = "h2", variant 
 
           {b.rating && <StarRating value={b.rating} />}
 
-          {b.claimed ? (
+          {b.claimed || b.description_rewritten ? (
             descExcerpt ? <p className="listing-card__desc">{descExcerpt}</p> : null
           ) : (
             <p className="listing-card__desc listing-card__desc--demo">

@@ -336,7 +336,7 @@ app.get("/api/businesses", asyncHandler(async (req, res) => {
     b.id, b.slug, b.name_fa, b.category, b.listing_title,
     b.address, b.city, b.postcode, b.phone, b.call_tracking_number,
     b.call_tracking_enabled,
-    b.cover_image_url, b.rating, b.claimed, b.status,
+    b.cover_image_url, b.rating, b.claimed, b.description_rewritten, b.status,
     b.listing_approval, b.exchange_manager_id,
     b.exchange_rates_json, b.payment_methods_json, b.exchange_features_json,
     LEFT(b.description, 300) AS description,
@@ -950,6 +950,24 @@ app.get("/api/admin/businesses-search", requireSuperAdmin, asyncHandler(async (r
   const offset = (page - 1) * limit;
   const items = filtered.slice(offset, offset + limit);
   res.json({ items, total, page, pageSize: limit, totalPages });
+}));
+
+/** حذف یک آگهی به همراه تصاویر S3 — فقط سوپرادمین */
+app.delete("/api/admin/businesses/:slug", requireSuperAdmin, asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug || "").trim();
+  if (!slug) return res.status(400).json({ error: "missing_slug" });
+  const result = await cascadeDeleteBusinessBySlug(slug);
+  if (!result.deleted) {
+    return res.status(result.reason === "not_found" ? 404 : 400).json({ error: result.reason });
+  }
+  writeSystemLog({
+    ...actorFromAuth(req.auth),
+    action: "business_delete",
+    targetType: "business",
+    targetId: slug,
+    message: `Deleted business: ${slug}`,
+  });
+  res.json({ ok: true, deleted: slug });
 }));
 
 /** حذف دسته‌ای آگهی — فقط سوپرادمین؛ حداکثر ADMIN_BULK_DELETE_MAX نامک */
