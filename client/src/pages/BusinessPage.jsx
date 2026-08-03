@@ -1121,7 +1121,7 @@ export default function BusinessPage() {
               </span>
               در یک نگاه
             </h2>
-            {!b.claimed && !aboutLead.summary ? (
+            {!b.claimed && !b.description_rewritten ? (
               <>
                 <p className="profile-about__demo">
                   در این بخش می‌توانید اطلاعات کاملی درباره کسب‌وکار خود، خدمات، محصولات، سابقه فعالیت و مزایای رقابتی خود را معرفی کنید. هرچه توضیحات شما کامل‌تر و دقیق‌تر باشد، مشتریان راحت‌تر با برند شما آشنا شده و با اطمینان بیشتری با شما تماس خواهند گرفت.
