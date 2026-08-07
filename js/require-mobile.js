@@ -3,6 +3,7 @@
   var mq = window.matchMedia("(min-width: 1025px)");
   var gate = null;
 
+  
   /** پنل ادمین، پنل مالک، تبلیغات و بسته‌ها روی دسکتاپ هم باز می‌شوند؛ بقیهٔ سایت موبایل‌محور می‌ماند */
   function allowDesktop() {
     var path = window.location.pathname || "";
